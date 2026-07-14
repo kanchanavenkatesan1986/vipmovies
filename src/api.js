@@ -23,7 +23,7 @@
 'use strict';
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
-const API_BASE   = 'https://api-movies.akatsuki-pvt-ltd.workers.dev/';
+const API_BASE   = 'https://api-movies.akatsuki-pvt-ltd.workers.dev';
 const DB_NAME    = 'vip_movies_db';
 const DB_VERSION = 1;
 
