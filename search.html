@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Movies - VIP Movies</title>
+
+    <link rel="stylesheet" href="./src/main.css" />
+    <script src="./src/api.js"></script>
+    <script src="./src/main.js" defer></script>
+
+    <!-- Lexend Font & FontAwesome Icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;700&display=swap" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+</head>
+
+<body>
+
+    <div class="main">
+
+        <!-- Navigation Drawer (Overlay) -->
+        <div id="myNav" class="overlay">
+            <img src="./m-image/Close icon.png" class="close" onclick="closeNav()" alt="Close Menu">
+            <img src="./m-image/VIP Movies.jpg" class="navimg" alt="VIP Movies">
+
+            <div class="nav-menu">
+               <a href="index.html" class="nav-link">
+                    <i class="fa-solid fa-house"></i> Home
+                </a>
+                <a href="favorites.html" class="nav-link">
+                    <i class="fa-solid fa-heart"></i> Favorites
+                </a>
+                <a href="setting.html" class="nav-link">
+                    <i class="fa-solid fa-gear"></i> Setting
+                </a>
+                <a href="sub-pages/feedback.html" class="nav-link">
+                    <i class="fa-solid fa-comment-dots"></i> Feedback
+                </a>
+                <a href="sub-pages/about.html" class="nav-link">
+                    <i class="fa-solid fa-circle-info"></i> About
+                </a>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <img src="./m-image/Menu icon.png" class="menu" onclick="openNav()" alt="Menu">
+            <img src="./m-image/Vip Title.png" class="title" alt="VIP Movies Logo" onclick="location.href='index.html'"
+                style="cursor:pointer;">
+            <a href="index.html"
+                style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px;">
+                <i class="fa-solid fa-house" style="font-size: 20px; color: var(--text-primary); opacity: 0.85;"></i>
+            </a>
+        </div>
+
+        <!-- SEARCH INPUTS -->
+        <input type="text" id="searchInput" placeholder="Search movie by title...">
+
+        <div class="search-box">
+            <select id="yearFilter">
+                <option value="">All Years</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+            </select>
+
+            <select id="langFilter">
+                <option value="">All Types</option>
+                <option value="tamil">Tamil</option>
+                <option value="hollywood">Hollywood</option>
+            </select>
+        </div>
+
+        <!-- MOVIE GRID -->
+        <div id="movieList" class="movies-grid"></div>
+
+        <!-- Movie Not Available Message -->
+        <div id="notAvailable" class="not-box" style="display: none;">
+            <i class="fa-solid fa-film"></i>
+            <h1 class="note">Movie Not Available...</h1>
+        </div>
+
+        <!-- Bottom Navigation Bar -->
+        <div class="bottom-nav">
+            <a href="index.html" class="bottom-nav-item">
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+            </a>
+            <a href="search.html" class="bottom-nav-item">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>Search</span>
+            </a>
+            <a href="years.html" class="bottom-nav-item">
+                <i class="fa-solid fa-calendar-days"></i>
+                <span>Years</span>
+            </a>
+            <a href="filter.html" class="bottom-nav-item">
+                <i class="fa-solid fa-sliders"></i>
+                <span>Filter</span>
+            </a>
+            <a href="history.html" class="bottom-nav-item">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>History</span>
+            </a>
+
+    </div>
+
+    <script>
+        var allMovies = [];
+
+        function initSearch() {
+            allMovies = MovieStore.getAll();
+            displayMovies(allMovies);
+        }
+
+        AppLoader.init()
+            .then(initSearch)
+            .catch(function (err) {
+                console.error("Error loading movies:", err);
+                showOfflineOverlay(function() {
+                    return AppLoader.forceRefresh().then(function() {
+                        window.location.reload();
+                    });
+                });
+            });
+
+        function displayMovies(movies) {
+            var container = document.getElementById("movieList");
+            var notAvailable = document.getElementById("notAvailable");
+
+            container.innerHTML = "";
+
+            if (movies.length === 0) {
+                notAvailable.style.display = "flex";
+                return;
+            }
+
+            notAvailable.style.display = "none";
+
+            // Sort movies: active first, coming soon last
+            movies.sort(function (a, b) {
+                var aComing = (a.status || "").toLowerCase() === "coming soon" ? 1 : 0;
+                var bComing = (b.status || "").toLowerCase() === "coming soon" ? 1 : 0;
+                return aComing - bComing;
+            });
+
+            var fragment = document.createDocumentFragment();
+
+            movies.forEach(function (movie) {
+                var isComingSoon = movie.status && movie.status.toLowerCase() === "coming soon";
+                var card = document.createElement("a");
+                var movieType = (movie.type || "").toLowerCase();
+                var movieYear = movie.year || "";
+                card.href = "watch.html?type=" + movieType + "&year=" + movieYear + "&id=" + movie.id;
+                card.className = "list-card-link";
+
+                if (isComingSoon) {
+                    card.style.opacity = "0.45";
+                    card.style.filter = "grayscale(60%)";
+                }
+
+                card.innerHTML =
+                    '<div class="list-card">' +
+                    '<div class="list-card-img-wrapper">' +
+                    '<img class="list-card-img" data-src="' + getMovieImageUrl(movie) + '" alt="' + movie.title + '" loading="lazy">' +
+                    '<span class="list-card-badge">' + (movie.year || '-') + '</span>' +
+                    (isComingSoon ? '<span class="coming-soon-badge">Coming Soon</span>' : '') +
+                    '</div>' +
+                    '<div class="list-card-details">' +
+                    '<h3 class="list-card-title">' + movie.title + '</h3>' +
+                    '<p class="list-card-info">Language: ' + (movie.language || '-') + '</p>' +
+                    '<p class="list-card-info">Release: ' + (movie.release || '-') + '</p>' +
+                    '<div class="list-card-action">' +
+                    '<i class="fa-solid fa-circle-play"></i> Watch Ads - Unlock' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
+
+                fragment.appendChild(card);
+            });
+
+            requestAnimationFrame(function() {
+                container.appendChild(fragment);
+                lazyLoadImages();
+            });
+        }
+
+        document.getElementById("searchInput").addEventListener("input", debounce(filterMovies, 250));
+        document.getElementById("yearFilter").addEventListener("change", filterMovies);
+        document.getElementById("langFilter").addEventListener("change", filterMovies);
+
+        function filterMovies() {
+            var search = document.getElementById("searchInput").value.toLowerCase();
+            var year = document.getElementById("yearFilter").value;
+            var typeFilter = document.getElementById("langFilter").value.toLowerCase();
+
+            // Query using MovieStore's optimized search filter
+            var filtered = MovieStore.search(search).filter(function (movie) {
+                var matchesYear = (year === "" || movie.year == year);
+                var matchesType = (typeFilter === "" || (movie.type || "").toLowerCase() === typeFilter);
+                return matchesYear && matchesType;
+            });
+
+            displayMovies(filtered);
+        }
+    </script>
+
+    <style>
+        .list-card-badge {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            top: auto;
+            right: auto;
+        }
+
+        .coming-soon-badge {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: linear-gradient(135deg, #ff0040, #c2003b);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 3;
+            box-shadow: 0 0 10px rgba(255, 0, 64, 0.7), 0 2px 8px rgba(0, 0, 0, 0.4);
+            animation: cs-pulse 1.8s ease-in-out infinite;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        @keyframes cs-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 8px rgba(255, 0, 64, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 18px rgba(255, 0, 64, 1), 0 2px 8px rgba(0, 0, 0, 0.4);
+            }
+        }
+    </style>
+
+    <!-- Cloudflare Web Analytics -->
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js'
+        data-cf-beacon='{"token": "d56e216847a549828166c56d48a99585"}'></script>
+    <!-- End Cloudflare Web Analytics -->
+
+</body>
+
+</html>

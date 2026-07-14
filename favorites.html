@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Favorites - VIP Movies</title>
+    <meta name="description" content="Your saved favorite movies on VIP Movies. Access all your bookmarked Tamil and Hollywood movies instantly.">
+
+    <link rel="stylesheet" href="./src/main.css" />
+    <script src="./src/api.js"></script>
+    <script src="./src/main.js" defer></script>
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;700&display=swap" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <style>
+        .page-hero {
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(245, 197, 24, 0.08) 0%, var(--bg-secondary) 100%);
+            border: 1px solid rgba(245, 197, 24, 0.15);
+            border-radius: var(--border-radius);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .page-hero h1 {
+            font-size: clamp(20px, 4vw, 26px);
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+        .page-hero p {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .fav-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 8px;
+        }
+        .btn-clear {
+            background: rgba(255, 23, 68, 0.08);
+            color: var(--danger, #ff1744);
+            border: 1px solid rgba(255, 23, 68, 0.2);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Lexend', sans-serif;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition);
+        }
+        .btn-clear:hover {
+            background: rgba(255, 23, 68, 0.15);
+            border-color: var(--danger, #ff1744);
+        }
+        .empty-state {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+            gap: 16px;
+        }
+        .empty-state i {
+            font-size: 52px;
+            color: rgba(245, 197, 24, 0.3);
+        }
+        .empty-state h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .empty-state p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .empty-state a {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, var(--accent), #d4a70f);
+            color: #000;
+            font-weight: 700;
+            font-size: 14px;
+            padding: 12px 24px;
+            border-radius: 10px;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        .empty-state a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245,197,24,0.3);
+        }
+        .result-count {
+            font-size: 12px;
+            color: var(--accent);
+            font-weight: 700;
+            background: rgba(245, 197, 24, 0.1);
+            padding: 4px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(245, 197, 24, 0.25);
+            margin-bottom: 12px;
+            display: inline-block;
+        }
+        /* Favorite card remove button */
+        .fav-card-wrapper {
+            position: relative;
+        }
+        .fav-remove-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 10;
+            width: 28px;
+            height: 28px;
+            background: rgba(255, 23, 68, 0.85);
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            backdrop-filter: blur(4px);
+        }
+        .fav-remove-btn:hover {
+            background: #ff1744;
+            transform: scale(1.1);
+        }
+        .coming-soon-badge {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: linear-gradient(135deg, #ff0040, #c2003b);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 3;
+            box-shadow: 0 0 10px rgba(255,0,64,0.7), 0 2px 8px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main">
+
+        <!-- Navigation Drawer (Overlay) -->
+        <div id="myNav" class="overlay">
+            <img src="./m-image/Close icon.png" class="close" onclick="closeNav()" alt="Close Menu">
+            <img src="./m-image/VIP Movies.jpg" class="navimg" alt="VIP Movies">
+            <div class="nav-menu">
+               <a href="index.html" class="nav-link">
+                    <i class="fa-solid fa-house"></i> Home
+                </a>
+                <a href="favorites.html" class="nav-link">
+                    <i class="fa-solid fa-heart"></i> Favorites
+                </a>
+                <a href="setting.html" class="nav-link">
+                    <i class="fa-solid fa-gear"></i> Setting
+                </a>
+                <a href="sub-pages/feedback.html" class="nav-link">
+                    <i class="fa-solid fa-comment-dots"></i> Feedback
+                </a>
+                <a href="sub-pages/about.html" class="nav-link">
+                    <i class="fa-solid fa-circle-info"></i> About
+                </a>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <img src="./m-image/Menu icon.png" class="menu" onclick="openNav()" alt="Menu">
+            <img src="./m-image/Vip Title.png" class="title" alt="VIP Movies Logo" onclick="location.href='index.html'" style="cursor:pointer;">
+            <a href="search.html">
+                <img src="./m-image/Search icon.png" class="search" alt="Search">
+            </a>
+        </div>
+
+        <!-- Hero Banner -->
+        <div class="page-hero">
+            <h1><i class="fa-solid fa-heart"></i> My Favorites</h1>
+            <p>Your saved movies, always available offline</p>
+        </div>
+
+        <!-- Actions Row -->
+        <div class="fav-actions">
+            <button class="btn-clear" id="clearFavsBtn" onclick="clearFavorites()" style="display:none;">
+                <i class="fa-solid fa-trash-can"></i> Clear All
+            </button>
+        </div>
+
+        <!-- Result Count -->
+        <div id="resultCount" class="result-count" style="display:none;"></div>
+
+        <!-- Movies Grid -->
+        <div id="favGrid" class="movies-grid"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state">
+            <i class="fa-regular fa-heart"></i>
+            <h2>No Favorites Yet</h2>
+            <p>Start adding movies to your favorites by tapping the ❤️ button on any movie page.</p>
+            <a href="index.html"><i class="fa-solid fa-house"></i> Browse Movies</a>
+        </div>
+
+        <!-- Bottom Navigation Bar -->
+        <div class="bottom-nav">
+            <a href="index.html" class="bottom-nav-item">
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+            </a>
+            <a href="search.html" class="bottom-nav-item">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>Search</span>
+            </a>
+            <a href="years.html" class="bottom-nav-item">
+                <i class="fa-solid fa-calendar-days"></i>
+                <span>Years</span>
+            </a>
+            <a href="filter.html" class="bottom-nav-item">
+                <i class="fa-solid fa-sliders"></i>
+                <span>Filter</span>
+            </a>
+            <a href="history.html" class="bottom-nav-item">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>History</span>
+            </a>
+    </div>
+
+    <script>
+        var favGrid    = document.getElementById('favGrid');
+        var emptyState = document.getElementById('emptyState');
+        var countEl    = document.getElementById('resultCount');
+        var clearBtn   = document.getElementById('clearFavsBtn');
+
+        function renderFavoriteCard(fav) {
+            var movie = MovieRepository.getById(fav.movieId) || fav;
+            var isComingSoon = (movie.status || '').toLowerCase() === 'coming soon';
+            var movieType    = (movie.type || '').toLowerCase();
+            var movieYear    = movie.year || '';
+
+            var wrapper = document.createElement('div');
+            wrapper.className = 'fav-card-wrapper';
+
+            var card = document.createElement('a');
+            card.href      = 'watch.html?type=' + movieType + '&year=' + movieYear + '&id=' + movie.id;
+            card.className = 'list-card-link';
+            if (isComingSoon) { card.style.opacity = '0.45'; card.style.filter = 'grayscale(60%)'; }
+
+            card.innerHTML =
+                '<div class="list-card">' +
+                    '<div class="list-card-img-wrapper">' +
+                        '<img class="list-card-img" data-src="' + getMovieImageUrl(movie) + '" alt="' + (movie.title || '') + '" loading="lazy">' +
+                        '<span class="list-card-badge">' + (movie.year || '-') + '</span>' +
+                        (isComingSoon ? '<span class="coming-soon-badge">Coming Soon</span>' : '') +
+                    '</div>' +
+                    '<div class="list-card-details">' +
+                        '<h3 class="list-card-title">' + (movie.title || 'Unknown') + '</h3>' +
+                        '<p class="list-card-info">' + (movieType.charAt(0).toUpperCase() + movieType.slice(1) || '-') + '</p>' +
+                    '</div>' +
+                '</div>';
+
+            var removeBtn = document.createElement('button');
+            removeBtn.className = 'fav-remove-btn';
+            removeBtn.title     = 'Remove from Favorites';
+            removeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            removeBtn.setAttribute('data-movie-id', String(movie.id || fav.movieId));
+            removeBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var movieId = this.getAttribute('data-movie-id');
+                FavoriteRepository.remove(movieId).then(function() {
+                    UIManager.showToast('Removed from Favorites');
+                    loadFavorites();
+                });
+            });
+
+            wrapper.appendChild(card);
+            wrapper.appendChild(removeBtn);
+            return wrapper;
+        }
+
+        function loadFavorites() {
+            AppLoader.init().then(function() {
+                return FavoriteRepository.getAll();
+            }).then(function(favs) {
+                favGrid.innerHTML = '';
+
+                if (favs.length === 0) {
+                    emptyState.style.display = 'flex';
+                    countEl.style.display    = 'none';
+                    clearBtn.style.display   = 'none';
+                    return;
+                }
+
+                emptyState.style.display = 'none';
+                countEl.style.display    = 'inline-block';
+                clearBtn.style.display   = 'inline-flex';
+                countEl.textContent      = favs.length + ' Saved';
+
+                var scroller = new VirtualScroller(favGrid, favs, renderFavoriteCard, { chunkSize: 20 });
+                scroller.init();
+            }).catch(function(err) {
+                console.error('Favorites load error:', err);
+                UIManager.showOfflineOverlay(function() {
+                    return AppLoader.forceRefresh().then(loadFavorites);
+                });
+            });
+        }
+
+        function clearFavorites() {
+            if (!confirm('Remove all favorites? This cannot be undone.')) return;
+            FavoriteRepository.clearAll().then(function() {
+                UIManager.showToast('All favorites cleared!');
+                loadFavorites();
+            });
+        }
+
+        loadFavorites();
+    </script>
+
+    <!-- Cloudflare Web Analytics -->
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js'
+        data-cf-beacon='{"token": "d56e216847a549828166c56d48a99585"}'></script>
+</body>
+
+</html>
