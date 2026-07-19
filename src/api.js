@@ -414,7 +414,8 @@ var VersionManager = (function() {
             return Promise.all([
                 DatabaseManager.replaceAll('movies', movies),
                 DatabaseManager.replaceAll('slider', slider),
-                saveMetadata({ version: data.version, updated: data.updated, count: data.count })
+                saveMetadata({ version: data.version, updated: data.updated, count: data.count }),
+                DatabaseManager.put('metadata', { key: 'lastVersionCheck', value: Date.now() })
             ]).then(function() {
                 CacheManager.populate(movies, slider);
                 return data;
@@ -425,19 +426,42 @@ var VersionManager = (function() {
     /**
      * Silently check version after initial load.
      * If different — download, store, show toast, reload page.
+     * Rate-limited to once every 10 minutes to prevent multiple request problem on page navigation.
      */
     function checkAndUpdate() {
-        return ApiManager.fetchVersion().then(function(serverData) {
-            return getLocalVersion().then(function(localVersion) {
-                if (String(localVersion) === String(serverData.version)) {
-                    // Same version — do nothing
-                    return false;
-                }
-                // Different version — background update
-                return downloadAndStore().then(function() {
-                    UIManager.showToast('🎬 Movies Updated! Refreshing...', 'update');
-                    setTimeout(function() { window.location.reload(); }, 2000);
-                    return true;
+        var now = Date.now();
+        var CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
+
+        return DatabaseManager.get('metadata', 'lastVersionCheck').then(function(rec) {
+            var lastCheck = rec ? Number(rec.value) : 0;
+            if (now - lastCheck < CHECK_INTERVAL) {
+                // Checked recently - skip checking to avoid spamming the worker
+                return false;
+            }
+
+            return ApiManager.fetchVersion().then(function(serverData) {
+                // Save version check timestamp immediately on success
+                return DatabaseManager.put('metadata', { key: 'lastVersionCheck', value: now }).then(function() {
+                    return getLocalVersion().then(function(localVersion) {
+                        if (localVersion && String(localVersion) === String(serverData.version)) {
+                            // Same version — do nothing
+                            return false;
+                        }
+                        // Different version — background update
+                        return downloadAndStore().then(function(newData) {
+                            // Verify that the fetched database version matches the version from the check
+                            // to prevent infinite reloading loops if worker cache is stale.
+                            if (newData && String(newData.version) === String(serverData.version)) {
+                                UIManager.showToast('🎬 Movies Updated! Refreshing...', 'update');
+                                setTimeout(function() { window.location.reload(); }, 2000);
+                                return true;
+                            } else {
+                                console.warn('VersionManager: Downloaded version (' + (newData ? newData.version : 'null') +
+                                             ') does not match server version (' + serverData.version + '). Stale database update skipped.');
+                                return false;
+                            }
+                        });
+                    });
                 });
             });
         }).catch(function(err) {
