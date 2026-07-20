@@ -4589,10 +4589,14 @@ a:focus-visible, button:focus-visible {
     border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 
-/* Year card enhance: animated icon bg on hover */
+/* Year card: force horizontal (left-to-right) icon + text alignment */
 .year-card {
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
 }
 
 .year-card::before {
