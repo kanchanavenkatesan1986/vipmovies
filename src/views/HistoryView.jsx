@@ -65,7 +65,7 @@ export default function HistoryView() {
               <a
                 key={hist.movieId}
                 href={`/watch?reward=${hist.movieId}`}
-                onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${hist.movieId}`); window.dispatchEvent(new PopStateEvent('popstate')); }}
+                onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${hist.movieId}`; }}
                 className="list-card-link"
                 style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}
               >

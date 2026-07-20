@@ -48,7 +48,7 @@ export default function WatchView({ movieId }) {
       `Watch ${movie.title} (${movie.year}) on VIP Movies!\n\n` +
       `Play Store:\nhttps://play.google.com/store/apps/details?id=com.vipmovies.tvkmovies`;
     if (navigator.share) {
-      navigator.share({ text: message }).catch(() => {});
+      navigator.share({ text: message }).catch(() => { });
     } else {
       window.open("https://wa.me/?text=" + encodeURIComponent(message), "_blank");
     }

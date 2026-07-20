@@ -105,7 +105,7 @@ export default function HomeView() {
       </div>
       <div className="movie-scroll" id="tamilMovies">
         {tamilMovies.map((movie) => (
-          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${movie.id}`); window.dispatchEvent(new PopStateEvent('popstate')); }} className="movie-card-link">
+          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${movie.id}`; }} className="movie-card-link">
             <div className="movie-card">
               <div className="movie-card-img-wrapper">
                 <img 
@@ -136,7 +136,7 @@ export default function HomeView() {
       </div>
       <div className="movie-scroll" id="hollywoodMovies">
         {hollywoodMovies.map((movie) => (
-          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${movie.id}`); window.dispatchEvent(new PopStateEvent('popstate')); }} className="movie-card-link">
+          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${movie.id}`; }} className="movie-card-link">
             <div className="movie-card">
               <div className="movie-card-img-wrapper">
                 <img 

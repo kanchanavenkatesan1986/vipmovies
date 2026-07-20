@@ -130,7 +130,7 @@ export default function ListView({ type = '', year = '' }) {
               <a 
                 key={movie.id} 
                 href={`/watch?reward=${movie.id}`} 
-                onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${movie.id}`); window.dispatchEvent(new PopStateEvent('popstate')); }}
+                onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${movie.id}`; }}
                 className="list-card-link"
               >
                 <div className={`list-card${isComingSoon ? ' coming-soon' : ''}`}>

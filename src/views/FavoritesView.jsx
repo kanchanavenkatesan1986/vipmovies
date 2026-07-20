@@ -52,7 +52,7 @@ export default function FavoritesView() {
               <div key={fav.movieId} className="fav-card-wrapper">
                 <a
                   href={`/watch?reward=${fav.movieId}`}
-                  onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${fav.movieId}`); window.dispatchEvent(new PopStateEvent('popstate')); }}
+                  onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${fav.movieId}`; }}
                   className="list-card-link"
                   style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}
                 >
