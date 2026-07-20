@@ -15,13 +15,19 @@ export default function YearsView() {
 
   return (
     <>
+      {/* Page Hero */}
+      <div className="page-hero">
+        <h1><i className="fa-solid fa-calendar-days"></i> Movie Collections</h1>
+        <p>Browse Tamil and Hollywood movies grouped by release years</p>
+      </div>
+
       {/* Tamil Movie Collections */}
       <h2 className="category-heading">Tamil Movie Collections</h2>
       <div className="years-grid">
         {years.map(yr => (
           <div
             key={`tamil-${yr}`}
-            className="year-card"
+            className="year-card tamil-card"
             onClick={() => handleYearClick('tamil', yr)}
           >
             <i className="fa-solid fa-calendar-days"></i>
@@ -36,7 +42,7 @@ export default function YearsView() {
         {years.map(yr => (
           <div
             key={`hollywood-${yr}`}
-            className="year-card"
+            className="year-card hollywood-card"
             onClick={() => handleYearClick('hollywood', yr)}
           >
             <i className="fa-solid fa-film"></i>

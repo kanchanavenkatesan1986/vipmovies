@@ -1917,12 +1917,13 @@ body {
     background: var(--bg-secondary);
     border: 1px solid rgba(255,255,255,0.05);
     border-radius: var(--border-radius);
-    padding: 18px 16px;
+    padding: 18px 20px;
     cursor: pointer;
     transition: var(--transition);
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
     text-decoration: none;
     color: inherit;
 }
@@ -3798,17 +3799,47 @@ textarea.form-control {
     flex-shrink: 0;
 }
 
+/* Year card hover enhancements */
 .year-card:hover {
     background-color: var(--bg-tertiary);
-    border-color: var(--accent);
     transform: translateY(-3px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(245, 197, 24, 0.1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.year-card.tamil-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 8px 24px rgba(245, 197, 24, 0.15), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.year-card.hollywood-card:hover {
+    border-color: #00d2ff;
+    box-shadow: 0 8px 24px rgba(0, 210, 255, 0.15), 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .year-card:hover i {
+    transform: scale(1.1) rotate(-8deg);
+}
+
+.year-card.tamil-card:hover i {
     background-color: var(--accent);
     color: #000;
-    transform: scale(1.1) rotate(-8deg);
+}
+
+.year-card.hollywood-card:hover i {
+    background-color: #00d2ff;
+    color: #000;
+}
+
+.year-card.tamil-card i {
+    color: var(--accent);
+    background-color: rgba(245, 197, 24, 0.08);
+    border: 1px solid rgba(245, 197, 24, 0.12);
+}
+
+.year-card.hollywood-card i {
+    color: #00d2ff;
+    background-color: rgba(0, 210, 255, 0.08);
+    border: 1px solid rgba(0, 210, 255, 0.12);
 }
 
 /* ══════════════════════════════════════════════════════════════
