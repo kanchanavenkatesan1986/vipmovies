@@ -23,7 +23,7 @@ export default function WatchView({ movieId }) {
     return (
       <div className="not-box">
         <i className="fa-solid fa-circle-exclamation"></i>
-        <p className="note">No movie selected. Go back to <a href="#/home" style={{ color: 'var(--accent)' }}>Home</a>.</p>
+        <p className="note">No movie selected. Go back to <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} style={{ color: 'var(--accent)' }}>Home</a>.</p>
       </div>
     );
   }
@@ -32,7 +32,7 @@ export default function WatchView({ movieId }) {
     return (
       <div className="not-box">
         <i className="fa-solid fa-circle-exclamation"></i>
-        <p className="note">Movie not found. Go back to <a href="#/home" style={{ color: 'var(--accent)' }}>Home</a>.</p>
+        <p className="note">Movie not found. Go back to <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} style={{ color: 'var(--accent)' }}>Home</a>.</p>
       </div>
     );
   }
@@ -69,7 +69,7 @@ export default function WatchView({ movieId }) {
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
               This movie is not yet available for streaming.
             </p>
-            <a href="#/home" className="cs-home-btn">
+            <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="cs-home-btn">
               <i className="fa-solid fa-house"></i> Back to Home
             </a>
           </div>

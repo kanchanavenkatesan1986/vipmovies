@@ -16,7 +16,7 @@ export default function SettingsView() {
         await window.DatabaseManager.clearStore('metadata');
         window.UIManager.showToast('🧹 Cache Cleared! Restarting...', 'update');
         setTimeout(() => {
-          window.location.hash = '#/home';
+          history.pushState(null, '', '/home');
           window.location.reload();
         }, 2000);
       } catch (err) {

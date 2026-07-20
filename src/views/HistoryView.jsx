@@ -64,7 +64,8 @@ export default function HistoryView() {
             return (
               <a
                 key={hist.movieId}
-                href={`#/watch?reward=${hist.movieId}`}
+                href={`/watch?reward=${hist.movieId}`}
+                onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${hist.movieId}`); window.dispatchEvent(new PopStateEvent('popstate')); }}
                 className="list-card-link"
                 style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}
               >
@@ -101,7 +102,7 @@ export default function HistoryView() {
           <i className="fa-regular fa-clock"></i>
           <h2>No Watch History</h2>
           <p>Movies you watch will appear here automatically. Start exploring!</p>
-          <a href="#/home"><i className="fa-solid fa-house"></i> Browse Movies</a>
+          <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }}><i className="fa-solid fa-house"></i> Browse Movies</a>
         </div>
       )}
     </>

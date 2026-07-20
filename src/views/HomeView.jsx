@@ -35,7 +35,8 @@ export default function HomeView() {
   };
 
   const handleFilterClick = (type, year) => {
-    window.location.hash = `#/list?type=${type}&year=${year}`;
+    history.pushState(null, '', `/list?type=${type}&year=${year}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
   return (
@@ -70,7 +71,7 @@ export default function HomeView() {
       {/* Years Collection */}
       <div className="info">
         <h1 className="info-head">Years Collection</h1>
-        <h1 className="info-all" onClick={() => window.location.hash = '#/years'}>
+        <h1 className="info-all" onClick={() => { history.pushState(null, '', '/years'); window.dispatchEvent(new PopStateEvent('popstate')); }}>
           View All <i className="fa-solid fa-chevron-right" style={{ fontSize: '11px' }}></i>
         </h1>
       </div>
@@ -104,7 +105,7 @@ export default function HomeView() {
       </div>
       <div className="movie-scroll" id="tamilMovies">
         {tamilMovies.map((movie) => (
-          <a key={movie.id} href={`#/watch?reward=${movie.id}`} className="movie-card-link">
+          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${movie.id}`); window.dispatchEvent(new PopStateEvent('popstate')); }} className="movie-card-link">
             <div className="movie-card">
               <div className="movie-card-img-wrapper">
                 <img 
@@ -135,7 +136,7 @@ export default function HomeView() {
       </div>
       <div className="movie-scroll" id="hollywoodMovies">
         {hollywoodMovies.map((movie) => (
-          <a key={movie.id} href={`#/watch?reward=${movie.id}`} className="movie-card-link">
+          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${movie.id}`); window.dispatchEvent(new PopStateEvent('popstate')); }} className="movie-card-link">
             <div className="movie-card">
               <div className="movie-card-img-wrapper">
                 <img 

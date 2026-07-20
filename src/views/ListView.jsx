@@ -111,7 +111,7 @@ export default function ListView({ type = '', year = '' }) {
       {/* Dynamic Category Title */}
       <div className="list-header">
         <span id="listTitle">{pageTitle}</span>
-        <a href="#/home" className="list-back-btn">
+        <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="list-back-btn">
           <i className="fa-solid fa-arrow-left"></i> Back to Home
         </a>
       </div>
@@ -129,7 +129,8 @@ export default function ListView({ type = '', year = '' }) {
             return (
               <a 
                 key={movie.id} 
-                href={`#/watch?reward=${movie.id}`} 
+                href={`/watch?reward=${movie.id}`} 
+                onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${movie.id}`); window.dispatchEvent(new PopStateEvent('popstate')); }}
                 className="list-card-link"
               >
                 <div className={`list-card${isComingSoon ? ' coming-soon' : ''}`}>

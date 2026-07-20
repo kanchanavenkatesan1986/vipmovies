@@ -11,52 +11,36 @@ import SettingsView from '../views/SettingsView';
 import FeedbackView from '../views/FeedbackView';
 import AboutView from '../views/AboutView';
 
+function parseLocation() {
+  // pathname e.g. "/watch", "/home", "/"
+  let path = window.location.pathname.replace(/^\//, '') || 'home';
+
+  // Parse query params from real search string e.g. ?reward=tamil-2025-00025
+  const params = {};
+  const urlParams = new URLSearchParams(window.location.search);
+  for (const [key, val] of urlParams.entries()) {
+    params[key] = val;
+  }
+
+  return { path, params };
+}
+
 export default function Router() {
-  const [route, setRoute] = useState({ path: 'home', params: {} });
+  const [route, setRoute] = useState(parseLocation);
 
   useEffect(() => {
-    const handleHashChange = () => {
-      let hash = window.location.hash || '#/home';
-      if (!hash.startsWith('#/')) {
-        hash = '#/home';
-      }
-
-      // Remove '#/'
-      const pathWithParams = hash.substring(2);
-      
-      // Separate path and query string
-      const qIndex = pathWithParams.indexOf('?');
-      let path = qIndex !== -1 ? pathWithParams.substring(0, qIndex) : pathWithParams;
-      const search = qIndex !== -1 ? pathWithParams.substring(qIndex) : '';
-
-      // Normalize path
-      if (!path || path === '') {
-        path = 'home';
-      }
-
-      // Parse parameters
-      const params = {};
-      if (search) {
-        const urlParams = new URLSearchParams(search);
-        for (const [key, val] of urlParams.entries()) {
-          params[key] = val;
-        }
-      }
-
-      setRoute({ path, params });
-      
-      // Scroll window to top on route change
+    const handlePopState = () => {
+      setRoute(parseLocation());
       window.scrollTo(0, 0);
     };
 
-    // Listen to hash changes
-    window.addEventListener('hashchange', handleHashChange);
-    
-    // Run once on load
-    handleHashChange();
+    window.addEventListener('popstate', handlePopState);
+
+    // Run once on mount to handle direct loads / refreshes
+    setRoute(parseLocation());
 
     return () => {
-      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handlePopState);
     };
   }, []);
 

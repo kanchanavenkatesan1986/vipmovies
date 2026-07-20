@@ -9,7 +9,8 @@ export default function YearsView() {
   }
 
   const handleYearClick = (type, year) => {
-    window.location.hash = `#/list?type=${type}&year=${year}`;
+    history.pushState(null, '', `/list?type=${type}&year=${year}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
   return (
