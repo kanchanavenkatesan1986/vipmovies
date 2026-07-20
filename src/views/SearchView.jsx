@@ -105,7 +105,8 @@ export default function SearchView({ query = '' }) {
             return (
               <a
                 key={movie.id}
-                href={`#/watch?reward=${movie.id}`}
+                href={`/watch?reward=${movie.id}`}
+                onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${movie.id}`); window.dispatchEvent(new PopStateEvent('popstate')); }}
                 className="list-card-link"
                 style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}
               >

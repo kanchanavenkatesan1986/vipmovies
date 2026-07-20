@@ -180,7 +180,8 @@ export default function FilterView() {
             return (
               <a
                 key={movie.id}
-                href={`#/watch?reward=${movie.id}`}
+                href={`/watch?reward=${movie.id}`}
+                onClick={(e) => { e.preventDefault(); history.pushState(null, '', `/watch?reward=${movie.id}`); window.dispatchEvent(new PopStateEvent('popstate')); }}
                 className="list-card-link new-release-card"
                 style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}
               >
