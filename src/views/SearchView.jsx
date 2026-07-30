@@ -47,11 +47,14 @@ export default function SearchView({ query = '' }) {
       results = results.filter(m => (m.type || '').toLowerCase() === selectedLang);
     }
 
-    // Sort: active first, coming soon last
+    // Sort: active first, coming soon last, and ID 1 first
     results.sort((a, b) => {
       const aComing = (a.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
       const bComing = (b.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
-      return aComing - bComing;
+      if (aComing !== bComing) {
+        return aComing - bComing;
+      }
+      return window.getMovieNumber(a.id) - window.getMovieNumber(b.id);
     });
 
     return results;

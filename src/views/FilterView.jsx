@@ -39,7 +39,7 @@ export default function FilterView() {
     const aComing = String(a.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
     const bComing = String(b.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
     if (aComing !== bComing) return aComing - bComing;
-    return (b.id || 0) - (a.id || 0);
+    return window.getMovieNumber(a.id) - window.getMovieNumber(b.id);
   });
 
   const [filteredMovies, setFilteredMovies] = useState(defaultMovies);
@@ -64,7 +64,7 @@ export default function FilterView() {
       const aComing = String(a.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
       const bComing = String(b.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
       if (aComing !== bComing) return aComing - bComing;
-      return (b.id || 0) - (a.id || 0);
+      return window.getMovieNumber(a.id) - window.getMovieNumber(b.id);
     });
 
     // Build timeline text

@@ -27,11 +27,14 @@ export default function ListView({ type = '', year = '' }) {
     return matchType && matchYear;
   });
 
-  // Sort movies: active first, coming soon last
+  // Sort movies: active first, coming soon last, and ID 1 first
   const sortedMovies = [...filteredMovies].sort((a, b) => {
     const aComing = String(a.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
     const bComing = String(b.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
-    return aComing - bComing;
+    if (aComing !== bComing) {
+      return aComing - bComing;
+    }
+    return window.getMovieNumber(a.id) - window.getMovieNumber(b.id);
   });
 
   const totalMovies = sortedMovies.length;

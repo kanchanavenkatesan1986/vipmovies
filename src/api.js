@@ -34,6 +34,13 @@ function buildYearList() {
     return years;
 }
 
+window.getMovieNumber = function(id) {
+    if (!id) return 0;
+    var parts = String(id).split('-');
+    var numStr = parts[parts.length - 1];
+    return parseInt(numStr, 10) || 0;
+};
+
 // ─── DATABASE MANAGER ────────────────────────────────────────────────────────
 var DatabaseManager = (function() {
     var db = null;
@@ -247,8 +254,12 @@ var CacheManager = (function() {
     }
 
     function populate(movies, slider) {
-        _movies = movies || [];
-        _slider = slider || [];
+        _movies = (movies || []).slice().sort(function(a, b) {
+            return getMovieNumber(a.id) - getMovieNumber(b.id);
+        });
+        _slider = (slider || []).slice().sort(function(a, b) {
+            return (Number(a.id) || 0) - (Number(b.id) || 0);
+        });
 
         _byId.clear();
         _byYear.clear();
