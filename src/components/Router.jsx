@@ -11,8 +11,16 @@ import SettingsView from '../views/SettingsView';
 import FeedbackView from '../views/FeedbackView';
 import AboutView from '../views/AboutView';
 
+// Admin CMS Imports
+import LoginPage from '../admin/pages/LoginPage';
+import DashboardPage from '../admin/pages/DashboardPage';
+import MoviesPage from '../admin/pages/MoviesPage';
+import SlidesPage from '../admin/pages/SlidesPage';
+import { authService } from '../admin/services/authService';
+import '../admin/styles/admin.css';
+
 function parseLocation() {
-  // pathname e.g. "/watch", "/home", "/"
+  // pathname e.g. "/watch", "/home", "/admin", "/admin/movies"
   let path = window.location.pathname.replace(/^\//, '') || 'home';
 
   // Parse query params from real search string e.g. ?reward=tamil-2025-00025
@@ -27,6 +35,11 @@ function parseLocation() {
 
 export default function Router() {
   const [route, setRoute] = useState(parseLocation);
+
+  const navigateTo = (newPath) => {
+    window.history.pushState(null, '', `/${newPath}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
 
   useEffect(() => {
     const handlePopState = () => {
@@ -44,7 +57,43 @@ export default function Router() {
     };
   }, []);
 
-  // Render correct view based on path
+  const path = route.path.toLowerCase();
+
+  // Admin Route Protection Guard
+  if (path.startsWith('admin')) {
+    const isLogin = path === 'admin/login' || path === 'admin-login';
+    const isAuthed = authService.isAuthenticated();
+
+    if (!isAuthed && !isLogin) {
+      return <LoginPage navigateTo={navigateTo} />;
+    }
+
+    if (isLogin) {
+      if (isAuthed) {
+        return <DashboardPage navigateTo={navigateTo} />;
+      }
+      return <LoginPage navigateTo={navigateTo} />;
+    }
+
+    if (path === 'admin' || path === 'admin/dashboard') {
+      return <DashboardPage navigateTo={navigateTo} />;
+    }
+
+    if (path === 'admin/slides') {
+      return <SlidesPage navigateTo={navigateTo} />;
+    }
+
+    if (path.startsWith('admin/movies')) {
+      const parts = path.split('/');
+      const type = parts[2] || '';
+      const year = parts[3] || '';
+      return <MoviesPage navigateTo={navigateTo} initialType={type} initialYear={year} />;
+    }
+
+    return <DashboardPage navigateTo={navigateTo} />;
+  }
+
+  // Public Web App Views Switch
   switch (route.path) {
     case 'home':
       return <HomeView />;

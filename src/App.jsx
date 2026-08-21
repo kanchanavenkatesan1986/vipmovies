@@ -86,6 +86,12 @@ export default function App() {
     );
   }
 
+  const isAdminPage = currentPath.toLowerCase().startsWith('admin');
+
+  if (isAdminPage) {
+    return <Router />;
+  }
+
   return (
     <div className="main">
       {/* Navigation Drawer (Overlay) */}
