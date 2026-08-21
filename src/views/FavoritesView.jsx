@@ -12,7 +12,7 @@ function getImageUrl(movie) {
 }
 
 export default function FavoritesView() {
-  const { favorites, removeFromFavorites, clearAllFavorites } = useApp();
+  const { favorites, removeFromFavorites, clearAllFavorites, openMoviePreview } = useApp();
 
   const hasFavorites = favorites && favorites.length > 0;
 
@@ -52,7 +52,7 @@ export default function FavoritesView() {
               <div key={fav.movieId} className="fav-card-wrapper">
                 <a
                   href={`/watch?reward=${fav.movieId}`}
-                  onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${fav.movieId}`; }}
+                  onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }}
                   className="list-card-link"
                   style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}
                 >
@@ -96,7 +96,7 @@ export default function FavoritesView() {
           <i className="fa-regular fa-heart"></i>
           <h2>No Favorites Yet</h2>
           <p>Start adding movies to your favorites by tapping the ❤️ button on any movie page.</p>
-          <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }}><i className="fa-solid fa-house"></i> Browse Movies</a>
+          <a href="/home" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }}><i className="fa-solid fa-house"></i> Browse Movies</a>
         </div>
       )}
     </>

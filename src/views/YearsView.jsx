@@ -9,7 +9,7 @@ export default function YearsView() {
   }
 
   const handleYearClick = (type, year) => {
-    history.pushState(null, '', `/list?type=${type}&year=${year}`);
+    window.history.pushState(null, '', `/list?type=${type}&year=${year}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 

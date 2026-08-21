@@ -14,7 +14,7 @@ function getImageUrl(movie) {
 }
 
 export default function ListView({ type = '', year = '' }) {
-  const { movies } = useApp();
+  const { movies, openMoviePreview } = useApp();
   const [page, setPage] = useState(1);
 
   const normType = type.toLowerCase().trim();
@@ -114,7 +114,7 @@ export default function ListView({ type = '', year = '' }) {
       {/* Dynamic Category Title */}
       <div className="list-header">
         <span id="listTitle">{pageTitle}</span>
-        <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="list-back-btn">
+        <a href="/home" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="list-back-btn">
           <i className="fa-solid fa-arrow-left"></i> Back to Home
         </a>
       </div>
@@ -133,7 +133,7 @@ export default function ListView({ type = '', year = '' }) {
               <a 
                 key={movie.id} 
                 href={`/watch?reward=${movie.id}`} 
-                onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${movie.id}`; }}
+                onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }}
                 className="list-card-link"
               >
                 <div className={`list-card${isComingSoon ? ' coming-soon' : ''}`}>

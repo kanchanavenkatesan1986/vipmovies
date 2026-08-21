@@ -25,7 +25,7 @@ function timeAgo(ts) {
 }
 
 export default function HistoryView() {
-  const { history, clearAllHistory } = useApp();
+  const { history, clearAllHistory, openMoviePreview } = useApp();
 
   const hasHistory = history && history.length > 0;
 
@@ -65,7 +65,7 @@ export default function HistoryView() {
               <a
                 key={hist.movieId}
                 href={`/watch?reward=${hist.movieId}`}
-                onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${hist.movieId}`; }}
+                onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }}
                 className="list-card-link"
                 style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}
               >
@@ -102,7 +102,7 @@ export default function HistoryView() {
           <i className="fa-regular fa-clock"></i>
           <h2>No Watch History</h2>
           <p>Movies you watch will appear here automatically. Start exploring!</p>
-          <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }}><i className="fa-solid fa-house"></i> Browse Movies</a>
+          <a href="/home" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }}><i className="fa-solid fa-house"></i> Browse Movies</a>
         </div>
       )}
     </>

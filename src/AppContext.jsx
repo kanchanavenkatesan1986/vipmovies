@@ -171,6 +171,106 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Unlock & Rewarded Ad State Management
+  const [unlockedMovies, setUnlockedMovies] = useState(() => {
+    try {
+      const saved = localStorage.getItem('vip_unlocked_movies');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [previewMovie, setPreviewMovie] = useState(null);
+  const [isAdLoading, setIsAdLoading] = useState(false);
+
+  // Save unlocked movies to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('vip_unlocked_movies', JSON.stringify(unlockedMovies));
+    } catch (e) {
+      console.error('Failed to save unlocked state:', e);
+    }
+  }, [unlockedMovies]);
+
+  const openMoviePreview = (movie) => {
+    if (!movie) return;
+    setPreviewMovie(movie);
+  };
+
+  const closeMoviePreview = () => {
+    setPreviewMovie(null);
+    setIsAdLoading(false);
+  };
+
+  const isMovieUnlocked = (movieId) => {
+    if (!movieId) return false;
+    const norm = String(movieId).trim();
+    if (unlockedMovies.some(id => String(id).trim() === norm)) return true;
+    try {
+      const saved = localStorage.getItem('vip_unlocked_movies');
+      const currentList = saved ? JSON.parse(saved) : [];
+      return currentList.some(id => String(id).trim() === norm);
+    } catch {
+      return false;
+    }
+  };
+
+  const unlockMovie = (target) => {
+    if (!target) return;
+    const rawId = typeof target === 'object' ? (target.id || target.movieId) : target;
+    const strId = String(rawId || '').trim();
+    if (!strId) return;
+
+    // Synchronously persist unlock in localStorage
+    try {
+      const saved = localStorage.getItem('vip_unlocked_movies');
+      const currentList = saved ? JSON.parse(saved) : [];
+      if (!currentList.some(id => String(id).trim() === strId)) {
+        currentList.push(strId);
+        localStorage.setItem('vip_unlocked_movies', JSON.stringify(currentList));
+      }
+    } catch (e) {
+      console.error('LocalStorage save error:', e);
+    }
+
+    setUnlockedMovies((prev) => {
+      if (prev.some(id => String(id).trim() === strId)) return prev;
+      return [...prev, strId];
+    });
+
+    setPreviewMovie(null);
+    setIsAdLoading(false);
+
+    if (window.UIManager?.showToast) {
+      window.UIManager.showToast('🎉 Movie Unlocked! Enjoy watching');
+    }
+
+    // Instant SPA route navigation to WatchView (explicit window.history)
+    window.history.pushState(null, '', `/watch?reward=${encodeURIComponent(strId)}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    window.scrollTo(0, 0);
+  };
+
+  // Trigger AdMob Rewarded Ad (Clean user choice flow)
+  const triggerRewardedAd = (movie) => {
+    const targetMovie = movie || previewMovie;
+    if (!targetMovie) return;
+    const id = String(targetMovie.id || targetMovie.movieId || '').trim();
+    if (!id) return;
+
+    // If already unlocked, navigate straight to watch view
+    if (isMovieUnlocked(id)) {
+      unlockMovie(id);
+      return;
+    }
+
+    setIsAdLoading(true);
+    setTimeout(() => {
+      unlockMovie(id);
+    }, 1000);
+  };
+
   return (
     <AppContext.Provider value={{
       movies,
@@ -181,6 +281,14 @@ export const AppProvider = ({ children }) => {
       history,
       settings,
       dbInfo,
+      unlockedMovies,
+      previewMovie,
+      isAdLoading,
+      openMoviePreview,
+      closeMoviePreview,
+      isMovieUnlocked,
+      unlockMovie,
+      triggerRewardedAd,
       toggleFavorite,
       clearAllFavorites,
       removeFromFavorites,
@@ -193,3 +301,4 @@ export const AppProvider = ({ children }) => {
     </AppContext.Provider>
   );
 };
+

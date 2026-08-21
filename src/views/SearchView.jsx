@@ -12,7 +12,7 @@ function getImageUrl(movie) {
 }
 
 export default function SearchView({ query = '' }) {
-  const { movies } = useApp();
+  const { movies, openMoviePreview } = useApp();
   const [searchText, setSearchText] = useState(query);
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedLang, setSelectedLang] = useState('');
@@ -109,7 +109,7 @@ export default function SearchView({ query = '' }) {
               <a
                 key={movie.id}
                 href={`/watch?reward=${movie.id}`}
-                onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${movie.id}`; }}
+                onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }}
                 className="list-card-link"
                 style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}
               >

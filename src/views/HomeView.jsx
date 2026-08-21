@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../AppContext';
 
 export default function HomeView() {
-  const { movies, slider } = useApp();
+  const { movies, slider, openMoviePreview } = useApp();
   const [slideIndex, setSlideIndex] = useState(0);
 
   // Slider autoplay transition
@@ -35,7 +35,7 @@ export default function HomeView() {
   };
 
   const handleFilterClick = (type, year) => {
-    history.pushState(null, '', `/list?type=${type}&year=${year}`);
+    window.history.pushState(null, '', `/list?type=${type}&year=${year}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
@@ -71,7 +71,7 @@ export default function HomeView() {
       {/* Years Collection */}
       <div className="info">
         <h1 className="info-head">Years Collection</h1>
-        <h1 className="info-all" onClick={() => { history.pushState(null, '', '/years'); window.dispatchEvent(new PopStateEvent('popstate')); }}>
+        <h1 className="info-all" onClick={() => { window.history.pushState(null, '', '/years'); window.dispatchEvent(new PopStateEvent('popstate')); }}>
           View All <i className="fa-solid fa-chevron-right" style={{ fontSize: '11px' }}></i>
         </h1>
       </div>
@@ -105,7 +105,7 @@ export default function HomeView() {
       </div>
       <div className="movie-scroll" id="tamilMovies">
         {tamilMovies.map((movie) => (
-          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${movie.id}`; }} className="movie-card-link">
+          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }} className="movie-card-link">
             <div className="movie-card">
               <div className="movie-card-img-wrapper">
                 <img 
@@ -136,7 +136,7 @@ export default function HomeView() {
       </div>
       <div className="movie-scroll" id="hollywoodMovies">
         {hollywoodMovies.map((movie) => (
-          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${movie.id}`; }} className="movie-card-link">
+          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }} className="movie-card-link">
             <div className="movie-card">
               <div className="movie-card-img-wrapper">
                 <img 

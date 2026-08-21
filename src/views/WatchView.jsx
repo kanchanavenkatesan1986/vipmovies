@@ -12,18 +12,20 @@ function getMovieImageUrl(movie) {
 }
 
 export default function WatchView({ movieId }) {
-  const { movies, favorites, toggleFavorite, recordHistory } = useApp();
-  const movie = movies.find(m => String(m.id) === String(movieId));
+  const { movies, favorites, toggleFavorite, recordHistory, isMovieUnlocked, openMoviePreview, triggerRewardedAd } = useApp();
+  const movie = movies.find(m => String(m.id || m.movieId).trim() === String(movieId || '').trim());
 
   useEffect(() => {
-    if (movie) recordHistory(movie);
-  }, [movie]);
+    if (movie && isMovieUnlocked(movie.id)) {
+      recordHistory(movie);
+    }
+  }, [movie, isMovieUnlocked]);
 
   if (!movieId) {
     return (
       <div className="not-box">
         <i className="fa-solid fa-circle-exclamation"></i>
-        <p className="note">No movie selected. Go back to <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} style={{ color: 'var(--accent)' }}>Home</a>.</p>
+        <p className="note">No movie selected. Go back to <a href="/home" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} style={{ color: 'var(--accent)' }}>Home</a>.</p>
       </div>
     );
   }
@@ -32,11 +34,12 @@ export default function WatchView({ movieId }) {
     return (
       <div className="not-box">
         <i className="fa-solid fa-circle-exclamation"></i>
-        <p className="note">Movie not found. Go back to <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} style={{ color: 'var(--accent)' }}>Home</a>.</p>
+        <p className="note">Movie not found. Go back to <a href="/home" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} style={{ color: 'var(--accent)' }}>Home</a>.</p>
       </div>
     );
   }
 
+  const unlocked = isMovieUnlocked(movie.id);
   const isFavorite = favorites.some(fav => String(fav.movieId) === String(movie.id));
   const isComingSoon = movie.status && movie.status.toLowerCase() === 'coming soon';
 
@@ -69,12 +72,14 @@ export default function WatchView({ movieId }) {
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
               This movie is not yet available for streaming.
             </p>
-            <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="cs-home-btn">
+            <a href="/home" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="cs-home-btn">
               <i className="fa-solid fa-house"></i> Back to Home
             </a>
           </div>
         </div>
       )}
+
+
 
       <div style={isComingSoon ? { opacity: 0.5, filter: 'grayscale(40%)', pointerEvents: 'none', userSelect: 'none' } : {}}>
 

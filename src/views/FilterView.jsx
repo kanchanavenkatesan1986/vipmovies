@@ -12,7 +12,7 @@ function getImageUrl(movie) {
 }
 
 export default function FilterView() {
-  const { movies } = useApp();
+  const { movies, openMoviePreview } = useApp();
   const [selectedType, setSelectedType] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -181,7 +181,7 @@ export default function FilterView() {
               <a
                 key={movie.id}
                 href={`/watch?reward=${movie.id}`}
-                onClick={(e) => { e.preventDefault(); window.location.href = `/watch?reward=${movie.id}`; }}
+                onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }}
                 className="list-card-link new-release-card"
                 style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}
               >

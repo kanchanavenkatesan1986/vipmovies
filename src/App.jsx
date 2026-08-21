@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from './AppContext';
 import Router from './components/Router';
+import MovieUnlockModal from './components/MovieUnlockModal';
 import './main.css';
 
 export default function App() {
+
   const { isLoading, error } = useApp();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState('home');
@@ -47,7 +49,7 @@ export default function App() {
   const closeDrawer = () => setIsDrawerOpen(false);
 
   const navigateTo = (path) => {
-    history.pushState(null, '', `/${path}`);
+    window.history.pushState(null, '', `/${path}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
     closeDrawer();
   };
@@ -121,10 +123,10 @@ export default function App() {
           src="/m-image/Vip Title.png" 
           className="title" 
           alt="VIP Movies Logo" 
-          onClick={() => { history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }}
+          onClick={() => { window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }}
           style={{ cursor: 'pointer' }}
         />
-        <a href="/search" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/search'); window.dispatchEvent(new PopStateEvent('popstate')); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <a href="/search" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/search'); window.dispatchEvent(new PopStateEvent('popstate')); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <img src="/m-image/Search icon.png" className="search" alt="Search" />
         </a>
       </div>
@@ -132,25 +134,28 @@ export default function App() {
       {/* Main View Router */}
       <Router />
 
+      {/* Policy Compliant Movie Unlock Modal */}
+      <MovieUnlockModal />
+
       {/* Bottom Navigation Bar */}
       <div className="bottom-nav">
-        <a href="/home" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'home' || currentPath === 'list' ? 'active' : ''}`}>
+        <a href="/home" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'home' || currentPath === 'list' ? 'active' : ''}`}>
           <i className="fa-solid fa-house"></i>
           <span>Home</span>
         </a>
-        <a href="/search" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/search'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'search' ? 'active' : ''}`}>
+        <a href="/search" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/search'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'search' ? 'active' : ''}`}>
           <i className="fa-solid fa-magnifying-glass"></i>
           <span>Search</span>
         </a>
-        <a href="/years" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/years'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'years' ? 'active' : ''}`}>
+        <a href="/years" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/years'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'years' ? 'active' : ''}`}>
           <i className="fa-solid fa-calendar-days"></i>
           <span>Years</span>
         </a>
-        <a href="/filter" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/filter'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'filter' ? 'active' : ''}`}>
+        <a href="/filter" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/filter'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'filter' ? 'active' : ''}`}>
           <i className="fa-solid fa-sliders"></i>
           <span>Filter</span>
         </a>
-        <a href="/history" onClick={(e) => { e.preventDefault(); history.pushState(null, '', '/history'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'history' ? 'active' : ''}`}>
+        <a href="/history" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/history'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'history' ? 'active' : ''}`}>
           <i className="fa-solid fa-clock-rotate-left"></i>
           <span>History</span>
         </a>
