@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../AppContext';
 
 function getImageUrl(movie) {
@@ -16,36 +16,40 @@ export default function FilterView() {
   const [selectedType, setSelectedType] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [applied, setApplied] = useState(false);
-  const [timelineText, setTimelineText] = useState('Recently Added');
 
-  // Stats
-  const totalCount = movies.length;
-  const tamilCount = movies.filter(m => String(m.type).toLowerCase() === 'tamil').length;
-  const hollyCount = movies.filter(m => String(m.type).toLowerCase() === 'hollywood').length;
+  // Memoized stats calculation
+  const { totalCount, tamilCount, hollyCount, allYears } = useMemo(() => {
+    let tCount = 0;
+    let hCount = 0;
+    const yearSet = new Set();
 
-  const allYears = Array.from(new Set(movies.map(m => String(m.year)).filter(Boolean)))
-    .sort((a, b) => b - a);
+    for (let i = 0; i < movies.length; i++) {
+      const m = movies[i];
+      const type = String(m.type || '').toLowerCase();
+      if (type === 'tamil') tCount++;
+      if (type === 'hollywood') hCount++;
+      if (m.year) yearSet.add(String(m.year));
+    }
 
-  // All categories from the original filter.html
+    const sortedYears = Array.from(yearSet).sort((a, b) => b - a);
+
+    return {
+      totalCount: movies.length,
+      tamilCount: tCount,
+      hollyCount: hCount,
+      allYears: sortedYears
+    };
+  }, [movies]);
+
   const categories = [
     'Action','Adventure','Animation','Comedy','Crime','Documentary',
     'Drama','Family','Fantasy','History','Horror','Kids','Music',
     'Mystery','Reality','Romance','Sci-Fi','Soap','Sport','Thriller','War'
   ];
 
-  // Initial display: show all movies sorted by active first, coming soon last
-  const defaultMovies = [...movies].sort((a, b) => {
-    const aComing = String(a.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
-    const bComing = String(b.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
-    if (aComing !== bComing) return aComing - bComing;
-    return window.getMovieNumber(a.id) - window.getMovieNumber(b.id);
-  });
-
-  const [filteredMovies, setFilteredMovies] = useState(defaultMovies);
-
-  const applyFilter = () => {
-    let results = [...movies];
+  // Instant memoized filter calculations
+  const filteredMovies = useMemo(() => {
+    let results = movies;
 
     if (selectedType) {
       results = results.filter(m => String(m.type).toLowerCase() === selectedType);
@@ -54,29 +58,32 @@ export default function FilterView() {
       results = results.filter(m => String(m.year) === selectedYear);
     }
     if (selectedCategory) {
+      const catLower = selectedCategory.toLowerCase();
       results = results.filter(m =>
-        (m.category || m.genre || '').toLowerCase() === selectedCategory.toLowerCase()
+        (m.category || m.genre || '').toLowerCase().includes(catLower)
       );
     }
 
-    // Sort
-    results.sort((a, b) => {
+    return [...results].sort((a, b) => {
       const aComing = String(a.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
       const bComing = String(b.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
       if (aComing !== bComing) return aComing - bComing;
-      return window.getMovieNumber(a.id) - window.getMovieNumber(b.id);
+      const getNum = (idStr) => {
+        const parts = String(idStr).split('-');
+        const last = parts[parts.length - 1];
+        return parseInt(last, 10) || 0;
+      };
+      return getNum(a.id) - getNum(b.id);
     });
+  }, [movies, selectedType, selectedYear, selectedCategory]);
 
-    // Build timeline text
+  const timelineText = useMemo(() => {
     const parts = [];
     if (selectedType) parts.push(selectedType.charAt(0).toUpperCase() + selectedType.slice(1));
     if (selectedYear) parts.push(selectedYear);
     if (selectedCategory) parts.push(selectedCategory);
-    setTimelineText(parts.length ? parts.join(' · ') + ' Movies' : 'All Movies');
-
-    setFilteredMovies(results);
-    setApplied(true);
-  };
+    return parts.length ? parts.join(' · ') + ' Movies' : 'All Movies';
+  }, [selectedType, selectedYear, selectedCategory]);
 
   return (
     <>
@@ -147,8 +154,8 @@ export default function FilterView() {
             </select>
           </div>
         </div>
-        <button className="filter-apply-btn" onClick={applyFilter}>
-          <i className="fa-solid fa-magnifying-glass"></i> Apply Filter
+        <button className="filter-apply-btn" onClick={() => { const el = document.getElementById('releasesGrid'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}>
+          <i className="fa-solid fa-magnifying-glass"></i> View Filtered Movies ({filteredMovies.length})
         </button>
       </div>
 

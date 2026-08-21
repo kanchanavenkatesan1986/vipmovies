@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../AppContext';
 
 function getImageUrl(movie) {
@@ -17,13 +17,15 @@ export default function SearchView({ query = '' }) {
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedLang, setSelectedLang] = useState('');
 
-  // Get unique years for dropdown
-  const uniqueYears = Array.from(new Set(movies.map(m => String(m.year)).filter(Boolean)))
-    .sort((a, b) => b - a);
+  // Memoized unique years computation
+  const uniqueYears = useMemo(() => {
+    return Array.from(new Set(movies.map(m => String(m.year)).filter(Boolean)))
+      .sort((a, b) => b - a);
+  }, [movies]);
 
-  // Search logic - debounced via state
-  const performSearch = () => {
-    let results = [...movies];
+  // Instant memoized search logic
+  const filteredMovies = useMemo(() => {
+    let results = movies;
 
     if (searchText.trim()) {
       const term = searchText.toLowerCase().trim();
@@ -40,27 +42,26 @@ export default function SearchView({ query = '' }) {
     }
 
     if (selectedYear) {
-      results = results.filter(m => String(m.year) == selectedYear);
+      results = results.filter(m => String(m.year) === selectedYear);
     }
 
     if (selectedLang) {
       results = results.filter(m => (m.type || '').toLowerCase() === selectedLang);
     }
 
-    // Sort: active first, coming soon last, and ID 1 first
-    results.sort((a, b) => {
+    // Sort: active first, coming soon last
+    return [...results].sort((a, b) => {
       const aComing = (a.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
       const bComing = (b.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
-      if (aComing !== bComing) {
-        return aComing - bComing;
-      }
-      return window.getMovieNumber(a.id) - window.getMovieNumber(b.id);
+      if (aComing !== bComing) return aComing - bComing;
+      const getNum = (idStr) => {
+        const parts = String(idStr).split('-');
+        const last = parts[parts.length - 1];
+        return parseInt(last, 10) || 0;
+      };
+      return getNum(a.id) - getNum(b.id);
     });
-
-    return results;
-  };
-
-  const filteredMovies = performSearch();
+  }, [movies, searchText, selectedYear, selectedLang]);
   const isSearching = !!(searchText.trim() || selectedYear || selectedLang);
 
   return (

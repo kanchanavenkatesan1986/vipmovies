@@ -48,9 +48,17 @@ export default function App() {
   const openDrawer = () => setIsDrawerOpen(true);
   const closeDrawer = () => setIsDrawerOpen(false);
 
-  const navigateTo = (path) => {
+  const switchNav = (e, path) => {
+    if (e) e.preventDefault();
+    if (currentPath === path) return;
+    setCurrentPath(path);
     window.history.pushState(null, '', `/${path}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const navigateTo = (path) => {
+    switchNav(null, path);
     closeDrawer();
   };
 
@@ -123,10 +131,10 @@ export default function App() {
           src="/m-image/Vip Title.png" 
           className="title" 
           alt="VIP Movies Logo" 
-          onClick={() => { window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }}
+          onClick={(e) => switchNav(e, 'home')}
           style={{ cursor: 'pointer' }}
         />
-        <a href="/search" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/search'); window.dispatchEvent(new PopStateEvent('popstate')); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <a href="/search" onClick={(e) => switchNav(e, 'search')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <img src="/m-image/Search icon.png" className="search" alt="Search" />
         </a>
       </div>
@@ -139,23 +147,23 @@ export default function App() {
 
       {/* Bottom Navigation Bar */}
       <div className="bottom-nav">
-        <a href="/home" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/home'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'home' || currentPath === 'list' ? 'active' : ''}`}>
+        <a href="/home" onClick={(e) => switchNav(e, 'home')} className={`bottom-nav-item ${currentPath === 'home' || currentPath === 'list' ? 'active' : ''}`}>
           <i className="fa-solid fa-house"></i>
           <span>Home</span>
         </a>
-        <a href="/search" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/search'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'search' ? 'active' : ''}`}>
+        <a href="/search" onClick={(e) => switchNav(e, 'search')} className={`bottom-nav-item ${currentPath === 'search' ? 'active' : ''}`}>
           <i className="fa-solid fa-magnifying-glass"></i>
           <span>Search</span>
         </a>
-        <a href="/years" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/years'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'years' ? 'active' : ''}`}>
+        <a href="/years" onClick={(e) => switchNav(e, 'years')} className={`bottom-nav-item ${currentPath === 'years' ? 'active' : ''}`}>
           <i className="fa-solid fa-calendar-days"></i>
           <span>Years</span>
         </a>
-        <a href="/filter" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/filter'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'filter' ? 'active' : ''}`}>
+        <a href="/filter" onClick={(e) => switchNav(e, 'filter')} className={`bottom-nav-item ${currentPath === 'filter' ? 'active' : ''}`}>
           <i className="fa-solid fa-sliders"></i>
           <span>Filter</span>
         </a>
-        <a href="/history" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/history'); window.dispatchEvent(new PopStateEvent('popstate')); }} className={`bottom-nav-item ${currentPath === 'history' ? 'active' : ''}`}>
+        <a href="/history" onClick={(e) => switchNav(e, 'history')} className={`bottom-nav-item ${currentPath === 'history' ? 'active' : ''}`}>
           <i className="fa-solid fa-clock-rotate-left"></i>
           <span>History</span>
         </a>
