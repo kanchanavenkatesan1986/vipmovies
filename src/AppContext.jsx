@@ -193,6 +193,27 @@ export const AppProvider = ({ children }) => {
     }
   }, [unlockedMovies]);
 
+  // Automatically unlock movie if URL contains ?reward= or ?id= (for Android WebView & direct links)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const rewardId = params.get('reward') || params.get('id');
+      if (rewardId) {
+        const idStr = String(rewardId).trim();
+        setUnlockedMovies((prev) => {
+          if (prev.some(item => String(item).trim() === idStr)) return prev;
+          const updated = [...prev, idStr];
+          try {
+            localStorage.setItem('vip_unlocked_movies', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+      }
+    } catch (e) {
+      console.error('URL unlock parse error:', e);
+    }
+  }, []);
+
   const openMoviePreview = (movie) => {
     if (!movie) return;
     setPreviewMovie(movie);
@@ -246,29 +267,18 @@ export const AppProvider = ({ children }) => {
       window.UIManager.showToast('🎉 Movie Unlocked! Enjoy watching');
     }
 
-    // Instant SPA route navigation to WatchView (explicit window.history)
-    window.history.pushState(null, '', `/watch?reward=${encodeURIComponent(strId)}`);
-    window.dispatchEvent(new PopStateEvent('popstate'));
-    window.scrollTo(0, 0);
+    // Full window location navigation so Android WebView shouldOverrideUrlLoading triggers native AdMob Rewarded Ad
+    window.location.href = `/watch?reward=${encodeURIComponent(strId)}`;
   };
 
-  // Trigger AdMob Rewarded Ad (Clean user choice flow)
+  // Trigger AdMob Rewarded Ad (Clean user choice flow for Android WebView & Web)
   const triggerRewardedAd = (movie) => {
     const targetMovie = movie || previewMovie;
     if (!targetMovie) return;
     const id = String(targetMovie.id || targetMovie.movieId || '').trim();
     if (!id) return;
 
-    // If already unlocked, navigate straight to watch view
-    if (isMovieUnlocked(id)) {
-      unlockMovie(id);
-      return;
-    }
-
-    setIsAdLoading(true);
-    setTimeout(() => {
-      unlockMovie(id);
-    }, 1000);
+    unlockMovie(id);
   };
 
   return (
