@@ -4,28 +4,60 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
   const [tamilOpen, setTamilOpen] = useState(true);
   const [hollywoodOpen, setHollywoodOpen] = useState(true);
 
-  const isNavActive = (path) => {
-    return currentRoute === path || currentRoute === `admin/${path}` || currentRoute.startsWith(`admin/${path}`);
+  const isActive = (path) =>
+    currentRoute === path ||
+    currentRoute === `admin/${path}` ||
+    currentRoute.startsWith(`admin/${path}/`);
+
+  const go = (path) => {
+    navigateTo(path);
+    onClose();
   };
 
   return (
     <aside className={`admin-sidebar ${isOpen ? 'open' : ''}`}>
-      {/* Brand Header */}
+
+      {/* Brand */}
       <div className="admin-sidebar-brand">
         <div className="admin-brand-icon">VIP</div>
         <div className="admin-brand-title">
           <strong>VIP MOVIES</strong>
           <span>ADMIN CMS</span>
         </div>
+
+        {/* Mobile close button inside sidebar */}
+        <button
+          onClick={onClose}
+          style={{
+            marginLeft: 'auto',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid var(--admin-border)',
+            color: 'var(--admin-text-muted)',
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            flexShrink: 0
+          }}
+          className="admin-toggle-menu"
+          aria-label="Close Sidebar"
+        >
+          <i className="fa-solid fa-xmark"></i>
+        </button>
       </div>
 
-      {/* Nav Menu */}
+      {/* Navigation */}
       <div className="admin-sidebar-nav">
-        <div className="admin-nav-section">Main Navigation</div>
+
+        <div className="admin-nav-section">Main</div>
 
         <div
-          className={`admin-nav-item ${isNavActive('dashboard') ? 'active' : ''}`}
-          onClick={() => { navigateTo('admin/dashboard'); onClose(); }}
+          className={`admin-nav-item ${isActive('admin/dashboard') || isActive('admin') ? 'active' : ''}`}
+          onClick={() => go('admin/dashboard')}
         >
           <i className="fa-solid fa-chart-pie"></i>
           <span>Dashboard</span>
@@ -34,8 +66,8 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
         <div className="admin-nav-section">Catalog CMS</div>
 
         <div
-          className={`admin-nav-item ${currentRoute === 'admin/movies' || currentRoute === 'movies' ? 'active' : ''}`}
-          onClick={() => { navigateTo('admin/movies'); onClose(); }}
+          className={`admin-nav-item ${currentRoute === 'admin/movies' ? 'active' : ''}`}
+          onClick={() => go('admin/movies')}
         >
           <i className="fa-solid fa-film"></i>
           <span>All Movies</span>
@@ -44,106 +76,93 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
         {/* Tamil Accordion */}
         <div
           className="admin-nav-item"
-          onClick={() => setTamilOpen(!tamilOpen)}
+          onClick={() => setTamilOpen(o => !o)}
           style={{ justifyContent: 'space-between' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <i className="fa-solid fa-globe"></i>
+            <i className="fa-solid fa-globe" style={{ color: 'var(--admin-gold)' }}></i>
             <span>Tamil Movies</span>
           </div>
-          <i className={`fa-solid ${tamilOpen ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '11px' }}></i>
+          <i className={`fa-solid fa-chevron-${tamilOpen ? 'down' : 'right'}`} style={{ fontSize: '11px' }}></i>
         </div>
 
         {tamilOpen && (
           <div className="admin-nav-sub">
-            <div
-              className={`admin-nav-sub-item ${currentRoute.includes('tamil/2026') ? 'active' : ''}`}
-              onClick={() => { navigateTo('admin/movies/tamil/2026'); onClose(); }}
-            >
-              2026 Collection
-            </div>
-            <div
-              className={`admin-nav-sub-item ${currentRoute.includes('tamil/2025') ? 'active' : ''}`}
-              onClick={() => { navigateTo('admin/movies/tamil/2025'); onClose(); }}
-            >
-              2025 Collection
-            </div>
-            <div
-              className={`admin-nav-sub-item ${currentRoute.includes('tamil/2024') ? 'active' : ''}`}
-              onClick={() => { navigateTo('admin/movies/tamil/2024'); onClose(); }}
-            >
-              2024 Collection
-            </div>
+            {['2026', '2025', '2024'].map(yr => (
+              <div
+                key={yr}
+                className={`admin-nav-sub-item ${currentRoute.includes(`tamil/${yr}`) ? 'active' : ''}`}
+                onClick={() => go(`admin/movies/tamil/${yr}`)}
+              >
+                {yr} Collection
+              </div>
+            ))}
           </div>
         )}
 
         {/* Hollywood Accordion */}
         <div
           className="admin-nav-item"
-          onClick={() => setHollywoodOpen(!hollywoodOpen)}
+          onClick={() => setHollywoodOpen(o => !o)}
           style={{ justifyContent: 'space-between' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <i className="fa-solid fa-clapperboard"></i>
+            <i className="fa-solid fa-clapperboard" style={{ color: 'var(--admin-blue)' }}></i>
             <span>Hollywood Movies</span>
           </div>
-          <i className={`fa-solid ${hollywoodOpen ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '11px' }}></i>
+          <i className={`fa-solid fa-chevron-${hollywoodOpen ? 'down' : 'right'}`} style={{ fontSize: '11px' }}></i>
         </div>
 
         {hollywoodOpen && (
           <div className="admin-nav-sub">
-            <div
-              className={`admin-nav-sub-item ${currentRoute.includes('hollywood/2026') ? 'active' : ''}`}
-              onClick={() => { navigateTo('admin/movies/hollywood/2026'); onClose(); }}
-            >
-              2026 Collection
-            </div>
-            <div
-              className={`admin-nav-sub-item ${currentRoute.includes('hollywood/2025') ? 'active' : ''}`}
-              onClick={() => { navigateTo('admin/movies/hollywood/2025'); onClose(); }}
-            >
-              2025 Collection
-            </div>
-            <div
-              className={`admin-nav-sub-item ${currentRoute.includes('hollywood/2024') ? 'active' : ''}`}
-              onClick={() => { navigateTo('admin/movies/hollywood/2024'); onClose(); }}
-            >
-              2024 Collection
-            </div>
+            {['2026', '2025', '2024'].map(yr => (
+              <div
+                key={yr}
+                className={`admin-nav-sub-item ${currentRoute.includes(`hollywood/${yr}`) ? 'active' : ''}`}
+                onClick={() => go(`admin/movies/hollywood/${yr}`)}
+              >
+                {yr} Collection
+              </div>
+            ))}
           </div>
         )}
 
-        <div className="admin-nav-section">Banner CMS</div>
+        <div className="admin-nav-section">Banners</div>
 
         <div
-          className={`admin-nav-item ${isNavActive('slides') ? 'active' : ''}`}
-          onClick={() => { navigateTo('admin/slides'); onClose(); }}
+          className={`admin-nav-item ${isActive('admin/slides') ? 'active' : ''}`}
+          onClick={() => go('admin/slides')}
         >
           <i className="fa-solid fa-images"></i>
           <span>Slide Management</span>
         </div>
+
       </div>
 
-      {/* Footer Profile & Logout */}
+      {/* Footer */}
       <div className="admin-sidebar-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--admin-accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '13px' }}>
-            A
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>Admin</span>
-            <span style={{ fontSize: '10px', color: 'var(--admin-text-dim)' }}>Administrator</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <div style={{
+            width: '36px', height: '36px', borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--admin-blue), var(--admin-purple))',
+            color: '#fff', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontWeight: 'bold', fontSize: '14px', flexShrink: 0
+          }}>A</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>Admin</div>
+            <div style={{ fontSize: '11px', color: 'var(--admin-text-dim)' }}>Administrator</div>
           </div>
         </div>
         <button
-          className="admin-btn"
-          style={{ padding: '6px 10px', color: 'var(--admin-danger)' }}
+          className="admin-btn danger"
+          style={{ padding: '8px 12px', flexShrink: 0 }}
           onClick={onLogout}
           title="Sign Out"
         >
           <i className="fa-solid fa-right-from-bracket"></i>
         </button>
       </div>
+
     </aside>
   );
 }

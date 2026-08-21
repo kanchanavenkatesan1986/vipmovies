@@ -1,7 +1,7 @@
 // Frontend Admin Session Abstraction Layer
 // Initial Development Credentials (DO NOT expose in production worker secrets)
-const DEV_USERNAME = import.meta.env.VITE_ADMIN_USER || 'admin';
-const DEV_PASSWORD = import.meta.env.VITE_ADMIN_PASS || 'VIPMovies@Admin2026!';
+const DEV_USERNAME = import.meta.env.VITE_ADMIN_USER || 'Ellayaff';
+const DEV_PASSWORD = import.meta.env.VITE_ADMIN_PASS || 'Ellayaff@.1';
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes inactivity timeout
 
 const SESSION_KEY = 'vip_admin_session';
