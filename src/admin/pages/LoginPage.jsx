@@ -24,7 +24,7 @@ export default function LoginPage({ navigateTo }) {
       setLoading(false);
 
       if (res.success) {
-        navigateTo('dashboard');
+        navigateTo('admin/dashboard');
       } else {
         setErrorMsg(res.message || 'Invalid username or password.');
       }

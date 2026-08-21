@@ -17,7 +17,7 @@ export default function AdminLayout({ children, currentRoute, navigateTo, pageTi
 
   const handleLogout = () => {
     authService.logout();
-    navigateTo('login');
+    navigateTo('admin/login');
   };
 
   return (

@@ -4,7 +4,9 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
   const [tamilOpen, setTamilOpen] = useState(true);
   const [hollywoodOpen, setHollywoodOpen] = useState(true);
 
-  const isNavActive = (path) => currentRoute === path;
+  const isNavActive = (path) => {
+    return currentRoute === path || currentRoute === `admin/${path}` || currentRoute.startsWith(`admin/${path}`);
+  };
 
   return (
     <aside className={`admin-sidebar ${isOpen ? 'open' : ''}`}>
@@ -23,7 +25,7 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
 
         <div
           className={`admin-nav-item ${isNavActive('dashboard') ? 'active' : ''}`}
-          onClick={() => { navigateTo('dashboard'); onClose(); }}
+          onClick={() => { navigateTo('admin/dashboard'); onClose(); }}
         >
           <i className="fa-solid fa-chart-pie"></i>
           <span>Dashboard</span>
@@ -32,8 +34,8 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
         <div className="admin-nav-section">Catalog CMS</div>
 
         <div
-          className={`admin-nav-item ${isNavActive('movies') ? 'active' : ''}`}
-          onClick={() => { navigateTo('movies'); onClose(); }}
+          className={`admin-nav-item ${currentRoute === 'admin/movies' || currentRoute === 'movies' ? 'active' : ''}`}
+          onClick={() => { navigateTo('admin/movies'); onClose(); }}
         >
           <i className="fa-solid fa-film"></i>
           <span>All Movies</span>
@@ -55,20 +57,20 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
         {tamilOpen && (
           <div className="admin-nav-sub">
             <div
-              className={`admin-nav-sub-item ${isNavActive('movies-tamil-2026') ? 'active' : ''}`}
-              onClick={() => { navigateTo('movies/tamil/2026'); onClose(); }}
+              className={`admin-nav-sub-item ${currentRoute.includes('tamil/2026') ? 'active' : ''}`}
+              onClick={() => { navigateTo('admin/movies/tamil/2026'); onClose(); }}
             >
               2026 Collection
             </div>
             <div
-              className={`admin-nav-sub-item ${isNavActive('movies-tamil-2025') ? 'active' : ''}`}
-              onClick={() => { navigateTo('movies/tamil/2025'); onClose(); }}
+              className={`admin-nav-sub-item ${currentRoute.includes('tamil/2025') ? 'active' : ''}`}
+              onClick={() => { navigateTo('admin/movies/tamil/2025'); onClose(); }}
             >
               2025 Collection
             </div>
             <div
-              className={`admin-nav-sub-item ${isNavActive('movies-tamil-2024') ? 'active' : ''}`}
-              onClick={() => { navigateTo('movies/tamil/2024'); onClose(); }}
+              className={`admin-nav-sub-item ${currentRoute.includes('tamil/2024') ? 'active' : ''}`}
+              onClick={() => { navigateTo('admin/movies/tamil/2024'); onClose(); }}
             >
               2024 Collection
             </div>
@@ -91,20 +93,20 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
         {hollywoodOpen && (
           <div className="admin-nav-sub">
             <div
-              className={`admin-nav-sub-item ${isNavActive('movies-hollywood-2026') ? 'active' : ''}`}
-              onClick={() => { navigateTo('movies/hollywood/2026'); onClose(); }}
+              className={`admin-nav-sub-item ${currentRoute.includes('hollywood/2026') ? 'active' : ''}`}
+              onClick={() => { navigateTo('admin/movies/hollywood/2026'); onClose(); }}
             >
               2026 Collection
             </div>
             <div
-              className={`admin-nav-sub-item ${isNavActive('movies-hollywood-2025') ? 'active' : ''}`}
-              onClick={() => { navigateTo('movies/hollywood/2025'); onClose(); }}
+              className={`admin-nav-sub-item ${currentRoute.includes('hollywood/2025') ? 'active' : ''}`}
+              onClick={() => { navigateTo('admin/movies/hollywood/2025'); onClose(); }}
             >
               2025 Collection
             </div>
             <div
-              className={`admin-nav-sub-item ${isNavActive('movies-hollywood-2024') ? 'active' : ''}`}
-              onClick={() => { navigateTo('movies/hollywood/2024'); onClose(); }}
+              className={`admin-nav-sub-item ${currentRoute.includes('hollywood/2024') ? 'active' : ''}`}
+              onClick={() => { navigateTo('admin/movies/hollywood/2024'); onClose(); }}
             >
               2024 Collection
             </div>
@@ -115,7 +117,7 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
 
         <div
           className={`admin-nav-item ${isNavActive('slides') ? 'active' : ''}`}
-          onClick={() => { navigateTo('slides'); onClose(); }}
+          onClick={() => { navigateTo('admin/slides'); onClose(); }}
         >
           <i className="fa-solid fa-images"></i>
           <span>Slide Management</span>

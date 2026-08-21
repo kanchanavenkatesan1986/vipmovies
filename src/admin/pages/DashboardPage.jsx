@@ -184,7 +184,7 @@ export default function DashboardPage({ navigateTo }) {
             <i className="fa-solid fa-clock-rotate-left" style={{ color: 'var(--admin-accent)', fontSize: '18px' }}></i>
             <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#fff', margin: 0 }}>Recently Added Movies</h3>
           </div>
-          <button className="admin-btn" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => navigateTo('movies')}>
+          <button className="admin-btn" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => navigateTo('admin/movies')}>
             View All Movies <i className="fa-solid fa-chevron-right" style={{ fontSize: '10px' }}></i>
           </button>
         </div>

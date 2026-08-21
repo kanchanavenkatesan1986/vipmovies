@@ -37,7 +37,8 @@ export default function Router() {
   const [route, setRoute] = useState(parseLocation);
 
   const navigateTo = (newPath) => {
-    window.history.pushState(null, '', `/${newPath}`);
+    let cleanPath = newPath.replace(/^\//, '');
+    window.history.pushState(null, '', `/${cleanPath}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
