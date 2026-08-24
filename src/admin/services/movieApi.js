@@ -1,6 +1,37 @@
 import { api } from './api';
 import { cacheManager } from './cacheManager';
 
+const MOVIE_COLUMNS = [
+  'id',
+  'title',
+  'image',
+  'release',
+  'language',
+  'year',
+  'category',
+  'duration',
+  'director',
+  'starring',
+  'story',
+  'p360',
+  'p720',
+  'p1080',
+  'created_at',
+  'type',
+  'status'
+];
+
+export function sanitizeMoviePayload(data) {
+  if (!data || typeof data !== 'object') return {};
+  const sanitized = {};
+  for (const col of MOVIE_COLUMNS) {
+    if (data[col] !== undefined) {
+      sanitized[col] = data[col];
+    }
+  }
+  return sanitized;
+}
+
 export const movieApi = {
   // Fetch all movies for a given table (using cache)
   async getMovies(table, forceRefresh = false) {
@@ -21,8 +52,9 @@ export const movieApi = {
 
   // Create a new movie
   async createMovie(table, data) {
-    const response = await api.post(`/api/${table}`, data);
-    const createdRecord = response.data || data;
+    const payload = sanitizeMoviePayload(data);
+    const response = await api.post(`/api/${table}`, payload);
+    const createdRecord = response.data || payload;
     // Update local cache synchronously
     cacheManager.addRecord(table, createdRecord);
     return createdRecord;
@@ -30,8 +62,9 @@ export const movieApi = {
 
   // Update an existing movie
   async updateMovie(table, id, data) {
-    const response = await api.put(`/api/${table}/${id}`, data);
-    const updatedRecord = response.data || { id, ...data };
+    const payload = sanitizeMoviePayload(data);
+    const response = await api.put(`/api/${table}/${id}`, payload);
+    const updatedRecord = response.data || { id, ...payload };
     // Update local cache synchronously
     cacheManager.updateRecord(table, updatedRecord);
     return updatedRecord;
@@ -64,3 +97,4 @@ export const movieApi = {
     return results;
   }
 };
+

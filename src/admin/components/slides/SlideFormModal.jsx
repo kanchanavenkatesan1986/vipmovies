@@ -54,8 +54,7 @@ export default function SlideFormModal({
       return;
     }
 
-    const payload = isEdit && initialData ? { ...initialData, ...formData } : formData;
-    onSave(payload);
+    onSave(formData);
   };
 
   if (!isOpen) return null;

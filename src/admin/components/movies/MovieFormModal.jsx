@@ -42,13 +42,28 @@ export default function MovieFormModal({
   // Initialize form state
   useEffect(() => {
     if (isEdit && initialData) {
+      const dbType = displayToDbType(initialData.type || targetType);
+      const yr = String(initialData.year || targetYear);
       setFormData({
-        ...initialData,
-        type: displayToDbType(initialData.type || targetType),
-        year: String(initialData.year || targetYear),
+        id: initialData.id || '',
+        title: initialData.title || '',
+        image: initialData.image || '',
+        release: initialData.release || '',
+        language: initialData.language || (dbType === 'tamil' ? 'Tamil' : 'English'),
+        year: yr,
+        category: initialData.category || 'Action',
+        duration: initialData.duration || '',
+        director: initialData.director || '',
+        starring: initialData.starring || '',
+        story: initialData.story || '',
+        p360: initialData.p360 || initialData.p460 || initialData['460p'] || '',
+        p720: initialData.p720 || initialData['720p'] || '',
+        p1080: initialData.p1080 || initialData['1080p'] || '',
+        created_at: initialData.created_at || new Date().toISOString().split('T')[0],
+        type: dbType,
         status: (initialData.status || 'active').toLowerCase()
       });
-      setTargetTable(getMovieTable(initialData.type || targetType, initialData.year || targetYear));
+      setTargetTable(initialData._sourceTable || getMovieTable(dbType, yr));
     } else {
       const dbType = displayToDbType(targetType);
       const yr = String(targetYear || '2026');
