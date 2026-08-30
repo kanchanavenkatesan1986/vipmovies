@@ -324,11 +324,21 @@ export default function AdvancedVideoPlayer({
   };
 
   // ─── 7. HORIZONTAL & FULLSCREEN HANDLERS ───
-  // Rotate ONLY player container 90deg, phone stays portrait
-  const toggleHorizontal = () => {
-    setIsHorizontalMode(prev => !prev);
+  // Rotate ONLY player container 90deg, phone stays portrait, full screen
+  const toggleHorizontal = async () => {
+    const nextMode = !isHorizontalMode;
+    setIsHorizontalMode(nextMode);
     setIsControlsVisible(true);
     resetControlsTimer();
+
+    // Trigger DOM Fullscreen on container if supported
+    if (nextMode && containerRef.current && !screenEngine.isFullscreen()) {
+      await screenEngine.requestFullscreen(containerRef.current).catch(() => {});
+      setIsFullscreen(screenEngine.isFullscreen());
+    } else if (!nextMode && screenEngine.isFullscreen()) {
+      await screenEngine.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+    }
   };
 
   // Native Fullscreen on DOM element only (no device orientation lock)
