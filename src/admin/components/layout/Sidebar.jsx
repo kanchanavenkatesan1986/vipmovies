@@ -127,6 +127,16 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
           </div>
         )}
 
+        <div className="admin-nav-section">Storage & Uploads</div>
+
+        <div
+          className={`admin-nav-item ${isActive('admin/uploads') ? 'active' : ''}`}
+          onClick={() => go('admin/uploads')}
+        >
+          <i className="fa-solid fa-cloud-arrow-up" style={{ color: 'var(--admin-blue)' }}></i>
+          <span>Upload Manager</span>
+        </div>
+
         <div className="admin-nav-section">Banners</div>
 
         <div

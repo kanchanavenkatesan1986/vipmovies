@@ -16,6 +16,7 @@ import LoginPage from '../admin/pages/LoginPage';
 import DashboardPage from '../admin/pages/DashboardPage';
 import MoviesPage from '../admin/pages/MoviesPage';
 import SlidesPage from '../admin/pages/SlidesPage';
+import UploadManagerPage from '../admin/pages/UploadManagerPage';
 import { authService } from '../admin/services/authService';
 import '../admin/styles/admin.css';
 
@@ -82,6 +83,10 @@ export default function Router() {
 
     if (path === 'admin/slides') {
       return <SlidesPage navigateTo={navigateTo} />;
+    }
+
+    if (path === 'admin/uploads' || path === 'admin/upload') {
+      return <UploadManagerPage navigateTo={navigateTo} />;
     }
 
     if (path.startsWith('admin/movies')) {
