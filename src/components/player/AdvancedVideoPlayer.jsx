@@ -327,6 +327,8 @@ export default function AdvancedVideoPlayer({
   // Rotate ONLY player container 90deg, phone stays portrait
   const toggleHorizontal = () => {
     setIsHorizontalMode(prev => !prev);
+    setIsControlsVisible(true);
+    resetControlsTimer();
   };
 
   // Native Fullscreen on DOM element only (no device orientation lock)

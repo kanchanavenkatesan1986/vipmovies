@@ -40,7 +40,11 @@ export default function PlayerControls({
   return (
     <div
       className={`vip-player-controls-overlay ${isVisible ? 'visible' : 'hidden'} ${disabled ? 'disabled' : ''}`}
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        if (e.target === e.currentTarget || e.target.classList.contains('vip-controls-center')) {
+          onTogglePlay();
+        }
+      }}
     >
       {/* ── 1. TOP BAR ── */}
       <div className="vip-controls-top">
