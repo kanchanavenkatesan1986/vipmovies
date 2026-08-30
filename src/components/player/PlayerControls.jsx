@@ -17,6 +17,7 @@ export default function PlayerControls({
   currentSubtitle = 'off',
   isTheatreMode = false,
   isFullscreen = false,
+  isHorizontalMode = false,
   isPipSupported = false,
   isPipActive = false,
   onTogglePlay,
@@ -29,6 +30,7 @@ export default function PlayerControls({
   onOpenSettings,
   onToggleTheatre,
   onToggleFullscreen,
+  onToggleHorizontal,
   onTogglePip,
   onBack,
   disabled = false
@@ -40,7 +42,7 @@ export default function PlayerControls({
       className={`vip-player-controls-overlay ${isVisible ? 'visible' : 'hidden'} ${disabled ? 'disabled' : ''}`}
       onClick={(e) => {
         if (e.target === e.currentTarget || e.target.classList.contains('vip-controls-center')) {
-          onTogglePlay();
+          if (onTogglePlay) onTogglePlay();
         }
       }}
     >
@@ -78,12 +80,12 @@ export default function PlayerControls({
             <span className="gold">VIP</span> MOVIES
           </div>
 
-          {/* ↻ HORIZONTAL / ↶ EXIT BUTTON */}
+          {/* ↻ HORIZONTAL / ↶ EXIT HORIZONTAL BUTTON */}
           <button
             type="button"
             className={`vip-ctrl-btn vip-horizontal-btn ${isHorizontalMode ? 'active' : ''}`}
             onClick={onToggleHorizontal}
-            title={isHorizontalMode ? 'Exit Horizontal Mode' : 'Rotate to Full Horizontal Screen'}
+            title={isHorizontalMode ? 'Exit Horizontal Mode' : 'Rotate to Horizontal Mode'}
             aria-label={isHorizontalMode ? 'Exit Horizontal' : 'Horizontal Player'}
           >
             <i className={`fa-solid ${isHorizontalMode ? 'fa-arrow-rotate-left' : 'fa-rotate'}`}></i>
@@ -189,7 +191,7 @@ export default function PlayerControls({
                   max="1"
                   step="0.05"
                   value={muted ? 0 : volume}
-                  onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+                  onChange={(e) => onVolumeChange && onVolumeChange(parseFloat(e.target.value))}
                   className="vip-volume-slider"
                   aria-label="Volume Slider"
                 />
@@ -269,7 +271,7 @@ export default function PlayerControls({
               <i className="fa-solid fa-gear"></i>
             </button>
 
-            {/* ⛶ FULLSCREEN / ⛶ EXIT FULLSCREEN */}
+            {/* Fullscreen */}
             <button
               type="button"
               className={`vip-ctrl-btn vip-fullscreen-btn ${isFullscreen ? 'active' : ''}`}
