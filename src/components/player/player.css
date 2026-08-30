@@ -63,15 +63,25 @@
   padding-right: env(safe-area-inset-right, 0);
 }
 
-/* ── HORIZONTAL IN-PAGE 90° ROTATED PLAYER (Device remains Portrait, Player rotates 90°) ── */
+/* ── HORIZONTAL IN-PAGE 90° ROTATED PLAYER ──
+   Phone stays PORTRAIT physically.
+   The container is rotated 90deg so:
+     CSS width  → becomes the visual HEIGHT on screen  (set to 100dvh)
+     CSS height → becomes the visual WIDTH  on screen  (set to 100dvw)
+   This makes the rotated box exactly fill the entire screen.
+── */
 .vip-advanced-player-container.vip-player-horizontal {
   position: fixed !important;
   top: 50% !important;
   left: 50% !important;
+  /* width = screen height (100dvh) so after 90deg rotation it spans full screen height visually */
   width: 100dvh !important;
+  /* height = screen width (100dvw) so after 90deg rotation it spans full screen width visually */
   height: 100dvw !important;
   max-width: none !important;
   max-height: none !important;
+  min-width: unset !important;
+  min-height: unset !important;
   transform: translate(-50%, -50%) rotate(90deg) !important;
   transform-origin: center center !important;
   z-index: 999999 !important;
@@ -80,15 +90,29 @@
   border: none !important;
   box-shadow: none !important;
   margin: 0 !important;
+  padding: 0 !important;
   aspect-ratio: unset !important;
   overflow: hidden !important;
-  padding-top: env(safe-area-inset-left, 0);
-  padding-bottom: env(safe-area-inset-right, 0);
-  padding-left: env(safe-area-inset-top, 0);
-  padding-right: env(safe-area-inset-bottom, 0);
 }
 
-/* If device is naturally in landscape already */
+/* Video fills 100% of the rotated container — object-fit: cover fills edge-to-edge */
+.vip-advanced-player-container.vip-player-horizontal .vip-html5-video {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Gesture layer must also fill rotated container */
+.vip-advanced-player-container.vip-player-horizontal .vip-gesture-layer {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* If device is naturally in landscape (no rotation needed) */
 @media (orientation: landscape) and (min-width: 600px) {
   .vip-advanced-player-container.vip-player-horizontal {
     top: 0 !important;
@@ -96,6 +120,9 @@
     width: 100dvw !important;
     height: 100dvh !important;
     transform: none !important;
+  }
+  .vip-advanced-player-container.vip-player-horizontal .vip-html5-video {
+    object-fit: contain !important;
   }
 }
 
@@ -127,9 +154,11 @@
   gap: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
+  user-select: none;
 }
 
-.vip-ctrl-btn.vip-horizontal-btn:hover {
+.vip-ctrl-btn.vip-horizontal-btn:hover,
+.vip-ctrl-btn.vip-horizontal-btn:active {
   background: var(--accent, #f59e0b);
   color: #000;
 }

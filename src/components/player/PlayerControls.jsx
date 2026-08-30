@@ -17,7 +17,6 @@ export default function PlayerControls({
   currentSubtitle = 'off',
   isTheatreMode = false,
   isFullscreen = false,
-  isHorizontalMode = false,
   isPipSupported = false,
   isPipActive = false,
   onTogglePlay,
@@ -30,7 +29,6 @@ export default function PlayerControls({
   onOpenSettings,
   onToggleTheatre,
   onToggleFullscreen,
-  onToggleHorizontal,
   onTogglePip,
   onBack,
   disabled = false
@@ -80,12 +78,12 @@ export default function PlayerControls({
             <span className="gold">VIP</span> MOVIES
           </div>
 
-          {/* ↻ HORIZONTAL / ↶ EXIT HORIZONTAL BUTTON */}
+          {/* ↻ HORIZONTAL / ↶ EXIT BUTTON */}
           <button
             type="button"
             className={`vip-ctrl-btn vip-horizontal-btn ${isHorizontalMode ? 'active' : ''}`}
             onClick={onToggleHorizontal}
-            title={isHorizontalMode ? 'Exit Horizontal Mode' : 'Rotate to Horizontal Mode'}
+            title={isHorizontalMode ? 'Exit Horizontal Mode' : 'Rotate to Full Horizontal Screen'}
             aria-label={isHorizontalMode ? 'Exit Horizontal' : 'Horizontal Player'}
           >
             <i className={`fa-solid ${isHorizontalMode ? 'fa-arrow-rotate-left' : 'fa-rotate'}`}></i>

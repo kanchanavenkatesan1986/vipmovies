@@ -39,15 +39,15 @@ export default function AdvancedVideoPlayer({
   const [brightness, setBrightness] = useState(100);
 
   // ─── PLAYER STATE ───
-  const [playerState, setPlayerState] = useState('LOADING'); // 'IDLE' | 'LOADING' | 'PLAYING' | 'PAUSED' | 'BUFFERING' | 'ERROR' | 'ENDED'
+  const [playerState, setPlayerState] = useState('LOADING');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [bufferedRanges, setBufferedRanges] = useState([]);
   const [isControlsVisible, setIsControlsVisible] = useState(true);
 
-  // ─── VIEWPORT & ORIENTATION MODES (Player rotation only, NO device lock) ───
-  const [isHorizontalMode, setIsHorizontalMode] = useState(false); // 90deg in-page rotated player
-  const [isFullscreen, setIsFullscreen] = useState(false); // Fullscreen DOM API
+  // ─── ORIENTATION & FULLSCREEN MODES ───
+  const [isHorizontalMode, setIsHorizontalMode] = useState(false); // 90° Rotated Mode (Phone held sideways in portrait)
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTheatreMode, setIsTheatreMode] = useState(settings.theatreMode || false);
   const [isPipActive, setIsPipActive] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -149,7 +149,6 @@ export default function AdvancedVideoPlayer({
       setDuration(dur);
     }
 
-    // Buffered calculation
     const buf = videoRef.current.buffered;
     const ranges = [];
     for (let i = 0; i < buf.length; i++) {
@@ -157,12 +156,10 @@ export default function AdvancedVideoPlayer({
     }
     setBufferedRanges(ranges);
 
-    // Up Next Check (Last 20 seconds)
     if (nextMovie && dur > 60 && (dur - curr) <= 20 && !showUpNext) {
       setShowUpNext(true);
     }
 
-    // Save Progress Throttled
     if (!progressSaveThrottleRef.current && movie) {
       progressSaveThrottleRef.current = setTimeout(() => {
         progressSaveThrottleRef.current = null;
@@ -324,18 +321,18 @@ export default function AdvancedVideoPlayer({
   };
 
   // ─── 7. HORIZONTAL & FULLSCREEN HANDLERS ───
-  // Pure in-page 90deg CSS Full-Screen Player (Works in all WebViews & Mobile Browsers)
   const toggleHorizontal = () => {
     setIsHorizontalMode(prev => !prev);
     setIsControlsVisible(true);
     resetControlsTimer();
   };
 
-  // Native Fullscreen on DOM element only (no device orientation lock)
   const toggleFullscreen = async () => {
     if (containerRef.current) {
       await screenEngine.toggleFullscreen(containerRef.current);
       setIsFullscreen(screenEngine.isFullscreen());
+    } else {
+      setIsFullscreen(prev => !prev);
     }
   };
 
@@ -351,7 +348,6 @@ export default function AdvancedVideoPlayer({
     setIsPipActive(active);
   };
 
-  // Track native fullscreen change
   useEffect(() => {
     const onFullscreenChange = () => {
       setIsFullscreen(screenEngine.isFullscreen());
@@ -366,7 +362,6 @@ export default function AdvancedVideoPlayer({
 
   // ─── 8. BACK ACTION IN STRICT PRIORITY ORDER ───
   const handleSmartBack = useCallback(() => {
-    // 1. If settings/stats modal open -> close modal
     if (isSettingsOpen) {
       setIsSettingsOpen(false);
       return;
@@ -375,24 +370,21 @@ export default function AdvancedVideoPlayer({
       setIsStatsOpen(false);
       return;
     }
-    // 2. If in fullscreen -> exit fullscreen
     if (isFullscreen) {
       screenEngine.exitFullscreen();
       setIsFullscreen(false);
       return;
     }
-    // 3. If in horizontal mode -> exit horizontal mode
     if (isHorizontalMode) {
       setIsHorizontalMode(false);
       return;
     }
-    // 4. Otherwise -> navigate back
     if (onBack) {
       onBack();
     }
   }, [isSettingsOpen, isStatsOpen, isFullscreen, isHorizontalMode, onBack]);
 
-  // ─── 8b. LOCK BODY SCROLL WHEN IN HORIZONTAL MODE ───
+  // Lock body scroll in horizontal mode
   useEffect(() => {
     if (isHorizontalMode) {
       const prevBodyOverflow = document.body.style.overflow;
@@ -516,7 +508,7 @@ export default function AdvancedVideoPlayer({
         'vip-advanced-player-container',
         isHorizontalMode ? 'vip-player-horizontal' : '',
         pageMode && !isHorizontalMode ? 'page-mode' : '',
-        !pageMode && !isHorizontalMode && isTheatreMode ? 'theatre-mode' : '',
+        !pageMode && isTheatreMode ? 'theatre-mode' : '',
         isFullscreen ? 'fullscreen-mode' : '',
         brightness < 100 ? 'brightness-filtered' : ''
       ].filter(Boolean).join(' ')}
@@ -528,7 +520,7 @@ export default function AdvancedVideoPlayer({
         }
       }}
     >
-      {/* ── GESTURE ENGINE LAYER ── */}
+      {/* ── GESTURE ENGINE LAYER (Transformed for 90deg rotation in horizontal mode) ── */}
       <PlayerGestureHandler
         containerRef={containerRef}
         onToggleControls={() => setIsControlsVisible(!isControlsVisible)}
