@@ -168,7 +168,13 @@ export default function UploadManagerPage({ navigateTo }) {
               onCancel={handleCancelItem}
               onDelete={(id) => uploadScheduler.removeUpload(id)}
               onBulkEdit={handleBulkEditOpen}
-              onRequestFileReattach={(item) => setResumeTargetItem(item)}
+              onRequestFileReattach={(item) => {
+                if (item.preselectedFile) {
+                  handleAttachFile(item.id, item.preselectedFile);
+                } else {
+                  setResumeTargetItem(item);
+                }
+              }}
               categories={DEFAULT_UPLOAD_CONFIG.allowedCategories}
               years={DEFAULT_UPLOAD_CONFIG.years}
               mediaBaseUrl={DEFAULT_UPLOAD_CONFIG.mediaBaseUrl}

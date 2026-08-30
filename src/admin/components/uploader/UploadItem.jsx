@@ -263,9 +263,25 @@ export default function UploadItem({
           <i className="fa-solid fa-triangle-exclamation"></i>
           <span>{item.error}</span>
           {item.error.includes('File object missing') && (
-            <button className="admin-btn text sm" onClick={() => onRequestFileReattach(item)}>
-              <i className="fa-solid fa-folder-open"></i> Select File
-            </button>
+            <label className="admin-btn primary sm" style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <i className="fa-solid fa-folder-open"></i>
+              <span>Select File</span>
+              <input
+                type="file"
+                accept=".mp4,.mkv,.webm,.mov,.m4v,.avi,video/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.name !== item.filename || file.size !== item.fileSize) {
+                    onRequestFileReattach(item);
+                  } else {
+                    onRequestFileReattach({ ...item, preselectedFile: file });
+                  }
+                  e.target.value = '';
+                }}
+              />
+            </label>
           )}
         </div>
       )}
