@@ -174,36 +174,57 @@
 /* ── HORIZONTAL BUTTON IN TOP BAR ── */
 .vip-ctrl-btn.vip-horizontal-btn {
   width: auto !important;
-  padding: 6px 14px !important;
-  background: var(--accent, #f59e0b) !important;
+  min-width: 128px !important;
+  height: 36px !important;
+  padding: 0 16px !important;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
   color: #000 !important;
-  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
   border-radius: 20px !important;
-  font-size: 11.5px !important;
+  font-size: 12px !important;
   font-weight: 900 !important;
-  letter-spacing: 0.6px !important;
+  letter-spacing: 0.8px !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  justify-content: center !important;
+  gap: 8px !important;
   cursor: pointer !important;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45) !important;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.5) !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   user-select: none !important;
   flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+.vip-ctrl-btn.vip-horizontal-btn i {
+  font-size: 13px !important;
+  color: #000 !important;
+}
+
+.vip-ctrl-btn.vip-horizontal-btn .vip-btn-label {
+  font-size: 11.5px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.8px !important;
+  color: #000 !important;
 }
 
 .vip-ctrl-btn.vip-horizontal-btn:hover,
 .vip-ctrl-btn.vip-horizontal-btn:active {
-  background: #fbbf24 !important;
-  transform: scale(1.05) !important;
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.65) !important;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+  transform: scale(1.04) !important;
+  box-shadow: 0 6px 22px rgba(245, 158, 11, 0.7) !important;
 }
 
 .vip-ctrl-btn.vip-horizontal-btn.active {
-  background: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(15, 23, 42, 0.85) !important;
   color: #fff !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  border-color: rgba(245, 158, 11, 0.6) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6) !important;
+}
+
+.vip-ctrl-btn.vip-horizontal-btn.active i,
+.vip-ctrl-btn.vip-horizontal-btn.active .vip-btn-label {
+  color: var(--accent, #f59e0b) !important;
 }
 
 /* ── GESTURE LAYER ── */
