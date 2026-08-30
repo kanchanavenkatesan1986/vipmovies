@@ -436,6 +436,17 @@ class UploadScheduler {
       item.error = err.message || 'Upload failed';
       item.speed = 0;
       item.eta = 0;
+
+      // Auto-delete / abort incomplete multipart upload session on Cloudflare R2 immediately
+      if (item.uploadId) {
+        uploadApi.abortUpload({
+          key: item.destinationKey,
+          uploadId: item.uploadId
+        }).catch(e => console.warn('[Scheduler] Auto-abort on failure error:', e));
+        item.uploadId = null;
+        item.completedParts = [];
+      }
+
       await uploadStorage.saveUpload(item);
       this.notifyListeners(true);
     } finally {
@@ -788,6 +799,57 @@ class UploadScheduler {
     }
     this.notifyListeners(true);
     this.processQueue();
+  }
+
+  async removeUpload(id) {
+    const item = this.queue.find(x => x.id === id);
+    if (!item) return;
+
+    if (item.uploadId && item.status !== UPLOAD_STATUS.COMPLETED) {
+      uploadApi.abortUpload({
+        key: item.destinationKey,
+        uploadId: item.uploadId
+      }).catch(e => console.warn('[Scheduler] Auto-abort on remove error:', e));
+    }
+
+    const controller = this.fileControllers.get(id);
+    if (controller) {
+      controller.abort('Removed');
+      this.fileControllers.delete(id);
+    }
+
+    this.activeFileIds.delete(id);
+    this.queue = this.queue.filter(x => x.id !== id);
+    this.fileMap.delete(id);
+    this.speedTrackers.delete(id);
+    await uploadStorage.deleteUpload(id);
+    this.notifyListeners(true);
+    this.processQueue();
+  }
+
+  async clearCompleted() {
+    this.queue = this.queue.filter(x => x.status !== UPLOAD_STATUS.COMPLETED);
+    this.notifyListeners(true);
+  }
+
+  async clearAll() {
+    for (const item of this.queue) {
+      if (item.uploadId && item.status !== UPLOAD_STATUS.COMPLETED) {
+        uploadApi.abortUpload({
+          key: item.destinationKey,
+          uploadId: item.uploadId
+        }).catch(e => console.warn('[Scheduler] Auto-abort on clearAll:', e));
+      }
+      const controller = this.fileControllers.get(item.id);
+      if (controller) controller.abort('Cleared');
+    }
+    this.activeFileIds.clear();
+    this.fileControllers.clear();
+    this.queue = [];
+    this.fileMap.clear();
+    this.speedTrackers.clear();
+    await uploadStorage.clearAllUploads();
+    this.notifyListeners(true);
   }
 }
 

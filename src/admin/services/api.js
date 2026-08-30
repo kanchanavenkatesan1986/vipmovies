@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api-database.akatsuki-pvt-ltd.workers.dev';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api-movies.akatsuki-pvt-ltd.workers.dev';
 
 export async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;

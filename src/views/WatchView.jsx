@@ -12,14 +12,14 @@ function getMovieImageUrl(movie) {
 }
 
 export default function WatchView({ movieId }) {
-  const { movies, favorites, toggleFavorite, recordHistory, isMovieUnlocked, openMoviePreview, triggerRewardedAd } = useApp();
+  const { movies, favorites, toggleFavorite, recordHistory, isMovieUnlocked } = useApp();
   const movie = movies.find(m => String(m.id || m.movieId).trim() === String(movieId || '').trim());
 
   useEffect(() => {
     if (movie && isMovieUnlocked(movie.id)) {
       recordHistory(movie);
     }
-  }, [movie, isMovieUnlocked]);
+  }, [movie, isMovieUnlocked, recordHistory]);
 
   if (!movieId) {
     return (
@@ -39,7 +39,6 @@ export default function WatchView({ movieId }) {
     );
   }
 
-  const unlocked = isMovieUnlocked(movie.id);
   const isFavorite = favorites.some(fav => String(fav.movieId) === String(movie.id));
   const isComingSoon = movie.status && movie.status.toLowerCase() === 'coming soon';
 
@@ -57,9 +56,17 @@ export default function WatchView({ movieId }) {
     }
   };
 
+  const navigateToPlayer = (quality = 'auto') => {
+    const id = movie.id || movie.movieId;
+    window.history.pushState(null, '', `/player?reward=${encodeURIComponent(id)}&quality=${encodeURIComponent(quality)}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  // Direct download links
   const p460Link = movie.p360 || movie.p460 || '#';
   const p720Link = movie.p720 || '#';
   const p1080Link = movie.p1080 || '#';
+  const directDownloadLink = p1080Link !== '#' ? p1080Link : p720Link !== '#' ? p720Link : p460Link;
 
   return (
     <>
@@ -78,8 +85,6 @@ export default function WatchView({ movieId }) {
           </div>
         </div>
       )}
-
-
 
       <div style={isComingSoon ? { opacity: 0.5, filter: 'grayscale(40%)', pointerEvents: 'none', userSelect: 'none' } : {}}>
 
@@ -138,12 +143,17 @@ export default function WatchView({ movieId }) {
           <span id="starring"> {movie.starring || '-'}</span>
         </div>
 
-        {/* ── ACTION BUTTONS ── */}
+        {/* ── ACTION BUTTONS: Watch Now opens separate player page, Direct Download downloads ── */}
         <div className="action-buttons">
-          <a className="btn-watch p460" href={p460Link}>
+          <button
+            type="button"
+            className="btn-watch p460"
+            onClick={() => navigateToPlayer('auto')}
+            style={{ cursor: 'pointer', border: 'none' }}
+          >
             <i className="fa-solid fa-circle-play"></i> Watch Now
-          </a>
-          <a className="btn-download p460" href={p460Link} target="_blank" rel="noopener noreferrer">
+          </button>
+          <a className="btn-download p460" href={directDownloadLink} target="_blank" rel="noopener noreferrer">
             <i className="fa-solid fa-circle-down"></i> Direct Download
           </a>
         </div>
@@ -154,7 +164,7 @@ export default function WatchView({ movieId }) {
           <p className="story-text" id="story">{movie.story || 'No description available.'}</p>
         </div>
 
-        {/* ── QUALITY BOX ── */}
+        {/* ── QUALITY BOX: Play opens separate player page with selected quality, Download downloads ── */}
         <div className="quality-box">
           <h3 className="quality-header">Watch &amp; Download (Select Quality)</h3>
           <div className="quality-list">
@@ -166,8 +176,18 @@ export default function WatchView({ movieId }) {
                 <span className="quality-label">Movie Quality - 460p (SD)</span>
               </div>
               <div className="quality-actions">
-                <a className="quality-btn-play p460" href={p460Link}><i className="fa-solid fa-play"></i></a>
-                <a className="quality-btn-down p460" href={p460Link} target="_blank" rel="noopener noreferrer"><i className="fa-solid fa-download"></i></a>
+                <button
+                  type="button"
+                  className="quality-btn-play p460"
+                  title="Play 460p in Player"
+                  onClick={() => navigateToPlayer('460p')}
+                  style={{ border: 'none', cursor: 'pointer' }}
+                >
+                  <i className="fa-solid fa-play"></i>
+                </button>
+                <a className="quality-btn-down p460" href={p460Link} target="_blank" rel="noopener noreferrer" title="Download 460p">
+                  <i className="fa-solid fa-download"></i>
+                </a>
               </div>
             </div>
 
@@ -178,8 +198,18 @@ export default function WatchView({ movieId }) {
                 <span className="quality-label">Movie Quality - 720p (HD)</span>
               </div>
               <div className="quality-actions">
-                <a className="quality-btn-play p720" href={p720Link}><i className="fa-solid fa-play"></i></a>
-                <a className="quality-btn-down p720" href={p720Link} target="_blank" rel="noopener noreferrer"><i className="fa-solid fa-download"></i></a>
+                <button
+                  type="button"
+                  className="quality-btn-play p720"
+                  title="Play 720p in Player"
+                  onClick={() => navigateToPlayer('720p')}
+                  style={{ border: 'none', cursor: 'pointer' }}
+                >
+                  <i className="fa-solid fa-play"></i>
+                </button>
+                <a className="quality-btn-down p720" href={p720Link} target="_blank" rel="noopener noreferrer" title="Download 720p">
+                  <i className="fa-solid fa-download"></i>
+                </a>
               </div>
             </div>
 
@@ -190,8 +220,18 @@ export default function WatchView({ movieId }) {
                 <span className="quality-label">Movie Quality - 1080p (Full HD)</span>
               </div>
               <div className="quality-actions">
-                <a className="quality-btn-play p1080" href={p1080Link}><i className="fa-solid fa-play"></i></a>
-                <a className="quality-btn-down p1080" href={p1080Link} target="_blank" rel="noopener noreferrer"><i className="fa-solid fa-download"></i></a>
+                <button
+                  type="button"
+                  className="quality-btn-play p1080"
+                  title="Play 1080p in Player"
+                  onClick={() => navigateToPlayer('1080p')}
+                  style={{ border: 'none', cursor: 'pointer' }}
+                >
+                  <i className="fa-solid fa-play"></i>
+                </button>
+                <a className="quality-btn-down p1080" href={p1080Link} target="_blank" rel="noopener noreferrer" title="Download 1080p">
+                  <i className="fa-solid fa-download"></i>
+                </a>
               </div>
             </div>
 

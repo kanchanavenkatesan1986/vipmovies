@@ -5,7 +5,7 @@ compatibility_date = "2024-04-01"
 # Cloudflare R2 Bucket Binding
 [[r2_buckets]]
 binding = "MY_BUCKET"
-bucket_name = "vipmovies" # Replace with your actual R2 bucket name if different
+bucket_name = "tvk-movies"
 
 # Configuration Variables
 [vars]

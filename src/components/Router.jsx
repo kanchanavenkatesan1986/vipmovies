@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import HomeView from '../views/HomeView';
 import WatchView from '../views/WatchView';
+import PlayerView from '../views/PlayerView';
 import SearchView from '../views/SearchView';
 import YearsView from '../views/YearsView';
 import ListView from '../views/ListView';
@@ -17,18 +18,29 @@ import DashboardPage from '../admin/pages/DashboardPage';
 import MoviesPage from '../admin/pages/MoviesPage';
 import SlidesPage from '../admin/pages/SlidesPage';
 import UploadManagerPage from '../admin/pages/UploadManagerPage';
+import FileManagerPage from '../admin/pages/FileManagerPage';
 import { authService } from '../admin/services/authService';
 import '../admin/styles/admin.css';
 
 function parseLocation() {
-  // pathname e.g. "/watch", "/home", "/admin", "/admin/movies"
+  // pathname e.g. "watch", "home", "admin", "admin/movies"
   let path = window.location.pathname.replace(/^\//, '') || 'home';
 
-  // Parse query params from real search string e.g. ?reward=tamil-2025-00025
+  // Parse query params from real search string e.g. ?reward=tamil-2025-00025 or ?tamil-2026-00001
   const params = {};
-  const urlParams = new URLSearchParams(window.location.search);
-  for (const [key, val] of urlParams.entries()) {
-    params[key] = val;
+  const searchStr = window.location.search.replace(/^\?/, '').trim();
+
+  if (searchStr) {
+    if (searchStr.includes('=')) {
+      const urlParams = new URLSearchParams(window.location.search);
+      for (const [key, val] of urlParams.entries()) {
+        params[key] = val;
+      }
+    } else {
+      // Direct movie ID query parameter like ?tamil-2026-00001
+      params.id = searchStr;
+      params.reward = searchStr;
+    }
   }
 
   return { path, params };
@@ -89,6 +101,10 @@ export default function Router() {
       return <UploadManagerPage navigateTo={navigateTo} />;
     }
 
+    if (path === 'admin/file-manager' || path === 'admin/files') {
+      return <FileManagerPage navigateTo={navigateTo} />;
+    }
+
     if (path.startsWith('admin/movies')) {
       const parts = path.split('/');
       const type = parts[2] || '';
@@ -105,6 +121,9 @@ export default function Router() {
       return <HomeView />;
     case 'watch':
       return <WatchView movieId={route.params.reward || route.params.id} type={route.params.type} year={route.params.year} />;
+    case 'player':
+    case 'play':
+      return <PlayerView movieId={route.params.reward || route.params.id} initialQuality={route.params.quality || 'auto'} />;
     case 'search':
       return <SearchView query={route.params.q} />;
     case 'years':

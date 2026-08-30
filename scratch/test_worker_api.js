@@ -37,7 +37,7 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/health`);
     const data = await res.json();
     assert(res.status === 200, 'Status code is 200', res.status);
-    assert(data.success === true && data.status === 'ok', 'Service status is ok', data);
+    assert(data.status === 'ok' && (data.service === 'vipmovies-r2-uploader' || data.service === 'vipmovies-r2-file-manager'), 'Service status is ok', data.service);
     assert(Array.isArray(data.allowedCategories) && data.allowedCategories.includes('tamil'), 'Allowed categories present', data.allowedCategories);
   } catch (err) {
     assert(false, 'GET /health failed with error', err.message);

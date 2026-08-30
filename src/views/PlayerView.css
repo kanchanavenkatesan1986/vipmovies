@@ -1,0 +1,63 @@
+/* ============================================================
+   VIP MOVIES — IN-PAGE PLAYER VIEW
+   Standard web page layout with 16:9 player
+   ============================================================ */
+
+.vip-player-page-view {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto 32px;
+  padding: 12px 16px;
+  box-sizing: border-box;
+}
+
+/* In-page 16:9 player wrapper */
+.vip-player-page-view .vip-advanced-player-container {
+  width: 100%;
+  aspect-ratio: 16 / 9 !important;
+  max-height: 75vh;
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 0 auto 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+}
+
+/* Movie details card under player */
+.vip-player-details-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-top: 16px;
+}
+
+.vip-player-details-card .movie-title {
+  margin: 0 0 10px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.vip-player-details-card .vip-movie-tags {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* Not found container */
+.vip-player-notfound {
+  text-align: center;
+  padding: 60px 20px;
+  color: #fff;
+}
+
+.vip-player-notfound i {
+  font-size: 40px;
+  color: var(--accent, #f59e0b);
+  margin-bottom: 14px;
+  display: block;
+}
+
+.vip-player-notfound a {
+  color: var(--accent, #f59e0b);
+}
