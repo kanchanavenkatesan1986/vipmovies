@@ -87,8 +87,9 @@ export default function App() {
   }
 
   const isAdminPage = currentPath.toLowerCase().startsWith('admin');
+  const isPlayerPage = currentPath === 'player' || currentPath === 'play';
 
-  if (isAdminPage) {
+  if (isAdminPage || isPlayerPage) {
     return <Router />;
   }
 
