@@ -41,7 +41,11 @@ class UploadApiClient {
 
   async getBaseUrl() {
     const config = await this.getConfig();
-    return (config.apiBase || DEFAULT_UPLOAD_CONFIG.apiBase).replace(/\/+$/, '');
+    let base = (config.apiBase || DEFAULT_UPLOAD_CONFIG.apiBase).replace(/\/+$/, '');
+    if (base.includes('api-uploud')) {
+      base = DEFAULT_UPLOAD_CONFIG.apiBase;
+    }
+    return base;
   }
 
   /**
@@ -91,6 +95,11 @@ class UploadApiClient {
         const timeoutErr = new Error(`Request timed out (${timeoutSeconds}s)`);
         timeoutErr.code = 'TIMEOUT';
         throw timeoutErr;
+      }
+      if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+        const netErr = new Error(`Cannot connect to Worker at ${baseUrl}. Please check Settings or Worker URL.`);
+        netErr.code = 'NETWORK_ERROR';
+        throw netErr;
       }
       throw err;
     }

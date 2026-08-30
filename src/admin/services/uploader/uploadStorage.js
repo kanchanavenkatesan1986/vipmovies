@@ -77,7 +77,11 @@ class UploadStorage {
       const db = await this.dbPromise;
       if (!db) {
         const local = localStorage.getItem('vip_upload_settings');
-        return local ? { ...DEFAULT_UPLOAD_CONFIG, ...JSON.parse(local) } : DEFAULT_UPLOAD_CONFIG;
+        const cfg = local ? { ...DEFAULT_UPLOAD_CONFIG, ...JSON.parse(local) } : DEFAULT_UPLOAD_CONFIG;
+        if (cfg.apiBase && cfg.apiBase.includes('api-uploud')) {
+          cfg.apiBase = DEFAULT_UPLOAD_CONFIG.apiBase;
+        }
+        return cfg;
       }
 
       return new Promise((resolve) => {
@@ -87,7 +91,11 @@ class UploadStorage {
 
         req.onsuccess = () => {
           if (req.result && req.result.config) {
-            resolve({ ...DEFAULT_UPLOAD_CONFIG, ...req.result.config });
+            const merged = { ...DEFAULT_UPLOAD_CONFIG, ...req.result.config };
+            if (merged.apiBase && merged.apiBase.includes('api-uploud')) {
+              merged.apiBase = DEFAULT_UPLOAD_CONFIG.apiBase;
+            }
+            resolve(merged);
           } else {
             resolve(DEFAULT_UPLOAD_CONFIG);
           }
