@@ -173,33 +173,37 @@
 
 /* ── HORIZONTAL BUTTON IN TOP BAR ── */
 .vip-ctrl-btn.vip-horizontal-btn {
-  width: auto;
-  padding: 5px 11px;
-  background: rgba(245, 158, 11, 0.18);
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  color: var(--accent, #f59e0b);
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  user-select: none;
+  width: auto !important;
+  padding: 6px 14px !important;
+  background: var(--accent, #f59e0b) !important;
+  color: #000 !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  border-radius: 20px !important;
+  font-size: 11.5px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  user-select: none !important;
+  flex-shrink: 0 !important;
 }
 
 .vip-ctrl-btn.vip-horizontal-btn:hover,
 .vip-ctrl-btn.vip-horizontal-btn:active {
-  background: var(--accent, #f59e0b);
-  color: #000;
+  background: #fbbf24 !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.65) !important;
 }
 
 .vip-ctrl-btn.vip-horizontal-btn.active {
-  background: var(--accent, #f59e0b);
-  color: #000;
-  border-color: var(--accent, #f59e0b);
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* ── GESTURE LAYER ── */
