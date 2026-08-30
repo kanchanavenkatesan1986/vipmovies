@@ -1332,3 +1332,53 @@
   .vip-center-play-btn { width: 48px; height: 48px; font-size: 18px; }
   .vip-controls-bottom { padding: 4px 16px 8px; }
 }
+
+/* ── MOBILE VERTICAL (PORTRAIT) COMPACT CONTROLS ──
+   In mobile vertical view, all extra options (Quality, Speed, Subtitles, PiP, etc.)
+   are neatly housed inside the Settings Gear ⚙️ only, preventing bottom bar overflow.
+── */
+@media (max-width: 680px) {
+  .vip-advanced-player-container:not(.vip-player-horizontal) .vip-ctrl-desktop-only {
+    display: none !important;
+  }
+
+  .vip-advanced-player-container:not(.vip-player-horizontal) .vip-controls-bottom {
+    padding: 6px 12px 10px !important;
+  }
+
+  .vip-advanced-player-container:not(.vip-player-horizontal) .vip-bottom-row {
+    gap: 4px !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+  }
+
+  .vip-advanced-player-container:not(.vip-player-horizontal) .vip-ctrl-group.left {
+    gap: 2px !important;
+  }
+
+  .vip-advanced-player-container:not(.vip-player-horizontal) .vip-ctrl-group.right {
+    gap: 4px !important;
+  }
+
+  .vip-advanced-player-container:not(.vip-player-horizontal) .vip-ctrl-btn {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 13px !important;
+  }
+
+  .vip-advanced-player-container:not(.vip-player-horizontal) .vip-time-display {
+    font-size: 11px !important;
+    gap: 3px !important;
+    margin-left: 2px !important;
+  }
+
+  .vip-advanced-player-container:not(.vip-player-horizontal) .vip-top-title {
+    font-size: 14px !important;
+    max-width: 130px !important;
+  }
+
+  .vip-advanced-player-container:not(.vip-player-horizontal) .vip-top-meta {
+    font-size: 10.5px !important;
+  }
+}
+

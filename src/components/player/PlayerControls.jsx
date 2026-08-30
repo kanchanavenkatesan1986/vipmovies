@@ -161,9 +161,9 @@ export default function PlayerControls({
               <i className="fa-solid fa-rotate-right"></i>
             </button>
 
-            {/* Volume Control with hover slider */}
+            {/* Volume Control with hover slider (Desktop only) */}
             <div
-              className="vip-volume-wrap"
+              className="vip-volume-wrap vip-ctrl-desktop-only"
               onMouseEnter={() => setShowVolumeSlider(true)}
               onMouseLeave={() => setShowVolumeSlider(false)}
             >
@@ -208,10 +208,10 @@ export default function PlayerControls({
 
           {/* Right Controls */}
           <div className="vip-ctrl-group right">
-            {/* Subtitles */}
+            {/* Subtitles (Desktop / Landscape only) */}
             <button
               type="button"
-              className={`vip-ctrl-btn ${currentSubtitle !== 'off' ? 'active' : ''}`}
+              className={`vip-ctrl-btn vip-ctrl-desktop-only ${currentSubtitle !== 'off' ? 'active' : ''}`}
               onClick={onOpenSettings}
               title="Subtitles & Captions (C)"
             >
@@ -219,31 +219,31 @@ export default function PlayerControls({
               {currentSubtitle !== 'off' && <span className="vip-ctrl-dot"></span>}
             </button>
 
-            {/* Speed Badge */}
+            {/* Speed Badge (Desktop / Landscape only) */}
             <button
               type="button"
-              className="vip-ctrl-btn vip-badge-btn"
+              className="vip-ctrl-btn vip-badge-btn vip-ctrl-desktop-only"
               onClick={onOpenSettings}
               title="Playback Speed"
             >
               <span>{playbackRate === 1 ? '1x' : `${playbackRate}x`}</span>
             </button>
 
-            {/* Quality Badge */}
+            {/* Quality Badge (Desktop / Landscape only) */}
             <button
               type="button"
-              className="vip-ctrl-btn vip-badge-btn gold"
+              className="vip-ctrl-btn vip-badge-btn gold vip-ctrl-desktop-only"
               onClick={onOpenSettings}
               title="Video Quality"
             >
               <span>{currentQuality.toUpperCase()}</span>
             </button>
 
-            {/* Picture in Picture */}
+            {/* Picture in Picture (Desktop / Landscape only) */}
             {isPipSupported && (
               <button
                 type="button"
-                className={`vip-ctrl-btn ${isPipActive ? 'active' : ''}`}
+                className={`vip-ctrl-btn vip-ctrl-desktop-only ${isPipActive ? 'active' : ''}`}
                 onClick={onTogglePip}
                 title="Picture-in-Picture (P)"
               >
@@ -254,17 +254,17 @@ export default function PlayerControls({
             {/* Theatre Mode (Desktop only) */}
             <button
               type="button"
-              className={`vip-ctrl-btn vip-theatre-btn ${isTheatreMode ? 'active' : ''}`}
+              className={`vip-ctrl-btn vip-theatre-btn vip-ctrl-desktop-only ${isTheatreMode ? 'active' : ''}`}
               onClick={onToggleTheatre}
               title="Theatre Mode (T)"
             >
               <i className="fa-solid fa-film"></i>
             </button>
 
-            {/* Settings Gear */}
+            {/* Settings Gear (Always Visible — Houses all options on Mobile Portrait) */}
             <button
               type="button"
-              className="vip-ctrl-btn"
+              className="vip-ctrl-btn vip-settings-btn"
               onClick={onOpenSettings}
               title="Player Settings"
             >
