@@ -392,6 +392,20 @@ export default function AdvancedVideoPlayer({
     }
   }, [isSettingsOpen, isStatsOpen, isFullscreen, isHorizontalMode, onBack]);
 
+  // ─── 8b. LOCK BODY SCROLL WHEN IN HORIZONTAL MODE ───
+  useEffect(() => {
+    if (isHorizontalMode) {
+      const prevBodyOverflow = document.body.style.overflow;
+      const prevHtmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevBodyOverflow;
+        document.documentElement.style.overflow = prevHtmlOverflow;
+      };
+    }
+  }, [isHorizontalMode]);
+
   // ─── 9. KEYBOARD SHORTCUTS ───
   useEffect(() => {
     const handleKeyDown = (e) => {
