@@ -36,7 +36,7 @@ class UploadScheduler {
     this.partControllers = new Map();  // `${fileId}_${partNumber}` -> AbortController
     this.speedTrackers = new Map();    // id -> SpeedTracker
     this.globalSpeedTracker = new SpeedTracker(10);
-    
+
     this.listeners = new Set();
     this.isPausedAll = false;
     this.isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
@@ -52,7 +52,7 @@ class UploadScheduler {
   async init() {
     this.config = await uploadStorage.getSettings();
     const storedUploads = await uploadStorage.getAllUploads();
-    
+
     if (storedUploads && storedUploads.length > 0) {
       this.queue = storedUploads.map(item => ({
         ...item,
@@ -313,7 +313,7 @@ class UploadScheduler {
 
       // Find candidates in QUEUED or RETRYING status
       while (this.activeFileIds.size < maxActive) {
-        const nextItem = this.queue.find(x => 
+        const nextItem = this.queue.find(x =>
           x.status === UPLOAD_STATUS.QUEUED || x.status === UPLOAD_STATUS.RETRYING
         );
 
@@ -549,7 +549,7 @@ class UploadScheduler {
     const start = (partNumber - 1) * partSize;
     const end = Math.min(start + partSize, file.size);
     const chunkSize = end - start;
-    
+
     // Slice memory-safe chunk
     const chunkBlob = file.slice(start, end);
 
