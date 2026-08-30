@@ -74,9 +74,9 @@
   position: fixed !important;
   top: 50% !important;
   left: 50% !important;
-  /* width = screen height (100dvh) so after 90deg rotation it spans full screen height visually */
+  width: 100vh !important;
   width: 100dvh !important;
-  /* height = screen width (100dvw) so after 90deg rotation it spans full screen width visually */
+  height: 100vw !important;
   height: 100dvw !important;
   max-width: none !important;
   max-height: none !important;
@@ -93,15 +93,19 @@
   padding: 0 !important;
   aspect-ratio: unset !important;
   overflow: hidden !important;
+  box-sizing: border-box !important;
 }
 
-/* Video fills 100% of the rotated container — object-fit: cover fills edge-to-edge */
+/* Video fills 100% of the rotated container */
 .vip-advanced-player-container.vip-player-horizontal .vip-html5-video {
   position: absolute !important;
   inset: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  object-fit: cover !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  background: #000 !important;
 }
 
 /* Gesture layer must also fill rotated container */
@@ -110,6 +114,35 @@
   inset: 0 !important;
   width: 100% !important;
   height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+/* Controls Overlay in Horizontal Mode */
+.vip-advanced-player-container.vip-player-horizontal .vip-player-controls-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 20 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-controls-top {
+  padding: 12px 18px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-controls-bottom {
+  padding: 8px 18px 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 /* If device is naturally in landscape (no rotation needed) */
@@ -127,7 +160,7 @@
 }
 
 /* ── PAGE MODE (when inside /player route — remove max-width and aspect-ratio) ── */
-.vip-advanced-player-container.page-mode {
+.vip-advanced-player-container.page-mode:not(.vip-player-horizontal) {
   max-width: none !important;
   width: 100% !important;
   height: 100% !important;

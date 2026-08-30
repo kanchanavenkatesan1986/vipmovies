@@ -19,7 +19,8 @@
   margin: 0;
 }
 
-.vip-player-isolated-wrapper .vip-advanced-player-container {
+/* Default Isolated Player Page (Not rotated) */
+.vip-player-isolated-wrapper .vip-advanced-player-container:not(.vip-player-horizontal) {
   width: 100% !important;
   height: 100% !important;
   max-width: none !important;
@@ -35,7 +36,7 @@
   background: #000;
 }
 
-.vip-player-isolated-wrapper .vip-html5-video {
+.vip-player-isolated-wrapper .vip-advanced-player-container:not(.vip-player-horizontal) .vip-html5-video {
   width: 100%;
   height: 100%;
   max-width: 100%;
