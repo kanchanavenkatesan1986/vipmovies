@@ -119,7 +119,7 @@ class UploadScheduler {
         for (const fn of this.listeners) {
           fn(snapshot);
         }
-      }, 250); // 250ms throttle for UI performance
+      }, 100); // 100ms throttle for smooth second-by-second UI animation
     }
   }
 
@@ -468,6 +468,31 @@ class UploadScheduler {
     const activePromises = new Set();
     const speedTracker = this.speedTrackers.get(item.id);
 
+    // In-flight part bytes map (partNumber -> loadedBytes)
+    const inFlightBytesMap = new Map();
+
+    const updateLiveProgress = () => {
+      let completedBytes = 0;
+      for (const p of completedMap.values()) {
+        completedBytes += p.size;
+      }
+      let inFlightTotal = 0;
+      for (const b of inFlightBytesMap.values()) {
+        inFlightTotal += b;
+      }
+
+      item.uploadedBytes = Math.min(item.fileSize, completedBytes + inFlightTotal);
+
+      if (speedTracker) {
+        speedTracker.record(item.uploadedBytes);
+        item.speed = speedTracker.getSpeed();
+        const remaining = Math.max(0, item.fileSize - item.uploadedBytes);
+        item.eta = item.speed > 0 ? remaining / item.speed : 0;
+      }
+      this.globalSpeedTracker.record(this.getStateSnapshot().stats.totalUploadedBytes);
+      this.notifyListeners();
+    };
+
     while (nextIndex < pendingPartNumbers.length || activePromises.size > 0) {
       if (fileSignal.aborted || this.isPausedAll || !this.isOnline) {
         break;
@@ -482,9 +507,15 @@ class UploadScheduler {
         const partNumber = pendingPartNumbers[nextIndex++];
         this.activePartCount++;
 
-        const partPromise = this.uploadSinglePartWithRetry(item, file, partNumber, fileSignal)
+        const onPartProgress = (loadedBytes) => {
+          inFlightBytesMap.set(partNumber, loadedBytes);
+          updateLiveProgress();
+        };
+
+        const partPromise = this.uploadSinglePartWithRetry(item, file, partNumber, fileSignal, onPartProgress)
           .then((partResult) => {
             if (partResult && partResult.etag) {
+              inFlightBytesMap.delete(partNumber);
               completedMap.set(partNumber, {
                 partNumber,
                 etag: partResult.etag,
@@ -492,26 +523,13 @@ class UploadScheduler {
               });
 
               item.completedParts = Array.from(completedMap.values());
-
-              // Recalculate uploaded bytes
-              let totalUploaded = 0;
-              for (const p of item.completedParts) {
-                totalUploaded += p.size;
-              }
-              item.uploadedBytes = Math.min(item.fileSize, totalUploaded);
-
-              // Update Speed & ETA
-              if (speedTracker) {
-                speedTracker.record(item.uploadedBytes);
-                item.speed = speedTracker.getSpeed();
-                const remaining = Math.max(0, item.fileSize - item.uploadedBytes);
-                item.eta = item.speed > 0 ? remaining / item.speed : 0;
-              }
-              this.globalSpeedTracker.record(this.getStateSnapshot().stats.totalUploadedBytes);
-
+              updateLiveProgress();
               uploadStorage.saveUpload(item);
-              this.notifyListeners();
             }
+          })
+          .catch((err) => {
+            inFlightBytesMap.delete(partNumber);
+            throw err;
           })
           .finally(() => {
             this.activePartCount = Math.max(0, this.activePartCount - 1);
@@ -541,7 +559,7 @@ class UploadScheduler {
   // ==========================================
   // SINGLE PART UPLOAD WITH RETRIES
   // ==========================================
-  async uploadSinglePartWithRetry(item, file, partNumber, fileSignal) {
+  async uploadSinglePartWithRetry(item, file, partNumber, fileSignal, onProgress) {
     const maxRetries = this.config.maxRetries || 5;
     const baseDelay = (this.config.retryDelaySeconds || 2) * 1000;
     const partSize = item.partSize;
@@ -571,7 +589,8 @@ class UploadScheduler {
           uploadId: item.uploadId,
           partNumber,
           chunk: chunkBlob,
-          signal: partCtrl.signal
+          signal: partCtrl.signal,
+          onProgress
         });
 
         this.partControllers.delete(partKey);

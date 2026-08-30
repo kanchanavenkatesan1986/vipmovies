@@ -122,26 +122,80 @@ class UploadApiClient {
 
   /**
    * POST /upload-part
-   * Sends chunk as multipart/form-data
+   * Sends chunk as multipart/form-data with live byte-by-byte progress tracking via XHR
    */
-  async uploadPart({ key, uploadId, partNumber, chunk, signal }) {
+  async uploadPart({ key, uploadId, partNumber, chunk, signal, onProgress }) {
+    const baseUrl = await this.getBaseUrl();
     const config = await this.getConfig();
-    const headers = await this.getHeaders(); // Do NOT set Content-Type header manually for FormData
-
-    const formData = new FormData();
-    formData.append('key', key);
-    formData.append('uploadId', uploadId);
-    formData.append('partNumber', String(partNumber));
-    formData.append('chunk', chunk);
-
+    const url = `${baseUrl}${config.endpoints.uploadPart || '/upload-part'}`;
+    const token = this.getAuthToken();
     const timeoutSec = config.requestTimeoutSeconds || 120;
 
-    return this.request(config.endpoints.uploadPart || '/upload-part', {
-      method: 'POST',
-      headers,
-      body: formData,
-      signal
-    }, timeoutSec);
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('key', key);
+      formData.append('uploadId', uploadId);
+      formData.append('partNumber', String(partNumber));
+      formData.append('chunk', chunk);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.timeout = timeoutSec * 1000;
+      xhr.setRequestHeader('Accept', 'application/json');
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+
+      // Real-time byte upload progress
+      if (xhr.upload && typeof onProgress === 'function') {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            onProgress(event.loaded, event.total);
+          }
+        };
+      }
+
+      // External Abort signal handling
+      if (signal) {
+        if (signal.aborted) {
+          xhr.abort();
+          return reject(new Error('Part upload cancelled'));
+        }
+        signal.addEventListener('abort', () => {
+          xhr.abort();
+          reject(new Error('Part upload cancelled'));
+        });
+      }
+
+      xhr.onload = () => {
+        let data = {};
+        try {
+          data = JSON.parse(xhr.responseText);
+        } catch (e) {}
+
+        if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+          resolve(data);
+        } else {
+          const errorMsg = data.error || `HTTP ${xhr.status}: Part upload failed`;
+          const err = new Error(errorMsg);
+          err.status = xhr.status;
+          err.code = data.code || 'HTTP_ERROR';
+          reject(err);
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Network error during part upload'));
+      };
+
+      xhr.ontimeout = () => {
+        const timeoutErr = new Error(`Request timed out (${timeoutSec}s)`);
+        timeoutErr.code = 'TIMEOUT';
+        reject(timeoutErr);
+      };
+
+      xhr.send(formData);
+    });
   }
 
   /**

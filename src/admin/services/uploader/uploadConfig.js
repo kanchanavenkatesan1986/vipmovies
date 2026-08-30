@@ -5,7 +5,7 @@
 
 export const DEFAULT_UPLOAD_CONFIG = {
   // Worker Base URL (Can be overridden via .env VITE_UPLOAD_API_BASE or in Settings UI)
-  apiBase: import.meta.env.VITE_UPLOAD_API_BASE || 'https://api-uploud.akatsuki-pvt-ltd.workers.dev',
+  apiBase: import.meta.env.VITE_UPLOAD_API_BASE || 'https://api-uploder.akatsuki-pvt-ltd.workers.dev',
 
   // Media / Playback Domain for previewing completed uploads
   mediaBaseUrl: import.meta.env.VITE_MEDIA_BASE_URL || 'https://media.vipmovies.in',

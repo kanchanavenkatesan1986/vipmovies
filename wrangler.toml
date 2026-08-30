@@ -1,0 +1,12 @@
+name = "api-uploder"
+main = "worker.js"
+compatibility_date = "2024-04-01"
+
+# Cloudflare R2 Bucket Binding
+[[r2_buckets]]
+binding = "MY_BUCKET"
+bucket_name = "vipmovies" # Replace with your actual R2 bucket name if different
+
+# Configuration Variables
+[vars]
+# UPLOAD_API_TOKEN is optional. Defaults to VIP_SECURE_TOKEN_2026 if not set

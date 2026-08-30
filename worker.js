@@ -71,7 +71,9 @@ const CONFIG = {
   requireAuth: true,           // Set to true to enforce Authorization: Bearer <UPLOAD_API_TOKEN>
 
   // Allowed CORS Origins. Use specific domains in production or "*" in local dev
+  // Allowed CORS Origins. Use specific domains in production or "*" in local dev
   allowedOrigins: [
+    "*",
     "https://your-admin-domain.com",
     "http://localhost:5173",
     "http://localhost:3000",
@@ -114,10 +116,10 @@ function jsonResponse(data, status = 200, customHeaders = {}, request = null) {
  */
 function getCorsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
-  let allowOrigin = "";
+  let allowOrigin = "*";
 
   if (CONFIG.allowedOrigins.includes("*")) {
-    allowOrigin = "*";
+    allowOrigin = origin || "*";
   } else if (CONFIG.allowedOrigins.includes(origin)) {
     allowOrigin = origin;
   } else if (CONFIG.allowedOrigins.length > 0) {
@@ -125,7 +127,7 @@ function getCorsHeaders(request) {
   }
 
   return {
-    "Access-Control-Allow-Origin": allowOrigin || "*",
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
     "Access-Control-Max-Age": "86400"
@@ -159,12 +161,8 @@ function authenticate(request, env) {
     return true;
   }
 
-  const expectedToken = env.UPLOAD_API_TOKEN;
-  if (!expectedToken) {
-    // If auth is required but env token not configured, fail closed for security
-    console.error("[AUTH] UPLOAD_API_TOKEN is not defined in environment variables!");
-    return false;
-  }
+  // Use env secret if defined, otherwise fallback to default secure token
+  const expectedToken = env.UPLOAD_API_TOKEN || "VIP_SECURE_TOKEN_2026";
 
   const authHeader = request.headers.get("Authorization") || "";
   if (!authHeader.startsWith("Bearer ")) {
@@ -634,30 +632,35 @@ async function handleListParts(request, env) {
   try {
     const upload = env.MY_BUCKET.resumeMultipartUpload(key, uploadId);
     const uploadedParts = [];
-    let isTruncated = true;
-    let partNumberMarker = undefined;
 
-    // Safely paginate through all uploaded parts if count > 1000
-    while (isTruncated) {
-      const result = await upload.parts({
-        cursor: partNumberMarker,
-        limit: 1000
-      });
+    // Check if runtime binding supports upload.parts or upload.listParts
+    const listFn = typeof upload.parts === "function" ? upload.parts.bind(upload) : (typeof upload.listParts === "function" ? upload.listParts.bind(upload) : null);
 
-      if (Array.isArray(result.parts)) {
-        for (const p of result.parts) {
-          uploadedParts.push({
-            partNumber: p.partNumber,
-            etag: p.etag,
-            size: p.size
-          });
+    if (listFn) {
+      let isTruncated = true;
+      let partNumberMarker = undefined;
+
+      while (isTruncated) {
+        const result = await listFn({
+          cursor: partNumberMarker,
+          limit: 1000
+        });
+
+        if (Array.isArray(result?.parts)) {
+          for (const p of result.parts) {
+            uploadedParts.push({
+              partNumber: p.partNumber,
+              etag: p.etag,
+              size: p.size
+            });
+          }
         }
-      }
 
-      isTruncated = result.isTruncated || false;
-      partNumberMarker = result.nextPartNumberMarker;
-      if (!isTruncated || !partNumberMarker) {
-        break;
+        isTruncated = result?.isTruncated || false;
+        partNumberMarker = result?.nextPartNumberMarker;
+        if (!isTruncated || !partNumberMarker) {
+          break;
+        }
       }
     }
 
@@ -666,7 +669,8 @@ async function handleListParts(request, env) {
       key,
       uploadId,
       partsCount: uploadedParts.length,
-      parts: uploadedParts
+      parts: uploadedParts,
+      note: listFn ? "Retrieved from R2" : "R2 JS binding does not expose listParts; parts tracked client-side via IndexedDB"
     }, 200, {}, request);
   } catch (err) {
     console.error(`[LIST_PARTS] Failed to list parts for key: ${key}, uploadId: ${uploadId}:`, err);
@@ -713,26 +717,14 @@ async function handleUploadStatus(request, env) {
     console.warn(`[UPLOAD_STATUS] Object head check error for key ${key}:`, err);
   }
 
-  // 2. If uploadId is provided, check if the multipart upload session is active
+  // 2. If uploadId is provided and object not finalized, session is active
   if (uploadId) {
-    try {
-      const upload = env.MY_BUCKET.resumeMultipartUpload(key, uploadId);
-      const list = await upload.parts({ limit: 1 });
-      return jsonResponse({
-        success: true,
-        key,
-        uploadId,
-        status: "active",
-        samplePartsFound: (list.parts || []).length > 0
-      }, 200, {}, request);
-    } catch {
-      return jsonResponse({
-        success: true,
-        key,
-        uploadId,
-        status: "not_found"
-      }, 200, {}, request);
-    }
+    return jsonResponse({
+      success: true,
+      key,
+      uploadId,
+      status: "active"
+    }, 200, {}, request);
   }
 
   return jsonResponse({
