@@ -9,6 +9,7 @@ import FileDetailsModal from '../components/fileManager/FileDetailsModal';
 import VideoPreviewModal from '../components/fileManager/VideoPreviewModal';
 import ImagePreviewModal from '../components/fileManager/ImagePreviewModal';
 import FolderCreateModal from '../components/fileManager/FolderCreateModal';
+import UploadUrlModal from '../components/fileManager/UploadUrlModal';
 import RenameModal from '../components/fileManager/RenameModal';
 import MoveCopyModal from '../components/fileManager/MoveCopyModal';
 import FilterDrawer from '../components/fileManager/FilterDrawer';
@@ -58,6 +59,8 @@ export default function FileManagerPage({ navigateTo }) {
   const [imageItem, setImageItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
+  const [isUploadUrlOpen, setIsUploadUrlOpen] = useState(false);
+  const [uploadUrlPrefix, setUploadUrlPrefix] = useState(currentPrefix);
   const [renameTarget, setRenameTarget] = useState(null);
   const [moveCopyDialog, setMoveCopyDialog] = useState({ isOpen: false, mode: 'move', items: [] });
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, isDanger: true });
@@ -401,6 +404,12 @@ export default function FileManagerPage({ navigateTo }) {
     navigateTo(`admin/uploads?category=${category}&year=${year}&folder=${folder}`);
   };
 
+  // 6. Direct URL Upload Dialog
+  const handleOpenUploadUrl = (targetPrefix = currentPrefix) => {
+    setUploadUrlPrefix(targetPrefix);
+    setIsUploadUrlOpen(true);
+  };
+
   return (
     <AdminLayout
       currentRoute="admin/file-manager"
@@ -435,6 +444,7 @@ export default function FileManagerPage({ navigateTo }) {
           sortOrder={sortState.order}
           onSortChange={handleSortChange}
           onOpenCreateFolder={() => setIsCreateFolderOpen(true)}
+          onOpenUploadUrl={() => handleOpenUploadUrl(currentPrefix)}
           onOpenUploadToCurrent={handleOpenUploadToCurrent}
           onToggleFilterDrawer={() => setIsFilterDrawerOpen(true)}
           hasActiveFilters={filters.types.size > 0 || filters.extensions.size > 0 || filters.sizeThreshold !== 'all' || filters.onlyPinned}
@@ -471,6 +481,9 @@ export default function FileManagerPage({ navigateTo }) {
               onDeleteItem={handleDeleteItem}
               onRenameItem={(target) => setRenameTarget(target)}
               onEditFile={(obj) => setEditItem(obj)}
+              onOpenUploadUrl={() => handleOpenUploadUrl(currentPrefix)}
+              onOpenCreateFolder={() => setIsCreateFolderOpen(true)}
+              onOpenUploadToCurrent={handleOpenUploadToCurrent}
             />
           ) : (
             <FileListView
@@ -487,6 +500,9 @@ export default function FileManagerPage({ navigateTo }) {
               onDeleteItem={handleDeleteItem}
               onRenameItem={(target) => setRenameTarget(target)}
               onEditFile={(obj) => setEditItem(obj)}
+              onOpenUploadUrl={() => handleOpenUploadUrl(currentPrefix)}
+              onOpenCreateFolder={() => setIsCreateFolderOpen(true)}
+              onOpenUploadToCurrent={handleOpenUploadToCurrent}
             />
           )}
         </div>
@@ -533,6 +549,42 @@ export default function FileManagerPage({ navigateTo }) {
           }}
         />
 
+        <UploadUrlModal
+          isOpen={isUploadUrlOpen}
+          currentPrefix={uploadUrlPrefix}
+          onClose={() => {
+            setIsUploadUrlOpen(false);
+            loadObjects(currentPrefix, true);
+          }}
+          onSuccess={(result) => {
+            showToast(`File "${result.filename}" uploaded successfully from URL!`, 'success');
+            loadObjects(currentPrefix, true);
+          }}
+          onViewFile={async (result) => {
+            setIsUploadUrlOpen(false);
+            await loadObjects(currentPrefix, true);
+            const ext = (result.filename || '').substring((result.filename || '').lastIndexOf('.')).toLowerCase();
+            const isVideo = ['.mp4', '.mkv', '.webm', '.mov', '.m4v'].includes(ext);
+            const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(ext);
+            const item = {
+              key: result.key,
+              filename: result.filename,
+              size: result.size,
+              sizeFormatted: result.sizeFormatted,
+              contentType: result.contentType || (isVideo ? 'video/mp4' : 'application/octet-stream'),
+              isVideo,
+              isImage
+            };
+            if (isVideo) {
+              setPreviewItem(item);
+            } else if (isImage) {
+              setImageItem(item);
+            } else {
+              setDetailsItem(item);
+            }
+          }}
+        />
+
         <RenameModal
           isOpen={!!renameTarget}
           target={renameTarget}
@@ -563,6 +615,7 @@ export default function FileManagerPage({ navigateTo }) {
           target={contextMenu.target}
           onClose={() => setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, target: null })}
           onOpen={(prefix) => handleNavigatePrefix(prefix)}
+          onUploadUrl={(prefix) => handleOpenUploadUrl(prefix)}
           onPreview={(item) => {
             if (item.isVideo) setPreviewItem(item);
             else if (item.isImage) setImageItem(item);

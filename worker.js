@@ -1394,6 +1394,257 @@ async function handlePutObject(request, env) {
   }
 }
 
+/**
+ * POST /upload-from-url
+ * Streams a remote file directly into Cloudflare R2 at the specified folder prefix
+ */
+async function handleUploadFromUrl(request, env, ctx) {
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ success: false, error: "Malformed JSON payload", code: "INVALID_JSON" }, 400, {}, request);
+  }
+
+  const { url: remoteUrl, prefix = "", filename, duplicatePolicy = "replace" } = body || {};
+
+  if (!remoteUrl || typeof remoteUrl !== "string") {
+    return jsonResponse({ success: false, error: "Missing or invalid 'url' parameter", code: "MISSING_URL" }, 400, {}, request);
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(remoteUrl.trim());
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return jsonResponse({ success: false, error: "Only http:// and https:// URLs are supported", code: "INVALID_PROTOCOL" }, 400, {}, request);
+    }
+  } catch (e) {
+    return jsonResponse({ success: false, error: `Invalid URL format: ${e.message}`, code: "INVALID_URL" }, 400, {}, request);
+  }
+
+  // Determine and clean filename
+  let cleanFilename = (filename || "").trim();
+  if (!cleanFilename) {
+    const rawName = decodeURIComponent(parsedUrl.pathname.split("/").pop() || "");
+    cleanFilename = rawName.split("?")[0].trim() || `imported_${Date.now()}`;
+  }
+
+  // Remove illegal characters
+  cleanFilename = cleanFilename.replace(/[\/\\]/g, "_").trim();
+  if (!cleanFilename) {
+    cleanFilename = `imported_${Date.now()}`;
+  }
+
+  // Ensure prefix format
+  let cleanPrefix = (prefix || "").trim();
+  if (cleanPrefix && !cleanPrefix.endsWith("/")) {
+    cleanPrefix += "/";
+  }
+  if (cleanPrefix.startsWith("/")) {
+    cleanPrefix = cleanPrefix.substring(1);
+  }
+
+  let finalKey = `${cleanPrefix}${cleanFilename}`;
+  if (!validateObjectKey(finalKey)) {
+    return jsonResponse({ success: false, error: `Invalid target object key '${finalKey}'`, code: "INVALID_KEY" }, 400, {}, request);
+  }
+
+  // Handle duplicate policy
+  try {
+    const existing = await env.MY_BUCKET.head(finalKey);
+    if (existing) {
+      if (duplicatePolicy === "reject" || duplicatePolicy === "skip") {
+        return jsonResponse({
+          success: false,
+          error: `File '${cleanFilename}' already exists in this folder`,
+          code: "OBJECT_EXISTS",
+          key: finalKey
+        }, 409, {}, request);
+      } else if (duplicatePolicy === "rename") {
+        const dotIdx = cleanFilename.lastIndexOf(".");
+        const namePart = dotIdx !== -1 ? cleanFilename.substring(0, dotIdx) : cleanFilename;
+        const extPart = dotIdx !== -1 ? cleanFilename.substring(dotIdx) : "";
+        cleanFilename = `${namePart}_${Date.now()}${extPart}`;
+        finalKey = `${cleanPrefix}${cleanFilename}`;
+      }
+    }
+  } catch (err) {
+    console.warn(`[UPLOAD_FROM_URL] Head check warning for ${finalKey}:`, err);
+  }
+
+  // Stream fetch remote file
+  try {
+    const remoteResponse = await fetch(parsedUrl.toString(), {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "*/*"
+      }
+    });
+
+    if (!remoteResponse.ok) {
+      return jsonResponse({
+        success: false,
+        error: `Remote server responded with HTTP ${remoteResponse.status}: ${remoteResponse.statusText}`,
+        code: "REMOTE_FETCH_ERROR",
+        statusCode: remoteResponse.status
+      }, 502, {}, request);
+    }
+
+    const remoteContentType = remoteResponse.headers.get("Content-Type");
+    const resolvedContentType = resolveContentType(cleanFilename, remoteContentType);
+    const contentLength = remoteResponse.headers.get("Content-Length");
+    const parsedLength = contentLength ? parseInt(contentLength, 10) : null;
+
+    // Check size limit if Content-Length header is present
+    if (parsedLength && parsedLength > CONFIG.maxFileSizeGB * 1024 * 1024 * 1024) {
+      return jsonResponse({
+        success: false,
+        error: `Remote file size (${formatBytes(parsedLength)}) exceeds maximum allowable limit of ${CONFIG.maxFileSizeGB}GB`,
+        code: "FILE_TOO_LARGE"
+      }, 413, {}, request);
+    }
+
+    const wantsStream = body?.stream === true || request.headers.get("Accept")?.includes("text/event-stream");
+
+    // Real-time SSE streaming mode for live percentage (%) and transferred bytes
+    if (wantsStream) {
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      const encoder = new TextEncoder();
+
+      const uploadTask = (async () => {
+        try {
+          let loadedBytes = 0;
+          let lastEmit = Date.now();
+          const startTime = Date.now();
+
+          // Emit initial start event
+          await writer.write(encoder.encode(`data: ${JSON.stringify({
+            type: "start",
+            total: parsedLength || 0,
+            filename: cleanFilename,
+            key: finalKey,
+            contentType: resolvedContentType
+          })}\n\n`)).catch(() => {});
+
+          const counterTransform = new TransformStream({
+            transform(chunk, controller) {
+              loadedBytes += chunk.length;
+              const now = Date.now();
+              if (now - lastEmit >= 250) { // update every 250ms for ultra smooth %
+                lastEmit = now;
+                const elapsedSec = Math.max(0.1, (now - startTime) / 1000);
+                const speedBps = Math.round(loadedBytes / elapsedSec);
+                const percent = parsedLength ? Math.min(99, Math.round((loadedBytes / parsedLength) * 100)) : null;
+                writer.write(encoder.encode(`data: ${JSON.stringify({
+                  type: "progress",
+                  loaded: loadedBytes,
+                  total: parsedLength || 0,
+                  percent,
+                  speed: formatBytes(speedBps) + "/s",
+                  elapsedSeconds: Math.round(elapsedSec)
+                })}\n\n`)).catch(() => {});
+              }
+              controller.enqueue(chunk);
+            }
+          });
+
+          const countingStream = remoteResponse.body.pipeThrough(counterTransform);
+
+          let streamForR2 = countingStream;
+          if (typeof FixedLengthStream !== "undefined" && parsedLength && parsedLength > 0) {
+            try {
+              streamForR2 = countingStream.pipeThrough(new FixedLengthStream(parsedLength));
+            } catch (flErr) {
+              console.warn("[FIXED_LENGTH_STREAM_WARN]", flErr);
+            }
+          }
+
+          const r2Object = await env.MY_BUCKET.put(finalKey, streamForR2, {
+            httpMetadata: {
+              contentType: resolvedContentType,
+              contentDisposition: `inline; filename="${encodeURIComponent(cleanFilename)}"`
+            },
+            customMetadata: {
+              sourceUrl: remoteUrl.substring(0, 500),
+              importedAt: new Date().toISOString()
+            }
+          });
+
+          const finalSize = r2Object.size || loadedBytes || parsedLength || 0;
+          await writer.write(encoder.encode(`data: ${JSON.stringify({
+            type: "complete",
+            success: true,
+            key: finalKey,
+            filename: cleanFilename,
+            prefix: cleanPrefix,
+            size: finalSize,
+            sizeFormatted: formatBytes(finalSize),
+            contentType: resolvedContentType,
+            percent: 100
+          })}\n\n`)).catch(() => {});
+        } catch (err) {
+          console.error("[UPLOAD_FROM_URL SSE ERROR]", err);
+          await writer.write(encoder.encode(`data: ${JSON.stringify({
+            type: "error",
+            error: err.message || "Upload stream failed"
+          })}\n\n`)).catch(() => {});
+        } finally {
+          await writer.close().catch(() => {});
+        }
+      })();
+
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(uploadTask);
+      }
+
+      const headers = new Headers({
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+      });
+      const cors = getCorsHeaders(request);
+      for (const [k, v] of Object.entries(cors)) {
+        headers.set(k, v);
+      }
+      return new Response(readable, { status: 200, headers });
+    }
+
+    // Fallback: Standard non-streaming put
+    const r2Object = await env.MY_BUCKET.put(finalKey, remoteResponse.body, {
+      httpMetadata: {
+        contentType: resolvedContentType,
+        contentDisposition: `inline; filename="${encodeURIComponent(cleanFilename)}"`
+      },
+      customMetadata: {
+        sourceUrl: remoteUrl.substring(0, 500),
+        importedAt: new Date().toISOString()
+      }
+    });
+
+    const finalSize = r2Object.size || parsedLength || 0;
+
+    return jsonResponse({
+      success: true,
+      key: finalKey,
+      filename: cleanFilename,
+      prefix: cleanPrefix,
+      size: finalSize,
+      sizeFormatted: formatBytes(finalSize),
+      contentType: resolvedContentType,
+      etag: r2Object.httpEtag || r2Object.etag,
+      message: `File directly imported and saved to '${finalKey}' successfully`
+    }, 200, {}, request);
+  } catch (err) {
+    console.error(`[UPLOAD_FROM_URL] Error streaming from ${remoteUrl} to ${finalKey}:`, err);
+    return jsonResponse({
+      success: false,
+      error: `Failed to upload from URL: ${err.message}`,
+      code: "STREAM_FAILED"
+    }, 500, {}, request);
+  }
+}
+
 // ==========================================
 // 5. MAIN ROUTER / WORKER FETCH HANDLER
 // ==========================================
@@ -1443,6 +1694,9 @@ export default {
       "/upload-status": handleUploadStatus,
       "/abort-upload": handleAbortUpload,
       "/cleanup-upload": handleAbortUpload,
+
+      // Direct URL Import
+      "/upload-from-url": handleUploadFromUrl,
 
       // File & Folder Management
       "/list-objects": handleListObjects,

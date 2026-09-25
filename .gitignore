@@ -23,3 +23,6 @@ dist-ssr
 *.esm.js
 *.css.map
 *.js.map
+
+# Scratch / Temp testing
+scratch/

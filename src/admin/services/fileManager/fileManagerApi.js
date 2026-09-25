@@ -273,6 +273,152 @@ class FileManagerApiClient {
     const mediaBase = (config.mediaBaseUrl || 'https://media.vipmovies.in').replace(/\/+$/, '');
     return `${mediaBase}/${key.replace(/^\/+/, '')}`;
   }
+
+  /**
+   * POST /upload-from-url
+   * Streams a file from a remote web URL directly into R2 at the specified prefix/folder
+   */
+  async uploadFromUrl({ url, prefix = '', filename = '', duplicatePolicy = 'replace' }) {
+    return this.request('/upload-from-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, prefix, filename, duplicatePolicy })
+    }, 900); // 15-minute timeout for large movie transfers
+  }
+
+  /**
+   * POST /upload-from-url with real-time SSE progress streaming (loaded, total, percent %, speed).
+   *
+   * Handles two response shapes from the worker:
+   *   1. text/event-stream  — SSE with start/progress/complete events (preferred)
+   *   2. application/json   — Plain JSON success object (older worker deploy or non-streaming path)
+   */
+  async uploadFromUrlWithProgress({ url, prefix = '', filename = '', duplicatePolicy = 'replace', onProgress, signal }) {
+    const baseUrl = await this.getBaseUrl();
+    const token = this.getAuthToken();
+    const endpointUrl = `${baseUrl}/upload-from-url`;
+
+    const response = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ url, prefix, filename, duplicatePolicy, stream: true }),
+      signal
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${response.status}: Failed to start stream`);
+    }
+
+    // ---- Detect response type ----
+    // When the worker is on an older deploy (or falls through to the non-streaming path),
+    // it returns application/json instead of text/event-stream.  Handle both gracefully.
+    const contentType = response.headers.get('Content-Type') || '';
+    if (!contentType.includes('text/event-stream')) {
+      const data = await response.json().catch(() => null);
+      if (!data) throw new Error('Upload returned an unreadable response.');
+      if (data.success === false) throw new Error(data.error || 'Upload failed (server error).');
+      const result = {
+        type: 'complete',
+        success: true,
+        key: data.key || `${prefix}${filename}`,
+        filename: data.filename || filename,
+        prefix: data.prefix != null ? data.prefix : prefix,
+        size: data.size || 0,
+        sizeFormatted: data.sizeFormatted || '',
+        contentType: data.contentType || '',
+        percent: 100
+      };
+      if (onProgress) onProgress(result);
+      return result;
+    }
+
+    // ---- SSE streaming path ----
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let lastResult = null;
+    let startInfo = null;
+    let lastProgress = null;
+
+    /**
+     * Parse one SSE message block (everything between two \n\n delimiters).
+     * Throws on stream errors; stores the complete event in lastResult.
+     */
+    const processSSEPart = (part) => {
+      if (!part.trim()) return;
+      for (const line of part.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.substring(6));
+          if (data.type === 'start') startInfo = data;
+          if (data.type === 'progress') lastProgress = data;
+          if (data.type === 'error') throw new Error(data.error || 'Stream error');
+          if (data.type === 'complete') lastResult = data;
+          if (onProgress) onProgress(data);
+        } catch (err) {
+          // Only re-throw genuine stream errors; silently skip JSON parse failures
+          if (err.message && !err.message.includes('JSON')) throw err;
+        }
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      // { stream: !done } flushes any bytes held in the TextDecoder's internal
+      // multi-byte state on the very last read, so we never drop the final event.
+      buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+      // Split on SSE message delimiter (\n\n).
+      // While streaming: hold back the last (possibly incomplete) fragment.
+      // When done: process ALL parts — the complete event may be in the final one.
+      const parts = buffer.split('\n\n');
+      buffer = done ? '' : (parts.pop() || '');
+      for (const part of parts) processSSEPart(part);
+
+      if (done) break;
+    }
+
+    // Safety net: flush any trailing bytes not terminated by \n\n
+    if (buffer.trim()) processSSEPart(buffer);
+
+    // If SSE stream ended without receiving the final 'complete' event (e.g. Cloudflare stream buffer limit on large files),
+    // automatically fall back to the native zero-copy direct transfer so the file is guaranteed to upload completely to R2.
+    if (!lastResult) {
+      if (onProgress) {
+        onProgress({
+          type: 'progress',
+          percent: 90,
+          speed: 'Completing Cloudflare direct transfer...'
+        });
+      }
+
+      const directResult = await this.uploadFromUrl({ url, prefix, filename, duplicatePolicy });
+      if (!directResult || directResult.success === false) {
+        throw new Error(directResult?.error || 'Upload failed');
+      }
+
+      lastResult = {
+        type: 'complete',
+        success: true,
+        key: directResult.key || `${prefix}${filename}`,
+        filename: directResult.filename || filename,
+        prefix: directResult.prefix != null ? directResult.prefix : prefix,
+        size: directResult.size || 0,
+        sizeFormatted: directResult.sizeFormatted || '',
+        contentType: directResult.contentType || '',
+        percent: 100
+      };
+      if (onProgress) onProgress(lastResult);
+    }
+
+    return lastResult;
+  }
 }
 
 export const fileManagerApi = new FileManagerApiClient();

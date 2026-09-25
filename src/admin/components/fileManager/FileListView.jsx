@@ -15,7 +15,10 @@ export default function FileListView({
   onTogglePin,
   onDeleteItem,
   onRenameItem,
-  onEditFile
+  onEditFile,
+  onOpenUploadUrl,
+  onOpenCreateFolder,
+  onOpenUploadToCurrent
 }) {
   const hasItems = folders.length > 0 || objects.length > 0;
 
@@ -26,7 +29,40 @@ export default function FileListView({
           <i className="fa-solid fa-folder-open"></i>
         </div>
         <h3>This folder is empty</h3>
-        <p>Upload movies, subtitles, or create subfolders to start organizing.</p>
+        <p>Directly upload files from web URLs, upload local files, or create subfolders.</p>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '16px', flexWrap: 'wrap' }}>
+          {onOpenUploadUrl && (
+            <button
+              type="button"
+              className="admin-btn primary"
+              onClick={onOpenUploadUrl}
+              style={{ background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' }}
+            >
+              <i className="fa-solid fa-cloud-arrow-down"></i>
+              <span>Upload from URL</span>
+            </button>
+          )}
+          {onOpenCreateFolder && (
+            <button
+              type="button"
+              className="admin-btn secondary"
+              onClick={onOpenCreateFolder}
+            >
+              <i className="fa-solid fa-folder-plus"></i>
+              <span>New Subfolder</span>
+            </button>
+          )}
+          {onOpenUploadToCurrent && (
+            <button
+              type="button"
+              className="admin-btn secondary"
+              onClick={onOpenUploadToCurrent}
+            >
+              <i className="fa-solid fa-cloud-arrow-up"></i>
+              <span>Upload Local Files</span>
+            </button>
+          )}
+        </div>
       </div>
     );
   }

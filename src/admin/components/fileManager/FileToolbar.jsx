@@ -9,6 +9,7 @@ export default function FileToolbar({
   sortOrder = 'asc',
   onSortChange,
   onOpenCreateFolder,
+  onOpenUploadUrl,
   onOpenUploadToCurrent,
   onToggleFilterDrawer,
   hasActiveFilters = false,
@@ -100,6 +101,7 @@ export default function FileToolbar({
             type="button"
             className="admin-btn secondary"
             onClick={onOpenCreateFolder}
+            title="Create a new subfolder in current folder"
           >
             <i className="fa-solid fa-folder-plus"></i>
             <span>New Folder</span>
@@ -107,8 +109,20 @@ export default function FileToolbar({
 
           <button
             type="button"
+            className="admin-btn secondary"
+            onClick={onOpenUploadUrl}
+            title="Directly upload/import a file from a web URL into this folder"
+            style={{ borderColor: 'rgba(59, 130, 246, 0.45)', background: 'rgba(59, 130, 246, 0.12)', color: '#93c5fd' }}
+          >
+            <i className="fa-solid fa-link" style={{ color: '#60a5fa' }}></i>
+            <span>Upload URL</span>
+          </button>
+
+          <button
+            type="button"
             className="admin-btn primary"
             onClick={onOpenUploadToCurrent}
+            title="Upload local files to this folder"
           >
             <i className="fa-solid fa-cloud-arrow-up"></i>
             <span>Upload Here</span>

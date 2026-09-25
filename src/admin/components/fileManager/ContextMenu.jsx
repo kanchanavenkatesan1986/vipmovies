@@ -14,7 +14,8 @@ export default function ContextMenu({
   onDelete,
   onDownload,
   onCopyKey,
-  onCopyMediaUrl
+  onCopyMediaUrl,
+  onUploadUrl
 }) {
   const menuRef = useRef(null);
 
@@ -60,6 +61,11 @@ export default function ContextMenu({
           <button type="button" className="fm-menu-item" onClick={() => { onClose(); onOpen(item.prefix); }}>
             <i className="fa-solid fa-folder-open"></i> Open Folder
           </button>
+          {onUploadUrl && (
+            <button type="button" className="fm-menu-item" onClick={() => { onClose(); onUploadUrl(item.prefix); }}>
+              <i className="fa-solid fa-cloud-arrow-down" style={{ color: 'var(--admin-blue)' }}></i> Upload from URL Here
+            </button>
+          )}
           <button type="button" className="fm-menu-item" onClick={() => { onClose(); onRename(target); }}>
             <i className="fa-solid fa-pen"></i> Rename
           </button>
