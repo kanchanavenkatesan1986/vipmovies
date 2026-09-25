@@ -44,8 +44,9 @@ const CONFIG = {
     "kannada"
   ],
 
-  // Allowed movie file extensions (case-insensitive)
+  // Allowed movie file extensions (case-insensitive) - Supports ALL formats
   allowedExtensions: [
+    // Video Formats
     ".mp4",
     ".mkv",
     ".webm",
@@ -53,21 +54,55 @@ const CONFIG = {
     ".m4v",
     ".avi",
     ".ts",
+    ".flv",
+    ".wmv",
+    ".3gp",
+    ".m2ts",
+    ".vob",
+    ".ogv",
+    ".mpg",
+    ".mpeg",
+    // Audio Formats
+    ".mp3",
+    ".m4a",
+    ".aac",
+    ".wav",
+    ".flac",
+    ".ogg",
+    ".opus",
+    ".wma",
+    // Subtitles
+    ".srt",
+    ".vtt",
+    ".sub",
+    ".ass",
+    ".ssa",
+    // Images
     ".jpg",
     ".jpeg",
     ".png",
     ".webp",
     ".gif",
     ".svg",
-    ".srt",
-    ".vtt",
+    ".bmp",
+    ".ico",
+    ".avif",
+    // Documents & Archives
+    ".zip",
+    ".rar",
+    ".7z",
+    ".tar",
+    ".gz",
+    ".pdf",
     ".txt",
     ".json",
+    ".nfo",
     ".keep"
   ],
 
   // MIME type mappings for playback & preview compatibility (Range / 206 Partial Content)
   mimeMap: {
+    // Videos
     ".mp4": "video/mp4",
     ".mkv": "video/x-matroska",
     ".webm": "video/webm",
@@ -75,16 +110,92 @@ const CONFIG = {
     ".m4v": "video/x-m4v",
     ".avi": "video/x-msvideo",
     ".ts": "video/mp2t",
+    ".flv": "video/x-flv",
+    ".wmv": "video/x-ms-wmv",
+    ".3gp": "video/3gpp",
+    ".m2ts": "video/mp2t",
+    ".vob": "video/x-ms-vob",
+    ".ogv": "video/ogg",
+    ".mpg": "video/mpeg",
+    ".mpeg": "video/mpeg",
+    // Audios
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".wav": "audio/wav",
+    ".flac": "audio/flac",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/opus",
+    ".wma": "audio/x-ms-wma",
+    // Subtitles
+    ".srt": "text/plain",
+    ".vtt": "text/vtt",
+    ".sub": "text/plain",
+    ".ass": "text/plain",
+    ".ssa": "text/plain",
+    // Images
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".webp": "image/webp",
     ".gif": "image/gif",
     ".svg": "image/svg+xml",
-    ".srt": "text/plain",
-    ".vtt": "text/vtt",
+    ".bmp": "image/bmp",
+    ".ico": "image/x-icon",
+    ".avif": "image/avif",
+    // Archives & Documents
+    ".zip": "application/zip",
+    ".rar": "application/x-rar-compressed",
+    ".7z": "application/x-7z-compressed",
+    ".tar": "application/x-tar",
+    ".gz": "application/gzip",
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
     ".json": "application/json",
+    ".nfo": "text/plain",
     ".keep": "text/plain"
+  },
+
+  // Reverse MIME-to-Extension mapping for format resolution
+  mimeToExtMap: {
+    "video/mp4": ".mp4",
+    "video/x-matroska": ".mkv",
+    "video/webm": ".webm",
+    "video/quicktime": ".mov",
+    "video/x-m4v": ".m4v",
+    "video/x-msvideo": ".avi",
+    "video/mp2t": ".ts",
+    "video/x-flv": ".flv",
+    "video/x-ms-wmv": ".wmv",
+    "video/3gpp": ".3gp",
+    "video/mpeg": ".mpg",
+    "video/ogg": ".ogv",
+    "audio/mpeg": ".mp3",
+    "audio/mp4": ".m4a",
+    "audio/aac": ".aac",
+    "audio/x-wav": ".wav",
+    "audio/wav": ".wav",
+    "audio/flac": ".flac",
+    "audio/ogg": ".ogg",
+    "audio/opus": ".opus",
+    "audio/x-ms-wma": ".wma",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "image/svg+xml": ".svg",
+    "image/bmp": ".bmp",
+    "image/x-icon": ".ico",
+    "image/avif": ".avif",
+    "application/zip": ".zip",
+    "application/x-rar-compressed": ".rar",
+    "application/vnd.rar": ".rar",
+    "application/x-7z-compressed": ".7z",
+    "application/x-tar": ".tar",
+    "application/gzip": ".gz",
+    "application/pdf": ".pdf",
+    "text/plain": ".txt",
+    "text/vtt": ".vtt"
   },
 
   // Upload validation limits
@@ -198,11 +309,190 @@ function authenticate(request, env) {
 }
 
 /**
+ * Script and dynamic execution extensions that should NEVER be stored as media
+ */
+const SCRIPT_EXTENSIONS = new Set([
+  ".php", ".php3", ".php4", ".php5", ".phtml",
+  ".asp", ".aspx", ".ashx", ".asmx",
+  ".jsp", ".jspx", ".do", ".action",
+  ".cgi", ".pl", ".py", ".sh", ".bash",
+  ".html", ".htm", ".cfm"
+]);
+
+/**
+ * Checks if a filename has a script / dynamic server-side extension
+ */
+function isScriptExtension(filename) {
+  if (!filename || typeof filename !== "string") return false;
+  const match = filename.match(/\.[a-zA-Z0-9]+$/i);
+  if (!match) return false;
+  return SCRIPT_EXTENSIONS.has(match[0].toLowerCase());
+}
+
+/**
+ * Parses RFC 6266 / RFC 5987 Content-Disposition header to extract genuine filename
+ */
+function parseContentDispositionFilename(header) {
+  if (!header || typeof header !== "string") return null;
+  // RFC 5987 / RFC 6266 UTF-8 encoded filename (filename*=UTF-8''...)
+  const utf8Match = header.match(/filename\*=(?:UTF-8'')?([^;]+)/i);
+  if (utf8Match) {
+    try {
+      const decoded = decodeURIComponent(utf8Match[1].trim().replace(/^["']|["']$/g, ""));
+      if (decoded) return decoded;
+    } catch {
+      const cleaned = utf8Match[1].trim().replace(/^["']|["']$/g, "");
+      if (cleaned) return cleaned;
+    }
+  }
+  // Standard filename="..." or filename=...
+  const standardMatch = header.match(/filename=(?:(["'])(.*?)\1|([^;\s]+))/i);
+  if (standardMatch) {
+    const raw = standardMatch[2] || standardMatch[3] || "";
+    try {
+      const decoded = decodeURIComponent(raw.trim());
+      if (decoded) return decoded;
+    } catch {
+      if (raw.trim()) return raw.trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolves standard file extension from MIME Content-Type
+ */
+function extensionFromMimeType(mimeType) {
+  if (!mimeType || typeof mimeType !== "string") return null;
+  const clean = mimeType.split(";")[0].trim().toLowerCase();
+  return CONFIG.mimeToExtMap[clean] || null;
+}
+
+/**
+ * Inspects a URL string, its query parameters, and base64 payloads to find the authentic filename
+ */
+function extractFilenameFromUrlString(urlString) {
+  if (!urlString || typeof urlString !== "string") return null;
+  try {
+    const u = new URL(urlString.trim());
+
+    // 1. Check known query parameters (e.g., ?file=..., ?path=..., ?filename=...)
+    const paramKeys = ["filename", "file", "name", "path", "title", "f", "download", "target", "source"];
+    for (const key of paramKeys) {
+      const val = u.searchParams.get(key);
+      if (val) {
+        const decoded = decodeURIComponent(val).split("/").pop() || "";
+        const clean = decoded.split("?")[0].trim();
+        if (clean && /\.[a-zA-Z0-9]{2,5}$/.test(clean) && !isScriptExtension(clean)) {
+          return clean;
+        }
+      }
+    }
+
+    // 2. Check base64 parameters (e.g. ?dl=c2VydmVy... on dub/uptodub/isai sites)
+    for (const [, val] of u.searchParams.entries()) {
+      if (val && val.length > 16 && /^[A-Za-z0-9+/=_-]+$/.test(val)) {
+        try {
+          let b64 = val.replace(/-/g, "+").replace(/_/g, "/");
+          while (b64.length % 4 !== 0) b64 += "=";
+          const decodedText = atob(b64);
+          
+          // Match path=... or filename=... or file=...
+          const paramMatch = decodedText.match(/(?:path|filename|file|name)=([^&]+)/i);
+          if (paramMatch) {
+            const candidate = decodeURIComponent(paramMatch[1]).split("/").pop() || "";
+            if (candidate && /\.[a-zA-Z0-9]{2,5}$/.test(candidate) && !isScriptExtension(candidate)) {
+              return candidate;
+            }
+          }
+
+          // Match any file with valid media/archive extension inside the payload
+          const mediaMatch = decodedText.match(/([a-zA-Z0-9_\-\. ()\[\]]+\.(?:mp4|mkv|webm|mov|m4v|avi|ts|flv|wmv|3gp|mp3|m4a|aac|flac|wav|ogg|opus|zip|rar|7z|tar|gz|pdf))/i);
+          if (mediaMatch) {
+            return mediaMatch[1].trim();
+          }
+        } catch {
+          // ignore base64 errors
+        }
+      }
+    }
+
+    // 3. Fallback to URL pathname
+    const raw = decodeURIComponent(u.pathname.split("/").pop() || "");
+    const clean = raw.split("?")[0].trim();
+    return clean || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Determines user-friendly format name (e.g. MP4, MKV, WEBM)
+ */
+function getFormatFromFilename(filename, contentType = "") {
+  const ext = (filename.match(/\.[0-9a-z]+$/i)?.[0] || "").toLowerCase();
+  if (ext === ".mp4") return "MP4 Video";
+  if (ext === ".mkv") return "MKV Video";
+  if (ext === ".webm") return "WEBM Video";
+  if (ext === ".mov") return "QuickTime Video";
+  if (ext === ".avi") return "AVI Video";
+  if (ext === ".ts") return "MPEG-TS Video";
+  if (ext === ".mp3") return "MP3 Audio";
+  if (ext === ".m4a") return "M4A Audio";
+  if (ext === ".aac") return "AAC Audio";
+  if (ext === ".zip" || ext === ".rar" || ext === ".7z") return "Archive";
+  if (contentType.includes("mp4")) return "MP4 Video";
+  if (contentType.includes("matroska")) return "MKV Video";
+  return ext.replace(".", "").toUpperCase() || "Media";
+}
+
+/**
+ * Resolves the ultimate safe, authentic filename, ensuring no .php/.html format
+ */
+function resolveFinalFilename({ userFilename, urlExtracted, cdFilename, contentType }) {
+  let name = (cdFilename || "").trim();
+
+  // If no Content-Disposition filename, try userFilename (if not a script extension)
+  if (!name && userFilename && !isScriptExtension(userFilename)) {
+    name = userFilename.trim();
+  }
+
+  // If still no valid name, try URL extractor (if not a script extension)
+  if (!name && urlExtracted && !isScriptExtension(urlExtracted)) {
+    name = urlExtracted.trim();
+  }
+
+  // If name is still empty or is a script extension (e.g. download.php, index.php)
+  if (!name) {
+    const rawBase = (userFilename || urlExtracted || "download").replace(/\.[a-zA-Z0-9]+$/i, "");
+    const safeBase = rawBase.replace(/^(download|index|file|stream|get)$/i, `download_${Date.now()}`);
+    const ext = extensionFromMimeType(contentType) || ".mp4";
+    name = `${safeBase || "download"}${ext}`;
+  }
+
+  // Double check and replace any script extension (.php, .aspx, .html) with genuine media format
+  if (isScriptExtension(name)) {
+    const ext = extensionFromMimeType(contentType) || 
+      (urlExtracted && !isScriptExtension(urlExtracted) ? urlExtracted.match(/\.[a-zA-Z0-9]+$/i)?.[0] : null) || 
+      ".mp4";
+    name = name.replace(/\.[a-zA-Z0-9]+$/i, ext);
+  }
+
+  // If the filename has no extension at all, append extension derived from contentType
+  if (!/\.[a-zA-Z0-9]{2,5}$/.test(name)) {
+    const ext = extensionFromMimeType(contentType) || ".mp4";
+    name = `${name}${ext}`;
+  }
+
+  return name.replace(/[\/\\]/g, "_").trim();
+}
+
+/**
  * Resolves appropriate MIME content type based on extension
  */
 function resolveContentType(filename, providedType = null) {
-  if (providedType && providedType !== "application/octet-stream" && providedType.trim() !== "") {
-    return providedType;
+  if (providedType && providedType !== "application/octet-stream" && providedType !== "text/html" && providedType.trim() !== "") {
+    return providedType.split(";")[0].trim();
   }
   const extMatch = filename.match(/\.[0-9a-z]+$/i);
   if (extMatch) {
@@ -1395,8 +1685,112 @@ async function handlePutObject(request, env) {
 }
 
 /**
+ * POST /probe-url & GET /probe-url
+ * Probes a remote URL using HEAD/GET to extract real filename, content-length, MIME type and format
+ */
+async function handleProbeUrl(request, env) {
+  let remoteUrl = "";
+  if (request.method === "POST") {
+    try {
+      const body = await request.json();
+      remoteUrl = body?.url?.trim() || "";
+    } catch {
+      return jsonResponse({ success: false, error: "Invalid JSON body", code: "INVALID_BODY" }, 400, {}, request);
+    }
+  } else {
+    const urlObj = new URL(request.url);
+    remoteUrl = urlObj.searchParams.get("url")?.trim() || "";
+  }
+
+  if (!remoteUrl) {
+    return jsonResponse({ success: false, error: "Missing 'url' parameter", code: "MISSING_URL" }, 400, {}, request);
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(remoteUrl);
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return jsonResponse({ success: false, error: "Only http:// and https:// URLs are supported", code: "INVALID_PROTOCOL" }, 400, {}, request);
+    }
+  } catch (e) {
+    return jsonResponse({ success: false, error: `Invalid URL format: ${e.message}`, code: "INVALID_URL" }, 400, {}, request);
+  }
+
+  // Pre-analyze URL query params & base64 payloads
+  const urlCandidate = extractFilenameFromUrlString(remoteUrl);
+
+  try {
+    // Attempt fast HEAD request first
+    let remoteResponse = await fetch(parsedUrl.toString(), {
+      method: "HEAD",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "*/*"
+      }
+    });
+
+    // Some web servers reject HEAD with 405 Method Not Allowed; fallback to Range GET
+    if (!remoteResponse.ok && remoteResponse.status === 405) {
+      remoteResponse = await fetch(parsedUrl.toString(), {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Range": "bytes=0-0",
+          "Accept": "*/*"
+        }
+      });
+    }
+
+    const cdHeader = remoteResponse.headers.get("Content-Disposition");
+    const cdFilename = parseContentDispositionFilename(cdHeader);
+    const contentType = remoteResponse.headers.get("Content-Type") || "application/octet-stream";
+    const contentLength = remoteResponse.headers.get("Content-Length");
+    const parsedLength = contentLength ? parseInt(contentLength, 10) : null;
+
+    const resolvedFilename = resolveFinalFilename({
+      userFilename: null,
+      urlExtracted: urlCandidate,
+      cdFilename: cdFilename,
+      contentType: contentType
+    });
+
+    const format = getFormatFromFilename(resolvedFilename, contentType);
+
+    return jsonResponse({
+      success: true,
+      filename: resolvedFilename,
+      size: parsedLength,
+      sizeFormatted: parsedLength ? formatBytes(parsedLength) : null,
+      contentType: contentType.split(";")[0].trim(),
+      format,
+      isLive: remoteResponse.ok
+    }, 200, {}, request);
+  } catch (err) {
+    // If remote server probe times out or blocks, gracefully return URL candidate info
+    const fallbackName = resolveFinalFilename({
+      userFilename: null,
+      urlExtracted: urlCandidate,
+      cdFilename: null,
+      contentType: "video/mp4"
+    });
+    return jsonResponse({
+      success: true,
+      filename: fallbackName,
+      size: null,
+      sizeFormatted: null,
+      contentType: "video/mp4",
+      format: getFormatFromFilename(fallbackName, "video/mp4"),
+      probed: false,
+      warning: `Probe error: ${err.message}`
+    }, 200, {}, request);
+  }
+}
+
+/**
  * POST /upload-from-url
- * Streams a remote file directly into Cloudflare R2 at the specified folder prefix
+ * Streams a remote file directly into Cloudflare R2 at the specified folder prefix.
+ * Automatically resolves genuine media filename (.mp4, .mkv, etc.) from Content-Disposition
+ * and MIME-type, completely preventing saving as .php or script formats.
  */
 async function handleUploadFromUrl(request, env, ctx) {
   let body = {};
@@ -1422,17 +1816,75 @@ async function handleUploadFromUrl(request, env, ctx) {
     return jsonResponse({ success: false, error: `Invalid URL format: ${e.message}`, code: "INVALID_URL" }, 400, {}, request);
   }
 
-  // Determine and clean filename
-  let cleanFilename = (filename || "").trim();
-  if (!cleanFilename) {
-    const rawName = decodeURIComponent(parsedUrl.pathname.split("/").pop() || "");
-    cleanFilename = rawName.split("?")[0].trim() || `imported_${Date.now()}`;
+  // Pre-analyze URL query params & base64 payloads to identify candidate filename
+  const urlCandidate = extractFilenameFromUrlString(remoteUrl.trim());
+
+  // Stream fetch remote file
+  let remoteResponse;
+  try {
+    remoteResponse = await fetch(parsedUrl.toString(), {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "*/*"
+      }
+    });
+  } catch (fetchErr) {
+    return jsonResponse({
+      success: false,
+      error: `Could not connect to remote URL: ${fetchErr.message}`,
+      code: "REMOTE_UNREACHABLE"
+    }, 502, {}, request);
   }
+
+  if (!remoteResponse.ok) {
+    return jsonResponse({
+      success: false,
+      error: `Remote server responded with HTTP ${remoteResponse.status}: ${remoteResponse.statusText}`,
+      code: "REMOTE_FETCH_ERROR",
+      statusCode: remoteResponse.status
+    }, 502, {}, request);
+  }
+
+  const remoteContentType = remoteResponse.headers.get("Content-Type") || "";
+  const cdHeader = remoteResponse.headers.get("Content-Disposition");
+  const cdFilename = parseContentDispositionFilename(cdHeader);
+  const contentLength = remoteResponse.headers.get("Content-Length");
+  const parsedLength = contentLength ? parseInt(contentLength, 10) : null;
+
+  // Protect against expired/404 links that return HTML error pages instead of media
+  if (remoteContentType.includes("text/html") && parsedLength !== null && parsedLength < 50000) {
+    if (!urlCandidate?.endsWith(".html")) {
+      return jsonResponse({
+        success: false,
+        error: "Remote download link returned an HTML page (link expired or 404) instead of the media file.",
+        code: "REMOTE_LINK_EXPIRED"
+      }, 400, {}, request);
+    }
+  }
+
+  // Determine authentic, safe filename — ensuring NO .php or script format is saved
+  let cleanFilename = resolveFinalFilename({
+    userFilename: filename,
+    urlExtracted: urlCandidate,
+    cdFilename: cdFilename,
+    contentType: remoteContentType
+  });
 
   // Remove illegal characters
   cleanFilename = cleanFilename.replace(/[\/\\]/g, "_").trim();
   if (!cleanFilename) {
-    cleanFilename = `imported_${Date.now()}`;
+    cleanFilename = `imported_${Date.now()}.mp4`;
+  }
+
+  const resolvedContentType = resolveContentType(cleanFilename, remoteContentType);
+
+  // Check size limit if Content-Length header is present
+  if (parsedLength && parsedLength > CONFIG.maxFileSizeGB * 1024 * 1024 * 1024) {
+    return jsonResponse({
+      success: false,
+      error: `Remote file size (${formatBytes(parsedLength)}) exceeds maximum allowable limit of ${CONFIG.maxFileSizeGB}GB`,
+      code: "FILE_TOO_LARGE"
+    }, 413, {}, request);
   }
 
   // Ensure prefix format
@@ -1449,7 +1901,7 @@ async function handleUploadFromUrl(request, env, ctx) {
     return jsonResponse({ success: false, error: `Invalid target object key '${finalKey}'`, code: "INVALID_KEY" }, 400, {}, request);
   }
 
-  // Handle duplicate policy
+  // Handle duplicate policy on the real target key
   try {
     const existing = await env.MY_BUCKET.head(finalKey);
     if (existing) {
@@ -1472,145 +1924,114 @@ async function handleUploadFromUrl(request, env, ctx) {
     console.warn(`[UPLOAD_FROM_URL] Head check warning for ${finalKey}:`, err);
   }
 
-  // Stream fetch remote file
-  try {
-    const remoteResponse = await fetch(parsedUrl.toString(), {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "*/*"
-      }
-    });
+  const wantsStream = body?.stream === true || request.headers.get("Accept")?.includes("text/event-stream");
 
-    if (!remoteResponse.ok) {
-      return jsonResponse({
-        success: false,
-        error: `Remote server responded with HTTP ${remoteResponse.status}: ${remoteResponse.statusText}`,
-        code: "REMOTE_FETCH_ERROR",
-        statusCode: remoteResponse.status
-      }, 502, {}, request);
-    }
+  // Real-time SSE streaming mode for live percentage (%) and transferred bytes
+  if (wantsStream) {
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const encoder = new TextEncoder();
 
-    const remoteContentType = remoteResponse.headers.get("Content-Type");
-    const resolvedContentType = resolveContentType(cleanFilename, remoteContentType);
-    const contentLength = remoteResponse.headers.get("Content-Length");
-    const parsedLength = contentLength ? parseInt(contentLength, 10) : null;
+    const uploadTask = (async () => {
+      try {
+        let loadedBytes = 0;
+        let lastEmit = Date.now();
+        const startTime = Date.now();
 
-    // Check size limit if Content-Length header is present
-    if (parsedLength && parsedLength > CONFIG.maxFileSizeGB * 1024 * 1024 * 1024) {
-      return jsonResponse({
-        success: false,
-        error: `Remote file size (${formatBytes(parsedLength)}) exceeds maximum allowable limit of ${CONFIG.maxFileSizeGB}GB`,
-        code: "FILE_TOO_LARGE"
-      }, 413, {}, request);
-    }
+        // Emit initial start event with resolved filename and key
+        await writer.write(encoder.encode(`data: ${JSON.stringify({
+          type: "start",
+          total: parsedLength || 0,
+          filename: cleanFilename,
+          key: finalKey,
+          contentType: resolvedContentType
+        })}\n\n`)).catch(() => {});
 
-    const wantsStream = body?.stream === true || request.headers.get("Accept")?.includes("text/event-stream");
-
-    // Real-time SSE streaming mode for live percentage (%) and transferred bytes
-    if (wantsStream) {
-      const { readable, writable } = new TransformStream();
-      const writer = writable.getWriter();
-      const encoder = new TextEncoder();
-
-      const uploadTask = (async () => {
-        try {
-          let loadedBytes = 0;
-          let lastEmit = Date.now();
-          const startTime = Date.now();
-
-          // Emit initial start event
-          await writer.write(encoder.encode(`data: ${JSON.stringify({
-            type: "start",
-            total: parsedLength || 0,
-            filename: cleanFilename,
-            key: finalKey,
-            contentType: resolvedContentType
-          })}\n\n`)).catch(() => {});
-
-          const counterTransform = new TransformStream({
-            transform(chunk, controller) {
-              loadedBytes += chunk.length;
-              const now = Date.now();
-              if (now - lastEmit >= 250) { // update every 250ms for ultra smooth %
-                lastEmit = now;
-                const elapsedSec = Math.max(0.1, (now - startTime) / 1000);
-                const speedBps = Math.round(loadedBytes / elapsedSec);
-                const percent = parsedLength ? Math.min(99, Math.round((loadedBytes / parsedLength) * 100)) : null;
-                writer.write(encoder.encode(`data: ${JSON.stringify({
-                  type: "progress",
-                  loaded: loadedBytes,
-                  total: parsedLength || 0,
-                  percent,
-                  speed: formatBytes(speedBps) + "/s",
-                  elapsedSeconds: Math.round(elapsedSec)
-                })}\n\n`)).catch(() => {});
-              }
-              controller.enqueue(chunk);
+        const counterTransform = new TransformStream({
+          transform(chunk, controller) {
+            loadedBytes += chunk.length;
+            const now = Date.now();
+            if (now - lastEmit >= 250) { // update every 250ms for ultra smooth %
+              lastEmit = now;
+              const elapsedSec = Math.max(0.1, (now - startTime) / 1000);
+              const speedBps = Math.round(loadedBytes / elapsedSec);
+              const percent = parsedLength ? Math.min(99, Math.round((loadedBytes / parsedLength) * 100)) : null;
+              writer.write(encoder.encode(`data: ${JSON.stringify({
+                type: "progress",
+                loaded: loadedBytes,
+                total: parsedLength || 0,
+                percent,
+                speed: formatBytes(speedBps) + "/s",
+                elapsedSeconds: Math.round(elapsedSec)
+              })}\n\n`)).catch(() => {});
             }
-          });
-
-          const countingStream = remoteResponse.body.pipeThrough(counterTransform);
-
-          let streamForR2 = countingStream;
-          if (typeof FixedLengthStream !== "undefined" && parsedLength && parsedLength > 0) {
-            try {
-              streamForR2 = countingStream.pipeThrough(new FixedLengthStream(parsedLength));
-            } catch (flErr) {
-              console.warn("[FIXED_LENGTH_STREAM_WARN]", flErr);
-            }
+            controller.enqueue(chunk);
           }
+        });
 
-          const r2Object = await env.MY_BUCKET.put(finalKey, streamForR2, {
-            httpMetadata: {
-              contentType: resolvedContentType,
-              contentDisposition: `inline; filename="${encodeURIComponent(cleanFilename)}"`
-            },
-            customMetadata: {
-              sourceUrl: remoteUrl.substring(0, 500),
-              importedAt: new Date().toISOString()
-            }
-          });
+        const countingStream = remoteResponse.body.pipeThrough(counterTransform);
 
-          const finalSize = r2Object.size || loadedBytes || parsedLength || 0;
-          await writer.write(encoder.encode(`data: ${JSON.stringify({
-            type: "complete",
-            success: true,
-            key: finalKey,
-            filename: cleanFilename,
-            prefix: cleanPrefix,
-            size: finalSize,
-            sizeFormatted: formatBytes(finalSize),
-            contentType: resolvedContentType,
-            percent: 100
-          })}\n\n`)).catch(() => {});
-        } catch (err) {
-          console.error("[UPLOAD_FROM_URL SSE ERROR]", err);
-          await writer.write(encoder.encode(`data: ${JSON.stringify({
-            type: "error",
-            error: err.message || "Upload stream failed"
-          })}\n\n`)).catch(() => {});
-        } finally {
-          await writer.close().catch(() => {});
+        let streamForR2 = countingStream;
+        if (typeof FixedLengthStream !== "undefined" && parsedLength && parsedLength > 0) {
+          try {
+            streamForR2 = countingStream.pipeThrough(new FixedLengthStream(parsedLength));
+          } catch (flErr) {
+            console.warn("[FIXED_LENGTH_STREAM_WARN]", flErr);
+          }
         }
-      })();
 
-      if (ctx?.waitUntil) {
-        ctx.waitUntil(uploadTask);
-      }
+        const r2Object = await env.MY_BUCKET.put(finalKey, streamForR2, {
+          httpMetadata: {
+            contentType: resolvedContentType,
+            contentDisposition: `inline; filename="${encodeURIComponent(cleanFilename)}"`
+          },
+          customMetadata: {
+            sourceUrl: remoteUrl.substring(0, 500),
+            importedAt: new Date().toISOString()
+          }
+        });
 
-      const headers = new Headers({
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive"
-      });
-      const cors = getCorsHeaders(request);
-      for (const [k, v] of Object.entries(cors)) {
-        headers.set(k, v);
+        const finalSize = r2Object.size || loadedBytes || parsedLength || 0;
+        await writer.write(encoder.encode(`data: ${JSON.stringify({
+          type: "complete",
+          success: true,
+          key: finalKey,
+          filename: cleanFilename,
+          prefix: cleanPrefix,
+          size: finalSize,
+          sizeFormatted: formatBytes(finalSize),
+          contentType: resolvedContentType,
+          percent: 100
+        })}\n\n`)).catch(() => {});
+      } catch (err) {
+        console.error("[UPLOAD_FROM_URL SSE ERROR]", err);
+        await writer.write(encoder.encode(`data: ${JSON.stringify({
+          type: "error",
+          error: err.message || "Upload stream failed"
+        })}\n\n`)).catch(() => {});
+      } finally {
+        await writer.close().catch(() => {});
       }
-      return new Response(readable, { status: 200, headers });
+    })();
+
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(uploadTask);
     }
 
-    // Fallback: Standard non-streaming put
+    const headers = new Headers({
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive"
+    });
+    const cors = getCorsHeaders(request);
+    for (const [k, v] of Object.entries(cors)) {
+      headers.set(k, v);
+    }
+    return new Response(readable, { status: 200, headers });
+  }
+
+  // Fallback: Standard non-streaming put
+  try {
     const r2Object = await env.MY_BUCKET.put(finalKey, remoteResponse.body, {
       httpMetadata: {
         contentType: resolvedContentType,
@@ -1633,7 +2054,7 @@ async function handleUploadFromUrl(request, env, ctx) {
       sizeFormatted: formatBytes(finalSize),
       contentType: resolvedContentType,
       etag: r2Object.httpEtag || r2Object.etag,
-      message: `File directly imported and saved to '${finalKey}' successfully`
+      message: `File directly imported and saved as '${cleanFilename}' successfully`
     }, 200, {}, request);
   } catch (err) {
     console.error(`[UPLOAD_FROM_URL] Error streaming from ${remoteUrl} to ${finalKey}:`, err);
@@ -1684,6 +2105,14 @@ export default {
       return handleStreamMedia(request, env);
     }
 
+    // 4b. GET /probe-url
+    if (request.method === "GET" && path === "/probe-url") {
+      if (!authenticate(request, env)) {
+        return jsonResponse({ success: false, error: "Unauthorized", code: "UNAUTHORIZED" }, 401, {}, request);
+      }
+      return handleProbeUrl(request, env);
+    }
+
     // 5. POST Dispatch Routes Table
     const postRoutes = {
       // Multipart Uploader
@@ -1695,8 +2124,9 @@ export default {
       "/abort-upload": handleAbortUpload,
       "/cleanup-upload": handleAbortUpload,
 
-      // Direct URL Import
+      // Direct URL Import & Probe
       "/upload-from-url": handleUploadFromUrl,
+      "/probe-url": handleProbeUrl,
 
       // File & Folder Management
       "/list-objects": handleListObjects,

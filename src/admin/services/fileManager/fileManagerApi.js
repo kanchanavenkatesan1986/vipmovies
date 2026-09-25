@@ -275,6 +275,18 @@ class FileManagerApiClient {
   }
 
   /**
+   * POST /probe-url
+   * Probes a remote URL using HEAD/GET to extract real filename, content-length, MIME type and format
+   */
+  async probeUrl(url) {
+    return this.request('/probe-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url.trim() })
+    }, 20);
+  }
+
+  /**
    * POST /upload-from-url
    * Streams a file from a remote web URL directly into R2 at the specified prefix/folder
    */

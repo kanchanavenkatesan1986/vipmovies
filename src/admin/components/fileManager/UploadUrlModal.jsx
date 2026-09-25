@@ -2,6 +2,93 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { formatBytes, getFileCategory, getFileIcon } from '../../services/fileManager/fileManagerUtils';
 import { fileManagerApi } from '../../services/fileManager/fileManagerApi';
 
+// Script and dynamic extensions that should NEVER be stored as media in R2
+const SCRIPT_EXTENSIONS = new Set([
+  '.php', '.php3', '.php4', '.php5', '.phtml',
+  '.asp', '.aspx', '.ashx', '.asmx',
+  '.jsp', '.jspx', '.do', '.action',
+  '.cgi', '.pl', '.py', '.sh', '.bash',
+  '.html', '.htm', '.cfm'
+]);
+
+function isScriptExtension(filename) {
+  if (!filename || typeof filename !== 'string') return false;
+  const match = filename.match(/\.[a-zA-Z0-9]+$/i);
+  if (!match) return false;
+  return SCRIPT_EXTENSIONS.has(match[0].toLowerCase());
+}
+
+/**
+ * Advanced filename extractor: inspects query parameters and base64 payloads (e.g. ?dl=... on uptodub/isaidub)
+ * to uncover the true media file name and format (.mp4, .mkv, etc.).
+ */
+function extractFilenameFromUrlAdvanced(urlStr) {
+  if (!urlStr || !urlStr.trim()) return '';
+  try {
+    const u = new URL(urlStr.trim());
+
+    // 1. Check known query parameters (e.g. ?file=..., ?path=..., ?filename=...)
+    const paramKeys = ['filename', 'file', 'name', 'path', 'title', 'f', 'download', 'target', 'source'];
+    for (const key of paramKeys) {
+      const val = u.searchParams.get(key);
+      if (val) {
+        const decoded = decodeURIComponent(val).split('/').pop() || '';
+        const clean = decoded.split('?')[0].trim();
+        if (clean && /\.[a-zA-Z0-9]{2,5}$/.test(clean) && !isScriptExtension(clean)) {
+          return clean;
+        }
+      }
+    }
+
+    // 2. Check base64 encoded parameters (e.g. ?dl=c2VydmVy... on dub/uptodub/isai sites)
+    for (const [, val] of u.searchParams.entries()) {
+      if (val && val.length > 16 && /^[A-Za-z0-9+/=_-]+$/.test(val)) {
+        try {
+          let b64 = val.replace(/-/g, '+').replace(/_/g, '/');
+          while (b64.length % 4 !== 0) b64 += '=';
+          const decodedText = atob(b64);
+
+          // Match path=... or filename=... or file=...
+          const paramMatch = decodedText.match(/(?:path|filename|file|name)=([^&]+)/i);
+          if (paramMatch) {
+            const candidate = decodeURIComponent(paramMatch[1]).split('/').pop() || '';
+            if (candidate && /\.[a-zA-Z0-9]{2,5}$/.test(candidate) && !isScriptExtension(candidate)) {
+              return candidate;
+            }
+          }
+
+          // Match any file with valid media/archive extension inside the payload
+          const mediaMatch = decodedText.match(/([a-zA-Z0-9_\-\. ()\[\]]+\.(?:mp4|mkv|webm|mov|m4v|avi|ts|flv|wmv|3gp|mp3|m4a|aac|flac|wav|ogg|opus|zip|rar|7z|tar|gz|pdf))/i);
+          if (mediaMatch) {
+            return mediaMatch[1].trim();
+          }
+        } catch {
+          // ignore base64 errors
+        }
+      }
+    }
+
+    // 3. Fallback to URL pathname
+    const raw = decodeURIComponent(u.pathname.split('/').pop() || '');
+    let clean = raw.split('?')[0].trim();
+
+    // If pathname ends with a script extension (.php, .aspx, etc.), convert to clean movie name
+    if (isScriptExtension(clean) || clean.toLowerCase() === 'download.php') {
+      const base = clean.replace(/\.[a-zA-Z0-9]+$/i, '');
+      const safeBase = (!base || base.toLowerCase() === 'download') ? 'download_movie' : base;
+      return `${safeBase}.mp4`;
+    }
+
+    return clean;
+  } catch {
+    const raw = urlStr.trim().split('?')[0].split('/').pop() || '';
+    if (isScriptExtension(raw)) {
+      return 'download_movie.mp4';
+    }
+    return raw;
+  }
+}
+
 export default function UploadUrlModal({
   isOpen,
   currentPrefix = '',
@@ -11,6 +98,7 @@ export default function UploadUrlModal({
 }) {
   const [fileUrl, setFileUrl] = useState('');
   const [customFilename, setCustomFilename] = useState('');
+  const [selectedFormat, setSelectedFormat] = useState('auto'); // 'auto' | '.mp4' | '.mkv' | '.webm' | '.avi'
   const [duplicatePolicy, setDuplicatePolicy] = useState('replace');
   const [uploadMode, setUploadMode] = useState('cloud'); // 'cloud' (server-side stream) | 'browser' (client fetch)
   const [status, setStatus] = useState('idle'); // 'idle' | 'uploading' | 'success' | 'error'
@@ -18,6 +106,10 @@ export default function UploadUrlModal({
   const [errorMessage, setErrorMessage] = useState('');
   const [uploadedResult, setUploadedResult] = useState(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  // Live probing states
+  const [probeLoading, setProbeLoading] = useState(false);
+  const [probedData, setProbedData] = useState(null);
 
   // Live percentage & bytes tracking
   const [percent, setPercent] = useState(0);
@@ -51,6 +143,7 @@ export default function UploadUrlModal({
     if (isOpen) {
       setFileUrl('');
       setCustomFilename('');
+      setSelectedFormat('auto');
       setDuplicatePolicy('replace');
       setUploadMode('cloud');
       setStatus('idle');
@@ -62,21 +155,53 @@ export default function UploadUrlModal({
       setLoadedBytes(0);
       setTotalBytes(0);
       setTransferSpeed('');
+      setProbeLoading(false);
+      setProbedData(null);
     }
   }, [isOpen, currentPrefix]);
 
-  // Auto-extract filename from URL
+  // Auto-extract filename from URL using advanced query & payload analyzer
   const extractedFilename = useMemo(() => {
-    if (!fileUrl || !fileUrl.trim()) return '';
-    try {
-      const parsed = new URL(fileUrl.trim());
-      const raw = decodeURIComponent(parsed.pathname.split('/').pop() || '');
-      const clean = raw.split('?')[0].trim();
-      return clean;
-    } catch {
-      const match = fileUrl.trim().split('?')[0].split('/').pop();
-      return match || '';
+    return extractFilenameFromUrlAdvanced(fileUrl);
+  }, [fileUrl]);
+
+  // Remote link probe: Automatically inspect Content-Disposition & Content-Length in background
+  useEffect(() => {
+    if (!fileUrl || !fileUrl.trim()) {
+      setProbedData(null);
+      setProbeLoading(false);
+      return;
     }
+
+    try {
+      const u = new URL(fileUrl.trim());
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
+    } catch {
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      setProbeLoading(true);
+      try {
+        const res = await fileManagerApi.probeUrl(fileUrl.trim());
+        if (isMounted && res && res.success) {
+          setProbedData(res);
+          if (res.filename && !customFilename) {
+            setCustomFilename(res.filename);
+          }
+        }
+      } catch (err) {
+        console.warn('[PROBE_NOTICE]', err);
+      } finally {
+        if (isMounted) setProbeLoading(false);
+      }
+    }, 500);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, [fileUrl]);
 
   // Sync customFilename with extractedFilename when extractedFilename changes
@@ -86,8 +211,26 @@ export default function UploadUrlModal({
     }
   }, [extractedFilename]);
 
-  // Effective filename
-  const effectiveFilename = customFilename.trim() || extractedFilename || 'downloaded_file';
+  // Calculate clean effective filename with guaranteed non-php format
+  const effectiveFilename = useMemo(() => {
+    let name = (customFilename.trim() || extractedFilename || 'download_media.mp4').trim();
+
+    // If user selected an explicit format chip (.mp4, .mkv, .webm, etc.)
+    if (selectedFormat !== 'auto') {
+      name = name.replace(/\.[a-zA-Z0-9]+$/i, '') + selectedFormat;
+    } else if (isScriptExtension(name)) {
+      // Auto-convert script extension (.php, .aspx) to .mp4
+      name = name.replace(/\.[a-zA-Z0-9]+$/i, '.mp4');
+    }
+
+    // Ensure it has an extension
+    if (!/\.[a-zA-Z0-9]{2,5}$/.test(name)) {
+      name = `${name}.mp4`;
+    }
+
+    return name.replace(/[\/\\]/g, '_');
+  }, [customFilename, extractedFilename, selectedFormat]);
+
   const fileCategory = getFileCategory(effectiveFilename);
   const fileIcon = getFileIcon(effectiveFilename);
 
@@ -264,7 +407,7 @@ export default function UploadUrlModal({
                     setFileUrl(e.target.value);
                     if (errorMessage) setErrorMessage('');
                   }}
-                  placeholder="https://example.com/files/movie.mp4 or poster.jpg"
+                  placeholder="https://dub.uptodub.ch/download.php?dl=... or https://example.com/movie.mp4"
                   autoFocus
                   required
                   disabled={status === 'uploading'}
@@ -282,11 +425,50 @@ export default function UploadUrlModal({
                   }}
                 ></i>
               </div>
+
+              {/* Probe / Inspection Status */}
+              {probeLoading && (
+                <div style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                  <i className="fa-solid fa-circle-notch fa-spin" style={{ color: 'var(--admin-blue)' }}></i>
+                  <span>Inspecting remote link & format headers...</span>
+                </div>
+              )}
+              {probedData && !probeLoading && (
+                <div style={{ fontSize: '11.5px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                  <i className="fa-solid fa-circle-check"></i>
+                  <span>
+                    Detected: <strong>{probedData.format || 'Media'}</strong> {probedData.sizeFormatted ? `(${probedData.sizeFormatted})` : ''}
+                  </span>
+                </div>
+              )}
+
+              {/* PHP Script Link Notice */}
+              {fileUrl && (fileUrl.toLowerCase().includes('.php') || fileUrl.toLowerCase().includes('download.php')) && (
+                <div
+                  style={{
+                    marginTop: '8px',
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    fontSize: '11.5px',
+                    color: '#93c5fd',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--admin-blue)', fontSize: '13px' }}></i>
+                  <span>
+                    PHP download URL detected. Automatically extracting original video format (<strong>{effectiveFilename.split('.').pop()?.toUpperCase()}</strong>) — will <strong>never</strong> save as .php.
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Filename & Category Preview */}
+            {/* Filename & Format Selection */}
             <div className="admin-form-group">
-              <label className="admin-label">Save As (Filename)</label>
+              <label className="admin-label">Save As (Target Filename & Format)</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input
                   type="text"
@@ -317,8 +499,40 @@ export default function UploadUrlModal({
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: '11.5px', color: 'var(--admin-text-dim)', marginTop: '4px' }}>
-                Full R2 Destination Key: <code style={{ color: '#60a5fa' }}>{currentPrefix || ''}{effectiveFilename}</code>
+
+              {/* Format Override Chips */}
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', color: 'var(--admin-text-dim)' }}>Format:</span>
+                {[
+                  { id: 'auto', label: 'Auto (Original)' },
+                  { id: '.mp4', label: 'MP4' },
+                  { id: '.mkv', label: 'MKV' },
+                  { id: '.webm', label: 'WEBM' },
+                  { id: '.avi', label: 'AVI' },
+                  { id: '.mp3', label: 'MP3' }
+                ].map((fmt) => (
+                  <button
+                    key={fmt.id}
+                    type="button"
+                    onClick={() => setSelectedFormat(fmt.id)}
+                    disabled={status === 'uploading'}
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      borderRadius: '6px',
+                      border: `1px solid ${selectedFormat === fmt.id ? 'var(--admin-blue)' : 'var(--admin-border)'}`,
+                      background: selectedFormat === fmt.id ? 'rgba(59, 130, 246, 0.2)' : 'var(--admin-surface)',
+                      color: selectedFormat === fmt.id ? '#60a5fa' : 'var(--admin-text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {fmt.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ fontSize: '11.5px', color: 'var(--admin-text-dim)', marginTop: '6px' }}>
+                Target R2 Key: <code style={{ color: '#60a5fa' }}>{currentPrefix || ''}{effectiveFilename}</code>
               </div>
             </div>
 
