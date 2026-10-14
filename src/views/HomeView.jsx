@@ -96,6 +96,13 @@ export default function HomeView() {
         </a>
       </div>
 
+      <script async type="application/javascript" src="https://a.magsrv.com/ad-provider.js"></script> 
+ <ins class="eas6a97888e2" data-zoneid="6055926"></ins> 
+ <script>(AdProvider = window.AdProvider || []).push({"serve": {}});</script>
+
+      <iframe src="//a.magsrv.com/iframe.php?idzone=6055926&size=300x250" width="300" height="250" scrolling="no" marginwidth="0" marginheight="0" frameborder="0"></iframe>
+        
+
       {/* Tamil Movies */}
       <div className="info">
         <h1 className="info-head">Tamil Movies</h1>
