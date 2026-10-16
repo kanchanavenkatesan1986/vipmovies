@@ -14,6 +14,23 @@ export default function HomeView() {
     return () => clearInterval(interval);
   }, [slider]);
 
+  // Load Advertisement Script
+  useEffect(() => {
+    try {
+      if (!document.querySelector('script[src*="ad-provider.js"]')) {
+        const script = document.createElement('script');
+        script.async = true;
+        script.type = 'application/javascript';
+        script.src = 'https://a.magsrv.com/ad-provider.js';
+        document.head.appendChild(script);
+      }
+      window.AdProvider = window.AdProvider || [];
+      window.AdProvider.push({ serve: {} });
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Filter Tamil movies for 2026 and status active
   const tamilMovies = movies
     .filter(m => String(m.type).toLowerCase() === 'tamil' && String(m.year) === '2026' && String(m.status).toLowerCase() === 'active')
@@ -96,11 +113,21 @@ export default function HomeView() {
         </a>
       </div>
 
-      <script async type="application/javascript" src="https://a.magsrv.com/ad-provider.js"></script> 
- <ins class="eas6a97888e2" data-zoneid="6055926"></ins> 
- <script>(AdProvider = window.AdProvider || []).push({"serve": {}});</script>
-
-      <iframe src="//a.magsrv.com/iframe.php?idzone=6055926&size=300x250" width="300" height="250" scrolling="no" marginwidth="0" marginheight="0" frameborder="0"></iframe>
+      {/* Advertisement Banner */}
+      <div style={{ textAlign: 'center', margin: '16px auto', maxWidth: '320px' }}>
+        <ins className="eas6a97888e2" data-zoneid="6055926"></ins>
+        <iframe
+          src="//a.magsrv.com/iframe.php?idzone=6055926&size=300x250"
+          width="300"
+          height="250"
+          scrolling="no"
+          marginWidth="0"
+          marginHeight="0"
+          frameBorder="0"
+          style={{ border: 'none', overflow: 'hidden' }}
+          title="Advertisement"
+        ></iframe>
+      </div>
         
 
       {/* Tamil Movies */}
