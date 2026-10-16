@@ -68,6 +68,16 @@ export default function FileManagerHeader({
         </div>
 
         <div className="fm-stat-item">
+          <div className="fm-stat-icon" style={{ background: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa' }}>
+            <i className="fa-solid fa-clapperboard"></i>
+          </div>
+          <div className="fm-stat-text">
+            <div className="fm-stat-val">{stats.videoCount || 0}</div>
+            <div className="fm-stat-label">Videos</div>
+          </div>
+        </div>
+
+        <div className="fm-stat-item">
           <div className="fm-stat-icon gold">
             <i className="fa-solid fa-hard-drive"></i>
           </div>

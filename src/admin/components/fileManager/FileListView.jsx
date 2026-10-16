@@ -2,7 +2,7 @@ import React from 'react';
 import { formatBytes, formatDate, getFileIcon } from '../../services/fileManager/fileManagerUtils';
 import { isEditable } from './TextEditorModal';
 
-export default function FileListView({
+function FileListView({
   folders = [],
   objects = [],
   selectedKeys = new Set(),
@@ -16,6 +16,8 @@ export default function FileListView({
   onDeleteItem,
   onRenameItem,
   onEditFile,
+  onCopyUrl,
+  onDownload,
   onOpenUploadUrl,
   onOpenCreateFolder,
   onOpenUploadToCurrent
@@ -204,6 +206,26 @@ export default function FileListView({
                         <i className="fa-solid fa-code"></i>
                       </button>
                     )}
+                    {onCopyUrl && (
+                      <button
+                        type="button"
+                        className="fm-quick-btn copy-url"
+                        title="Copy Direct URL"
+                        onClick={() => onCopyUrl(obj.key)}
+                      >
+                        <i className="fa-solid fa-link"></i>
+                      </button>
+                    )}
+                    {onDownload && (
+                      <button
+                        type="button"
+                        className="fm-quick-btn download"
+                        title="Download File"
+                        onClick={() => onDownload(obj)}
+                      >
+                        <i className="fa-solid fa-download"></i>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="fm-quick-btn rename"
@@ -237,3 +259,5 @@ export default function FileListView({
     </div>
   );
 }
+
+export default React.memo(FileListView);

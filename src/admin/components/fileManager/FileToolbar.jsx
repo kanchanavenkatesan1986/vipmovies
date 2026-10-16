@@ -19,7 +19,8 @@ export default function FileToolbar({
   totalItems = 0,
   onBulkDelete,
   onBulkMove,
-  onBulkCopy
+  onBulkCopy,
+  onShowShortcuts
 }) {
   return (
     <div className="fm-toolbar">
@@ -127,6 +128,18 @@ export default function FileToolbar({
             <i className="fa-solid fa-cloud-arrow-up"></i>
             <span>Upload Here</span>
           </button>
+
+          {onShowShortcuts && (
+            <button
+              type="button"
+              className="admin-btn text"
+              onClick={onShowShortcuts}
+              title="Keyboard Shortcuts (?)"
+              style={{ padding: '0 10px', minWidth: 'unset', fontSize: '15px', fontWeight: 700, color: 'var(--admin-text-muted)' }}
+            >
+              <i className="fa-solid fa-keyboard"></i>
+            </button>
+          )}
         </div>
       </div>
 

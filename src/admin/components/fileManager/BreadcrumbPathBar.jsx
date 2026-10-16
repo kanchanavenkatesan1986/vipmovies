@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { parseBreadcrumbs } from '../../services/fileManager/fileManagerUtils';
+import { parseBreadcrumbs, formatBytes } from '../../services/fileManager/fileManagerUtils';
 import { showToast } from '../common/ToastContainer';
 
 export default function BreadcrumbPathBar({
   currentPrefix = '',
-  onNavigatePrefix
+  onNavigatePrefix,
+  totalFiles = 0,
+  totalFolders = 0,
+  totalBytes = 0
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [customPath, setCustomPath] = useState(currentPrefix);
@@ -81,6 +84,40 @@ export default function BreadcrumbPathBar({
       </div>
 
       <div className="fm-path-actions">
+        {(totalFiles > 0 || totalFolders > 0) && (
+          <div
+            className="fm-folder-stats"
+            title={`Total items in current view: ${totalFiles} file(s), ${totalFolders} folder(s), ${formatBytes(totalBytes)}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '4px 12px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '16px',
+              fontSize: '11px',
+              color: 'var(--admin-text-muted)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              marginRight: '6px'
+            }}
+          >
+            <span>
+              <i className="fa-solid fa-file" style={{ color: 'var(--admin-blue)', marginRight: '4px' }}></i>
+              {totalFiles} file{totalFiles !== 1 ? 's' : ''}
+            </span>
+            <span style={{ opacity: 0.35 }}>•</span>
+            <span style={{ color: '#fff', fontWeight: 600 }}>{formatBytes(totalBytes)}</span>
+            {totalFolders > 0 && (
+              <>
+                <span style={{ opacity: 0.35 }}>•</span>
+                <span>
+                  <i className="fa-solid fa-folder" style={{ color: 'var(--admin-gold)', marginRight: '4px' }}></i>
+                  {totalFolders}
+                </span>
+              </>
+            )}
+          </div>
+        )}
         <button
           type="button"
           className="admin-btn text sm"

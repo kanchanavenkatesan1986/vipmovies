@@ -1207,6 +1207,7 @@ async function handleStreamMedia(request, env) {
     headers.set("Content-Type", contentType);
     headers.set("Accept-Ranges", "bytes");
     headers.set("ETag", object.httpEtag || object.etag);
+    headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
 
     // Range & Content-Length specification required for HTML5 video player buffer seeking
     if (object.range) {
@@ -1951,18 +1952,23 @@ async function handleUploadFromUrl(request, env, ctx) {
           transform(chunk, controller) {
             loadedBytes += chunk.length;
             const now = Date.now();
-            if (now - lastEmit >= 250) { // update every 250ms for ultra smooth %
+            if (now - lastEmit >= 100) { // update every 100ms for ultra smooth real-time % & ms tracking
               lastEmit = now;
-              const elapsedSec = Math.max(0.1, (now - startTime) / 1000);
+              const elapsedSec = Math.max(0.05, (now - startTime) / 1000);
+              const elapsedMs = now - startTime;
               const speedBps = Math.round(loadedBytes / elapsedSec);
-              const percent = parsedLength ? Math.min(99, Math.round((loadedBytes / parsedLength) * 100)) : null;
+              const percent = parsedLength ? Math.min(99.9, Math.round((loadedBytes / parsedLength) * 10000) / 100) : null;
+              const etaSeconds = (parsedLength && speedBps > 0) ? Math.max(0, Math.round((parsedLength - loadedBytes) / speedBps)) : null;
               writer.write(encoder.encode(`data: ${JSON.stringify({
                 type: "progress",
                 loaded: loadedBytes,
                 total: parsedLength || 0,
                 percent,
                 speed: formatBytes(speedBps) + "/s",
-                elapsedSeconds: Math.round(elapsedSec)
+                speedBps,
+                elapsedSeconds: Math.round(elapsedSec),
+                elapsedMs,
+                etaSeconds
               })}\n\n`)).catch(() => {});
             }
             controller.enqueue(chunk);

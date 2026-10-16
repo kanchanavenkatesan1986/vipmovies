@@ -15,7 +15,8 @@ export default function ContextMenu({
   onDownload,
   onCopyKey,
   onCopyMediaUrl,
-  onUploadUrl
+  onUploadUrl,
+  onOpenInNewTab
 }) {
   const menuRef = useRef(null);
 
@@ -98,6 +99,11 @@ export default function ContextMenu({
           <button type="button" className="fm-menu-item" onClick={() => { onClose(); onDownload(item); }}>
             <i className="fa-solid fa-download"></i> Download
           </button>
+          {onOpenInNewTab && (
+            <button type="button" className="fm-menu-item" onClick={() => { onClose(); onOpenInNewTab(item); }}>
+              <i className="fa-solid fa-arrow-up-right-from-square"></i> Open in New Tab
+            </button>
+          )}
           <div className="fm-menu-divider"></div>
           <button type="button" className="fm-menu-item" onClick={() => { onClose(); onCopyKey(item.key); }}>
             <i className="fa-solid fa-key"></i> Copy Object Key

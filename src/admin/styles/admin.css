@@ -2926,6 +2926,26 @@ textarea.admin-input {
   color: #fff;
 }
 
+.fm-quick-btn.copy-url {
+  color: #818cf8;
+  border-color: rgba(129, 140, 248, 0.3);
+}
+.fm-quick-btn.copy-url:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: #6366f1;
+  color: #fff;
+}
+
+.fm-quick-btn.download {
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.3);
+}
+.fm-quick-btn.download:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #fff;
+}
+
 /* List view table action buttons row */
 .fm-table-actions-wrap {
   display: flex;
@@ -3081,6 +3101,399 @@ textarea.admin-input {
   background: rgba(59, 130, 246, 0.35);
 }
 
+/* ============================================================
+   ADVANCED REAL-TIME UPLOAD TELEMETRY & PROGRESS STYLES
+   ============================================================ */
 
+.fm-upload-live-card {
+  background: radial-gradient(120% 120% at 50% 0%, rgba(29, 78, 216, 0.16) 0%, rgba(10, 14, 26, 0.95) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
 
+.fm-upload-live-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #3b82f6, #06b6d4, #10b981, transparent);
+  animation: fmLaserSweep 2.5s infinite linear;
+}
 
+@keyframes fmLaserSweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Pipeline Multi-Step Progress Tracker */
+.fm-pipeline-tracker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  padding: 4px 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.fm-pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--admin-text-dim);
+  transition: all 0.25s ease;
+  z-index: 2;
+}
+
+.fm-pipeline-step.active {
+  color: #38bdf8;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+.fm-pipeline-step.completed {
+  color: #34d399;
+}
+
+.fm-pipeline-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--admin-text-dim);
+  transition: all 0.25s ease;
+}
+
+.fm-pipeline-step.active .fm-pipeline-dot {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+  animation: fmDotPulse 1.5s infinite;
+}
+
+.fm-pipeline-step.completed .fm-pipeline-dot {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #34d399;
+}
+
+@keyframes fmDotPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.8; }
+}
+
+/* Hero Progress Number & Timer Row */
+.fm-hero-telemetry-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.fm-hero-percent-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.fm-hero-percent {
+  font-size: 34px;
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.fm-hero-percent-symbol {
+  font-size: 20px;
+  color: #38bdf8;
+  margin-left: 2px;
+}
+
+/* Ultra Precise Millisecond Stopwatch Display */
+.fm-stopwatch-badge {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  border-radius: 8px;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.fm-stopwatch-icon {
+  color: #60a5fa;
+  font-size: 13px;
+  animation: fmIconSpin 3s linear infinite;
+}
+
+@keyframes fmIconSpin {
+  100% { transform: rotate(360deg); }
+}
+
+.fm-stopwatch-digits {
+  font-size: 14px;
+  font-weight: 800;
+  color: #e2e8f0;
+  letter-spacing: 0.5px;
+}
+
+.fm-stopwatch-ms {
+  color: #38bdf8;
+  font-size: 12.5px;
+  font-weight: 900;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}
+
+/* Multi-Tier Telemetry Metric Chips */
+.fm-telemetry-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.fm-telemetry-chip {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fm-telemetry-chip.highlight {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.fm-telemetry-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fm-telemetry-val {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #fff;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.fm-telemetry-val.speed {
+  color: #34d399;
+  text-shadow: 0 0 10px rgba(52, 211, 153, 0.4);
+}
+
+.fm-telemetry-val.eta {
+  color: #fbbf24;
+}
+
+/* Advanced Glowing Progress Bar Track */
+.fm-progress-track-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.fm-progress-track {
+  width: 100%;
+  height: 12px;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.fm-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb 0%, #3b82f6 30%, #06b6d4 70%, #10b981 100%);
+  border-radius: 8px;
+  transition: width 0.1s linear;
+  position: relative;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.65);
+}
+
+.fm-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  background: #fff;
+  box-shadow: 0 0 12px #fff, 0 0 24px #38bdf8;
+  border-radius: 8px;
+  opacity: 0.9;
+}
+
+/* Audio / Network Equalizer Wave Visualizer */
+.fm-network-equalizer {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+  padding: 0 4px;
+}
+
+.fm-eq-bar {
+  width: 3px;
+  background: #38bdf8;
+  border-radius: 2px;
+  animation: fmEqBounce 0.8s ease-in-out infinite alternate;
+}
+
+.fm-eq-bar:nth-child(1) { height: 30%; animation-delay: 0.0s; }
+.fm-eq-bar:nth-child(2) { height: 75%; animation-delay: 0.2s; background: #60a5fa; }
+.fm-eq-bar:nth-child(3) { height: 100%; animation-delay: 0.4s; background: #34d399; }
+.fm-eq-bar:nth-child(4) { height: 50%; animation-delay: 0.1s; background: #38bdf8; }
+.fm-eq-bar:nth-child(5) { height: 85%; animation-delay: 0.3s; background: #818cf8; }
+
+@keyframes fmEqBounce {
+  0% { transform: scaleY(0.2); }
+  100% { transform: scaleY(1); }
+}
+
+/* Subtext & Pipeline Badges */
+.fm-upload-live-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--admin-text-muted);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fm-pipeline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ============================================================
+   OVERALL FILE MANAGER UI/UX GLASSMORPHISM & VISIBILITY POLISH
+   ============================================================ */
+
+/* Polished Glass Cards */
+.fm-card {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.8) 0%, rgba(10, 14, 26, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fm-card:hover {
+  border-color: rgba(59, 130, 246, 0.55);
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.fm-card.selected {
+  border-color: var(--admin-blue);
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.18) 0%, rgba(15, 23, 42, 0.95) 100%);
+  box-shadow: 0 0 24px rgba(59, 130, 246, 0.35);
+}
+
+/* Elevated Toolbar */
+.fm-toolbar {
+  background: rgba(10, 14, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--admin-radius);
+  padding: 12px 16px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Breadcrumb Bar Glass */
+.fm-breadcrumb-bar {
+  background: rgba(10, 14, 26, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--admin-radius);
+  padding: 10px 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Admin Modals Glass Overlay */
+.admin-modal-overlay {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: rgba(2, 6, 23, 0.75);
+}
+
+.admin-modal-box {
+  width: 100%;
+  max-width: 660px;
+  max-height: 90vh;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(155deg, rgba(15, 23, 42, 0.95) 0%, rgba(10, 14, 26, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  position: relative;
+}
+
+.admin-modal-box.sm { max-width: 440px; }
+.admin-modal-box.md { max-width: 650px; }
+.admin-modal-box.lg { max-width: 800px; }
+.admin-modal-box.xl { max-width: 960px; }
+
+.admin-modal-box form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-modal-box .admin-modal-body {
+  overflow-y: auto;
+  max-height: calc(90vh - 140px);
+}

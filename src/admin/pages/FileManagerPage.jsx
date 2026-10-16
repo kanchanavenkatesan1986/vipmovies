@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '../components/layout/AdminLayout';
 import FileManagerHeader from '../components/fileManager/FileManagerHeader';
 import BreadcrumbPathBar from '../components/fileManager/BreadcrumbPathBar';
@@ -16,6 +16,7 @@ import FilterDrawer from '../components/fileManager/FilterDrawer';
 import ContextMenu from '../components/fileManager/ContextMenu';
 import TextEditorModal from '../components/fileManager/TextEditorModal';
 import ConfirmationModal from '../components/common/ConfirmationModal';
+import KeyboardShortcutsModal from '../components/fileManager/KeyboardShortcutsModal';
 import { fileManagerApi } from '../services/fileManager/fileManagerApi';
 import { fileManagerStorage } from '../services/fileManager/fileManagerStorage';
 import { getFileCategory } from '../services/fileManager/fileManagerUtils';
@@ -65,12 +66,42 @@ export default function FileManagerPage({ navigateTo }) {
   const [moveCopyDialog, setMoveCopyDialog] = useState({ isOpen: false, mode: 'move', items: [] });
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, isDanger: true });
   const [contextMenu, setContextMenu] = useState({ isOpen: false, position: { x: 0, y: 0 }, target: null });
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+
+  // Clipboard state for cut operations (Ctrl+X then paste)
+  const [clipboard, setClipboard] = useState(null); // { mode: 'cut' | 'copy', items: [] }
+
+  // Ref to search input for Ctrl+F focus
+  const searchInputRef = useRef(null);
+
+  // In-memory LRU folder cache for instant 0ms folder switching
+  const folderCacheRef = useRef(new Map());
+
+  const invalidateCache = useCallback((prefix = null) => {
+    if (prefix !== null) {
+      folderCacheRef.current.delete(prefix);
+    } else {
+      folderCacheRef.current.clear();
+    }
+  }, []);
 
   // ==========================================
-  // DATA FETCHING
+  // DATA FETCHING (with SWR Instant Navigation)
   // ==========================================
-  const loadObjects = useCallback(async (prefix = currentPrefix, isNewPrefix = true) => {
-    setLoading(true);
+  const loadObjects = useCallback(async (prefix = currentPrefix, isNewPrefix = true, skipCache = false) => {
+    // 1. Instant Cache Hit: render from memory without spinner flicker
+    if (!skipCache && isNewPrefix && folderCacheRef.current.has(prefix)) {
+      const cached = folderCacheRef.current.get(prefix);
+      setFolders(cached.folders);
+      setObjects(cached.objects);
+      setCursor(cached.cursor);
+      setHasMore(cached.hasMore);
+      setSelectedKeys(new Set());
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const data = await fileManagerApi.listObjects({
         prefix,
@@ -78,16 +109,22 @@ export default function FileManagerPage({ navigateTo }) {
         limit: 200
       });
 
-      if (isNewPrefix) {
-        setFolders(data.folders || []);
-        // Exclude system .keep marker from primary object grid
-        setObjects((data.objects || []).filter(o => !o.isKeepMarker));
-        setSelectedKeys(new Set());
-      } else {
-        setFolders(data.folders || []);
-        setObjects((data.objects || []).filter(o => !o.isKeepMarker));
-      }
+      const cleanFolders = data.folders || [];
+      const cleanObjects = (data.objects || []).filter(o => !o.isKeepMarker);
 
+      // Cache the result in memory
+      folderCacheRef.current.set(prefix, {
+        folders: cleanFolders,
+        objects: cleanObjects,
+        cursor: data.cursor || null,
+        hasMore: data.hasMore || false
+      });
+
+      setFolders(cleanFolders);
+      setObjects(cleanObjects);
+      if (isNewPrefix) {
+        setSelectedKeys(new Set());
+      }
       setCursor(data.cursor);
       setHasMore(data.hasMore);
     } catch (err) {
@@ -107,6 +144,36 @@ export default function FileManagerPage({ navigateTo }) {
     const clean = newPrefix ? `?prefix=${encodeURIComponent(newPrefix)}` : '';
     window.history.pushState(null, '', `/admin/file-manager${clean}`);
   };
+
+  // Load more (pagination) handler
+  const handleLoadMore = useCallback(async () => {
+    if (!hasMore || loading || !cursor) return;
+    setLoading(true);
+    try {
+      const data = await fileManagerApi.listObjects({
+        prefix: currentPrefix,
+        delimiter: '/',
+        limit: 200,
+        cursor
+      });
+      setFolders(prev => {
+        const existingPrefixes = new Set(prev.map(f => f.prefix));
+        const newFolders = (data.folders || []).filter(f => !existingPrefixes.has(f.prefix));
+        return [...prev, ...newFolders];
+      });
+      setObjects(prev => {
+        const existingKeys = new Set(prev.map(o => o.key));
+        const newObjs = (data.objects || []).filter(o => !o.isKeepMarker && !existingKeys.has(o.key));
+        return [...prev, ...newObjs];
+      });
+      setCursor(data.cursor);
+      setHasMore(data.hasMore);
+    } catch (err) {
+      showToast(`Error loading more objects: ${err.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [hasMore, loading, cursor, currentPrefix]);
 
   // ==========================================
   // VIEW & SORT PREFERENCES
@@ -128,59 +195,66 @@ export default function FileManagerPage({ navigateTo }) {
   };
 
   // ==========================================
-  // FILTERING & SORTING COMPUTATION
+  // FAST FILTERING & SORTING COMPUTATION
   // ==========================================
   const filteredAndSortedItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const hasTypesFilter = filters.types.size > 0;
+    const hasExtFilter = filters.extensions.size > 0;
+    const hasSizeFilter = filters.sizeThreshold !== 'all';
+    const hasOnlyPinned = filters.onlyPinned;
+
     // 1. Filter folders
-    let displayFolders = folders.filter(f => {
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        if (!f.name.toLowerCase().includes(q) && !f.prefix.toLowerCase().includes(q)) return false;
-      }
-      if (filters.types.size > 0 && !filters.types.has('folder')) return false;
-      return true;
-    });
+    let displayFolders = folders;
+    if (q || hasTypesFilter) {
+      displayFolders = folders.filter(f => {
+        if (q && !f.name.toLowerCase().includes(q) && !f.prefix.toLowerCase().includes(q)) return false;
+        if (hasTypesFilter && !filters.types.has('folder')) return false;
+        return true;
+      });
+    }
 
     // 2. Filter objects
-    let displayObjects = objects.filter(obj => {
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const matchName = obj.filename.toLowerCase().includes(q);
-        const matchKey = obj.key.toLowerCase().includes(q);
-        const matchExt = obj.extension.toLowerCase().includes(q);
-        if (!matchName && !matchKey && !matchExt) return false;
-      }
+    let displayObjects = objects;
+    if (q || hasTypesFilter || hasExtFilter || hasSizeFilter || hasOnlyPinned) {
+      displayObjects = objects.filter(obj => {
+        if (q) {
+          const matchName = obj.filename.toLowerCase().includes(q);
+          const matchKey = obj.key.toLowerCase().includes(q);
+          const matchExt = obj.extension?.toLowerCase().includes(q);
+          if (!matchName && !matchKey && !matchExt) return false;
+        }
 
-      // Filter: Type
-      if (filters.types.size > 0) {
-        const cat = getFileCategory(obj.filename);
-        if (!filters.types.has(cat)) return false;
-      }
+        // Filter: Type
+        if (hasTypesFilter) {
+          const cat = getFileCategory(obj.filename);
+          if (!filters.types.has(cat)) return false;
+        }
 
-      // Filter: Extension
-      if (filters.extensions.size > 0) {
-        if (!filters.extensions.has(obj.extension.toLowerCase())) return false;
-      }
+        // Filter: Extension
+        if (hasExtFilter) {
+          if (!filters.extensions.has(obj.extension?.toLowerCase())) return false;
+        }
 
-      // Filter: Size threshold
-      if (filters.sizeThreshold === 'large_1g' && obj.size < 1024 * 1024 * 1024) return false;
-      if (filters.sizeThreshold === 'large_2g' && obj.size < 2 * 1024 * 1024 * 1024) return false;
-      if (filters.sizeThreshold === 'large_5g' && obj.size < 5 * 1024 * 1024 * 1024) return false;
+        // Filter: Size threshold
+        if (filters.sizeThreshold === 'large_1g' && obj.size < 1024 * 1024 * 1024) return false;
+        if (filters.sizeThreshold === 'large_2g' && obj.size < 2 * 1024 * 1024 * 1024) return false;
+        if (filters.sizeThreshold === 'large_5g' && obj.size < 5 * 1024 * 1024 * 1024) return false;
 
-      // Filter: Only Pinned
-      if (filters.onlyPinned && !pinnedKeys.has(obj.key)) return false;
+        // Filter: Only Pinned
+        if (hasOnlyPinned && !pinnedKeys.has(obj.key)) return false;
 
-      return true;
-    });
+        return true;
+      });
+    }
 
-    // 3. Sorting
+    // 3. Fast Sorting (clone arrays to prevent state mutation)
     const sortMultiplier = sortState.order === 'desc' ? -1 : 1;
-
-    displayFolders.sort((a, b) => {
+    const sortedFolders = [...displayFolders].sort((a, b) => {
       return a.name.localeCompare(b.name) * sortMultiplier;
     });
 
-    displayObjects.sort((a, b) => {
+    const sortedObjects = [...displayObjects].sort((a, b) => {
       switch (sortState.by) {
         case 'name':
           return a.filename.localeCompare(b.filename) * sortMultiplier;
@@ -189,13 +263,13 @@ export default function FileManagerPage({ navigateTo }) {
         case 'date':
           return (new Date(a.uploaded || 0) - new Date(b.uploaded || 0)) * sortMultiplier;
         case 'type':
-          return a.extension.localeCompare(b.extension) * sortMultiplier;
+          return (a.extension || '').localeCompare(b.extension || '') * sortMultiplier;
         default:
           return a.filename.localeCompare(b.filename) * sortMultiplier;
       }
     });
 
-    return { displayFolders, displayObjects };
+    return { displayFolders: sortedFolders, displayObjects: sortedObjects };
   }, [folders, objects, searchQuery, filters, sortState, pinnedKeys]);
 
   const { displayFolders, displayObjects } = filteredAndSortedItems;
@@ -203,12 +277,15 @@ export default function FileManagerPage({ navigateTo }) {
   // Header Statistics
   const stats = useMemo(() => {
     let totalSize = 0;
+    let videoCount = 0;
     for (const obj of objects) {
       totalSize += (obj.size || 0);
+      if (obj.isVideo) videoCount++;
     }
     return {
       folderCount: folders.length,
       totalObjects: objects.length,
+      videoCount,
       totalSize
     };
   }, [folders, objects]);
@@ -287,7 +364,8 @@ export default function FileManagerPage({ navigateTo }) {
             await fileManagerApi.deleteObject(target.item.key);
             showToast(`File "${name}" deleted`, 'success');
           }
-          loadObjects(currentPrefix, true);
+          invalidateCache(currentPrefix);
+          loadObjects(currentPrefix, true, true);
         } catch (err) {
           showToast(`Delete failed: ${err.message}`, 'error');
         }
@@ -325,7 +403,8 @@ export default function FileManagerPage({ navigateTo }) {
 
           showToast(`${count} item(s) deleted successfully`, 'success');
           setSelectedKeys(new Set());
-          loadObjects(currentPrefix, true);
+          invalidateCache(currentPrefix);
+          loadObjects(currentPrefix, true, true);
         } catch (err) {
           showToast(`Bulk delete error: ${err.message}`, 'error');
         }
@@ -342,7 +421,8 @@ export default function FileManagerPage({ navigateTo }) {
       await fileManagerApi.renameObject(oldKeyOrPrefix, newKeyOrPrefix);
       showToast('File renamed successfully', 'success');
     }
-    loadObjects(currentPrefix, true);
+    invalidateCache();
+    loadObjects(currentPrefix, true, true);
   };
 
   // 4. Bulk Move & Bulk Copy
@@ -392,7 +472,8 @@ export default function FileManagerPage({ navigateTo }) {
 
     showToast(`${items.length} item(s) ${mode === 'move' ? 'moved' : 'copied'} successfully`, 'success');
     setSelectedKeys(new Set());
-    loadObjects(currentPrefix, true);
+    invalidateCache();
+    loadObjects(currentPrefix, true, true);
   };
 
   // 5. Navigate to Uploader preset
@@ -409,6 +490,132 @@ export default function FileManagerPage({ navigateTo }) {
     setUploadUrlPrefix(targetPrefix);
     setIsUploadUrlOpen(true);
   };
+
+  // 7. Copy media URL for single item
+  const handleCopyMediaUrl = useCallback(async (key) => {
+    const mUrl = await fileManagerApi.getMediaUrl(key);
+    navigator.clipboard.writeText(mUrl);
+    showToast('Direct Stream & Download URL copied!', 'success');
+  }, []);
+
+  // 8. Download item
+  const handleDownloadItem = useCallback(async (item) => {
+    const dUrl = await fileManagerApi.getDownloadUrl(item.key);
+    window.open(dUrl, '_blank');
+  }, []);
+
+  // ==========================================
+  // KEYBOARD SHORTCUTS
+  // ==========================================
+  useEffect(() => {
+    const isModalOpen = () => (
+      !!detailsItem || !!previewItem || !!imageItem || !!editItem ||
+      isCreateFolderOpen || isUploadUrlOpen || !!renameTarget ||
+      moveCopyDialog.isOpen || confirmDialog.isOpen || isShortcutsOpen
+    );
+
+    const isInputFocused = () => {
+      const tag = document.activeElement?.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    };
+
+    const handleKeyDown = (e) => {
+      // ? key — show shortcuts (not in input)
+      if (e.key === '?' && !isInputFocused() && !isModalOpen()) {
+        e.preventDefault();
+        setIsShortcutsOpen(true);
+        return;
+      }
+
+      // Escape — close modals first, then deselect
+      if (e.key === 'Escape') {
+        if (contextMenu.isOpen) {
+          setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, target: null });
+          return;
+        }
+        if (isShortcutsOpen) { setIsShortcutsOpen(false); return; }
+        if (selectedKeys.size > 0 && !isModalOpen()) {
+          setSelectedKeys(new Set());
+        }
+        return;
+      }
+
+      // Ctrl+A — select all
+      if (e.key === 'a' && e.ctrlKey && !isInputFocused()) {
+        e.preventDefault();
+        handleSelectAll();
+        return;
+      }
+
+      // Ctrl+F — focus search
+      if (e.key === 'f' && e.ctrlKey) {
+        e.preventDefault();
+        const el = document.querySelector('.fm-search-input');
+        if (el) el.focus();
+        return;
+      }
+
+      // Ctrl+U — open upload URL dialog
+      if (e.key === 'u' && e.ctrlKey && !isInputFocused() && !isModalOpen()) {
+        e.preventDefault();
+        handleOpenUploadUrl(currentPrefix);
+        return;
+      }
+
+      // R — refresh (not in input, not in modal)
+      if (e.key === 'r' && !e.ctrlKey && !isInputFocused() && !isModalOpen()) {
+        e.preventDefault();
+        loadObjects(currentPrefix, true);
+        showToast('Refreshed', 'info');
+        return;
+      }
+
+      // Delete — delete selected
+      if (e.key === 'Delete' && !isInputFocused() && !isModalOpen()) {
+        if (selectedKeys.size > 0) {
+          e.preventDefault();
+          handleBulkDelete();
+        }
+        return;
+      }
+
+      // F2 — rename (only if exactly 1 selected)
+      if (e.key === 'F2' && !isInputFocused() && !isModalOpen()) {
+        if (selectedKeys.size === 1) {
+          e.preventDefault();
+          const key = Array.from(selectedKeys)[0];
+          const isFolder = key.endsWith('/');
+          if (isFolder) {
+            const folder = folders.find(f => f.prefix === key);
+            if (folder) setRenameTarget({ type: 'folder', item: folder });
+          } else {
+            const obj = objects.find(o => o.key === key);
+            if (obj) setRenameTarget({ type: 'file', item: obj });
+          }
+        }
+        return;
+      }
+
+      // Alt+← or Backspace — go up one level (not in input)
+      if ((e.key === 'Backspace' || (e.key === 'ArrowLeft' && e.altKey)) && !isInputFocused() && !isModalOpen()) {
+        if (currentPrefix) {
+          e.preventDefault();
+          const parts = currentPrefix.replace(/\/+$/, '').split('/');
+          parts.pop();
+          const parent = parts.length > 0 ? parts.join('/') + '/' : '';
+          handleNavigatePrefix(parent);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [
+    selectedKeys, currentPrefix, detailsItem, previewItem, imageItem, editItem,
+    isCreateFolderOpen, isUploadUrlOpen, renameTarget, moveCopyDialog, confirmDialog,
+    isShortcutsOpen, contextMenu, folders, objects,
+    handleSelectAll, handleBulkDelete, handleNavigatePrefix, loadObjects
+  ]);
 
   return (
     <AdminLayout
@@ -455,6 +662,7 @@ export default function FileManagerPage({ navigateTo }) {
           onBulkDelete={handleBulkDelete}
           onBulkMove={handleOpenBulkMove}
           onBulkCopy={handleOpenBulkCopy}
+          onShowShortcuts={() => setIsShortcutsOpen(true)}
         />
 
         {/* Primary Content: Grid or List View */}
@@ -481,6 +689,8 @@ export default function FileManagerPage({ navigateTo }) {
               onDeleteItem={handleDeleteItem}
               onRenameItem={(target) => setRenameTarget(target)}
               onEditFile={(obj) => setEditItem(obj)}
+              onCopyUrl={handleCopyMediaUrl}
+              onDownload={handleDownloadItem}
               onOpenUploadUrl={() => handleOpenUploadUrl(currentPrefix)}
               onOpenCreateFolder={() => setIsCreateFolderOpen(true)}
               onOpenUploadToCurrent={handleOpenUploadToCurrent}
@@ -500,10 +710,33 @@ export default function FileManagerPage({ navigateTo }) {
               onDeleteItem={handleDeleteItem}
               onRenameItem={(target) => setRenameTarget(target)}
               onEditFile={(obj) => setEditItem(obj)}
+              onCopyUrl={handleCopyMediaUrl}
+              onDownload={handleDownloadItem}
               onOpenUploadUrl={() => handleOpenUploadUrl(currentPrefix)}
               onOpenCreateFolder={() => setIsCreateFolderOpen(true)}
               onOpenUploadToCurrent={handleOpenUploadToCurrent}
             />
+          )}
+
+          {/* Load More button for paginated R2 results */}
+          {hasMore && !loading && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0 8px' }}>
+              <button
+                type="button"
+                className="admin-btn secondary"
+                onClick={handleLoadMore}
+                style={{ minWidth: '180px', gap: '8px' }}
+              >
+                <i className="fa-solid fa-chevron-down"></i>
+                Load More Objects
+              </button>
+            </div>
+          )}
+          {loading && objects.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0', color: 'var(--admin-text-muted)', gap: '8px', fontSize: '13px' }}>
+              <i className="fa-solid fa-spinner fa-spin"></i>
+              <span>Loading more...</span>
+            </div>
           )}
         </div>
 
@@ -545,7 +778,8 @@ export default function FileManagerPage({ navigateTo }) {
           onCreate={async (prefix) => {
             await fileManagerApi.createFolder(prefix);
             showToast('Folder created successfully', 'success');
-            loadObjects(currentPrefix, true);
+            invalidateCache(currentPrefix);
+            loadObjects(currentPrefix, true, true);
           }}
         />
 
@@ -558,11 +792,13 @@ export default function FileManagerPage({ navigateTo }) {
           }}
           onSuccess={(result) => {
             showToast(`File "${result.filename}" uploaded successfully from URL!`, 'success');
-            loadObjects(currentPrefix, true);
+            invalidateCache(currentPrefix);
+            loadObjects(currentPrefix, true, true);
           }}
           onViewFile={async (result) => {
             setIsUploadUrlOpen(false);
-            await loadObjects(currentPrefix, true);
+            invalidateCache(currentPrefix);
+            await loadObjects(currentPrefix, true, true);
             const ext = (result.filename || '').substring((result.filename || '').lastIndexOf('.')).toLowerCase();
             const isVideo = ['.mp4', '.mkv', '.webm', '.mov', '.m4v'].includes(ext);
             const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(ext);
@@ -638,6 +874,10 @@ export default function FileManagerPage({ navigateTo }) {
             navigator.clipboard.writeText(mUrl);
             showToast('Direct Stream & Download URL copied to clipboard!', 'success');
           }}
+          onOpenInNewTab={async (item) => {
+            const mUrl = await fileManagerApi.getMediaUrl(item.key);
+            window.open(mUrl, '_blank', 'noopener,noreferrer');
+          }}
         />
 
         <ConfirmationModal
@@ -651,6 +891,11 @@ export default function FileManagerPage({ navigateTo }) {
             setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null, isDanger: true });
           }}
           onCancel={() => setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null, isDanger: true })}
+        />
+
+        <KeyboardShortcutsModal
+          isOpen={isShortcutsOpen}
+          onClose={() => setIsShortcutsOpen(false)}
         />
       </div>
     </AdminLayout>

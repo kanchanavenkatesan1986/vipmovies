@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { formatBytes, getFileCategory, getFileIcon } from '../../services/fileManager/fileManagerUtils';
 import { fileManagerApi } from '../../services/fileManager/fileManagerApi';
 
@@ -79,11 +79,14 @@ function extractFilenameFromUrlAdvanced(urlStr) {
       return `${safeBase}.mp4`;
     }
 
+    if (!clean || clean === 'http:' || clean === 'https:' || clean.includes('://')) {
+      return '';
+    }
     return clean;
   } catch {
     const raw = urlStr.trim().split('?')[0].split('/').pop() || '';
-    if (isScriptExtension(raw)) {
-      return 'download_movie.mp4';
+    if (!raw || raw === 'http:' || raw === 'https:' || isScriptExtension(raw)) {
+      return '';
     }
     return raw;
   }
@@ -111,25 +114,72 @@ export default function UploadUrlModal({
   const [probeLoading, setProbeLoading] = useState(false);
   const [probedData, setProbedData] = useState(null);
 
-  // Live percentage & bytes tracking
+  // Live percentage, bytes & telemetry tracking
   const [percent, setPercent] = useState(0);
   const [loadedBytes, setLoadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
   const [transferSpeed, setTransferSpeed] = useState('');
+  const [speedBps, setSpeedBps] = useState(0);
+  const [peakSpeedBps, setPeakSpeedBps] = useState(0);
+  const [etaSeconds, setEtaSeconds] = useState(null);
+  const [uploadStage, setUploadStage] = useState('idle'); // 'idle' | 'probing' | 'handshake' | 'streaming' | 'finalizing' | 'complete'
 
-  // Live timer while uploading
+  // Ultra-precise millisecond-by-millisecond timer
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startTimeRef = useRef(null);
+
   useEffect(() => {
-    let timer = null;
+    let interval = null;
     if (status === 'uploading') {
+      startTimeRef.current = performance.now();
+      setElapsedMs(0);
       setElapsedSeconds(0);
-      timer = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
+      interval = setInterval(() => {
+        if (startTimeRef.current) {
+          const now = performance.now();
+          const ms = Math.round(now - startTimeRef.current);
+          setElapsedMs(ms);
+          setElapsedSeconds(Math.floor(ms / 1000));
+        }
+      }, 33); // High-frequency ~30fps millisecond counter
+    } else {
+      if (interval) clearInterval(interval);
+      startTimeRef.current = null;
     }
     return () => {
-      if (timer) clearInterval(timer);
+      if (interval) clearInterval(interval);
     };
   }, [status]);
+
+  const formatPreciseStopwatch = (ms) => {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    const mill = Math.floor(ms % 1000);
+    return {
+      mStr: String(m).padStart(2, '0'),
+      sStr: String(s).padStart(2, '0'),
+      msStr: String(mill).padStart(3, '0')
+    };
+  };
+
+  const calculatedEta = useMemo(() => {
+    if (typeof etaSeconds === 'number' && etaSeconds > 0) return etaSeconds;
+    if (totalBytes > 0 && loadedBytes > 0 && speedBps > 0) {
+      const remainingBytes = totalBytes - loadedBytes;
+      return Math.max(0, Math.round(remainingBytes / speedBps));
+    }
+    return null;
+  }, [etaSeconds, totalBytes, loadedBytes, speedBps]);
+
+  const formatEta = (sec) => {
+    if (sec === null || sec === undefined) return 'Calculating...';
+    if (sec <= 0) return 'Finalizing...';
+    if (sec < 60) return `~${sec}s left`;
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `~${m}m ${s < 10 ? '0' : ''}${s}s left`;
+  };
 
   const formatTime = (totalSec) => {
     const s = totalSec % 60;
@@ -151,10 +201,15 @@ export default function UploadUrlModal({
       setErrorMessage('');
       setUploadedResult(null);
       setElapsedSeconds(0);
+      setElapsedMs(0);
       setPercent(0);
       setLoadedBytes(0);
       setTotalBytes(0);
       setTransferSpeed('');
+      setSpeedBps(0);
+      setPeakSpeedBps(0);
+      setEtaSeconds(null);
+      setUploadStage('idle');
       setProbeLoading(false);
       setProbedData(null);
     }
@@ -206,7 +261,7 @@ export default function UploadUrlModal({
 
   // Sync customFilename with extractedFilename when extractedFilename changes
   useEffect(() => {
-    if (extractedFilename && !customFilename) {
+    if (extractedFilename && (!customFilename || customFilename === 'https:' || customFilename === 'http:')) {
       setCustomFilename(extractedFilename);
     }
   }, [extractedFilename]);
@@ -282,12 +337,16 @@ export default function UploadUrlModal({
     }
 
     setStatus('uploading');
+    setUploadStage('handshake');
     setErrorMessage('');
     setPercent(0);
     setLoadedBytes(0);
     setTotalBytes(0);
     setTransferSpeed('');
-    setStatusMessage('Connecting to remote server & opening stream...');
+    setSpeedBps(0);
+    setPeakSpeedBps(0);
+    setEtaSeconds(null);
+    setStatusMessage('Initiating remote origin handshake & establishing stream pipeline...');
 
     try {
       let result;
@@ -300,7 +359,8 @@ export default function UploadUrlModal({
           onProgress: (event) => {
             if (event.type === 'start') {
               if (event.total) setTotalBytes(event.total);
-              setStatusMessage('Stream connected. Streaming data into Cloudflare R2...');
+              setStatusMessage('Remote stream connected. High-speed zero-buffer direct R2 pipeline active...');
+              setUploadStage('streaming');
             } else if (event.type === 'progress') {
               if (typeof event.percent === 'number') {
                 setPercent(event.percent);
@@ -308,10 +368,24 @@ export default function UploadUrlModal({
               if (event.loaded) setLoadedBytes(event.loaded);
               if (event.total) setTotalBytes(event.total);
               if (event.speed) setTransferSpeed(event.speed);
-              setStatusMessage('Streaming to Cloudflare R2...');
+              if (event.speedBps) {
+                setSpeedBps(event.speedBps);
+                setPeakSpeedBps((prev) => Math.max(prev, event.speedBps));
+              }
+              if (typeof event.etaSeconds === 'number') {
+                setEtaSeconds(event.etaSeconds);
+              }
+              if (event.percent >= 98) {
+                setUploadStage('finalizing');
+                setStatusMessage('Writing final chunks & indexing Cloudflare R2 storage...');
+              } else {
+                setUploadStage('streaming');
+                setStatusMessage('High-speed data streaming directly into Cloudflare R2...');
+              }
             } else if (event.type === 'complete') {
               setPercent(100);
               if (event.size) setLoadedBytes(event.size);
+              setUploadStage('complete');
             }
           }
         });
@@ -321,7 +395,8 @@ export default function UploadUrlModal({
 
       setStatus('success');
       setPercent(100);
-      setStatusMessage('File uploaded successfully!');
+      setUploadStage('complete');
+      setStatusMessage('File imported and stored in Cloudflare R2 successfully!');
       setUploadedResult(result);
 
       if (onSuccess) {
@@ -330,6 +405,7 @@ export default function UploadUrlModal({
     } catch (err) {
       console.error('URL Upload error:', err);
       setStatus('error');
+      setUploadStage('idle');
       let msg = err.message || 'Failed to upload from URL.';
       if (msg.includes('CORS') || msg.includes('Failed to fetch')) {
         msg += ' (Tip: Remote host may be blocking server requests. Try switching to "Browser Fetch" mode below).';
@@ -358,9 +434,197 @@ export default function UploadUrlModal({
 
         <form onSubmit={handleSubmit}>
           <div className="admin-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Target Folder Location */}
-            <div className="admin-form-group">
-              <label className="admin-label">Target Folder Location</label>
+
+            {/* 1. HERO REAL-TIME TELEMETRY PROGRESS CARD (Shown at the very top when uploading) */}
+            {status === 'uploading' && (
+              <div className="fm-upload-live-card">
+                {/* Active Destination Header */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '9px 12px',
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  fontSize: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                    <i className="fa-solid fa-cloud-arrow-up" style={{ color: '#38bdf8' }}></i>
+                    <span style={{ color: 'var(--admin-text-muted)' }}>Saving to:</span>
+                    <strong style={{ color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      /{currentPrefix || ''}{effectiveFilename}
+                    </strong>
+                  </div>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    color: '#60a5fa',
+                    background: 'rgba(37, 99, 235, 0.25)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    flexShrink: 0
+                  }}>
+                    {uploadMode === 'cloud' ? 'Cloud Direct' : 'Browser Fetch'}
+                  </span>
+                </div>
+
+                {/* 4-Step Pipeline Status Tracker */}
+                <div className="fm-pipeline-tracker">
+                  <div className={`fm-pipeline-step ${uploadStage === 'handshake' ? 'active' : 'completed'}`}>
+                    <div className="fm-pipeline-dot">
+                      {uploadStage === 'handshake' ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-check"></i>}
+                    </div>
+                    <span>Handshake</span>
+                  </div>
+
+                  <div className={`fm-pipeline-step ${uploadStage === 'handshake' ? '' : (uploadStage === 'streaming' || uploadStage === 'finalizing' ? 'completed' : 'completed')}`}>
+                    <div className="fm-pipeline-dot">
+                      {uploadStage === 'handshake' ? '2' : <i className="fa-solid fa-check"></i>}
+                    </div>
+                    <span>Inspect</span>
+                  </div>
+
+                  <div className={`fm-pipeline-step ${uploadStage === 'streaming' ? 'active' : (uploadStage === 'finalizing' || uploadStage === 'complete' ? 'completed' : '')}`}>
+                    <div className="fm-pipeline-dot">
+                      {uploadStage === 'streaming' ? <i className="fa-solid fa-bolt fa-fade"></i> : (uploadStage === 'finalizing' || uploadStage === 'complete' ? <i className="fa-solid fa-check"></i> : '3')}
+                    </div>
+                    <span>R2 Stream</span>
+                  </div>
+
+                  <div className={`fm-pipeline-step ${uploadStage === 'finalizing' ? 'active' : (uploadStage === 'complete' ? 'completed' : '')}`}>
+                    <div className="fm-pipeline-dot">
+                      {uploadStage === 'finalizing' ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (uploadStage === 'complete' ? <i className="fa-solid fa-check"></i> : '4')}
+                    </div>
+                    <span>Finalize</span>
+                  </div>
+                </div>
+
+                {/* Hero Telemetry Row: Real-Time % & Millisecond-by-Millisecond Stopwatch */}
+                <div className="fm-hero-telemetry-row">
+                  <div className="fm-hero-percent-wrap">
+                    <div className="fm-hero-percent">
+                      {typeof percent === 'number' && percent > 0 ? (
+                        percent.toFixed(percent % 1 === 0 ? 0 : 2)
+                      ) : (
+                        '0.0'
+                      )}
+                      <span className="fm-hero-percent-symbol">%</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '11px', color: '#93c5fd', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Live Progress
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#cbd5e1' }}>
+                        {totalBytes > 0 ? (
+                          <span>
+                            <strong style={{ color: '#fff' }}>{formatBytes(loadedBytes)}</strong> / {formatBytes(totalBytes)}
+                          </span>
+                        ) : loadedBytes > 0 ? (
+                          <span>
+                            <strong style={{ color: '#fff' }}>{formatBytes(loadedBytes)}</strong> streamed
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--admin-text-muted)' }}>Opening channel...</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Real-time Millisecond Stopwatch */}
+                  <div className="fm-stopwatch-badge" title="Live Elapsed Transfer Time (mm:ss.millis)">
+                    <i className="fa-solid fa-stopwatch fm-stopwatch-icon"></i>
+                    <span className="fm-stopwatch-digits">
+                      {formatPreciseStopwatch(elapsedMs).mStr}:{formatPreciseStopwatch(elapsedMs).sStr}
+                    </span>
+                    <span className="fm-stopwatch-ms">
+                      .{formatPreciseStopwatch(elapsedMs).msStr}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Glowing Multi-Layered Progress Bar Track */}
+                <div className="fm-progress-track-wrapper">
+                  <div className="fm-progress-track">
+                    <div
+                      className="fm-progress-fill"
+                      style={{
+                        width: `${percent > 0 ? Math.min(100, percent) : (elapsedMs > 0 ? 2 : 0)}%`
+                      }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* 4-Column Live Metric Telemetry Cards */}
+                <div className="fm-telemetry-metrics-grid">
+                  <div className="fm-telemetry-chip highlight">
+                    <span className="fm-telemetry-label">
+                      <i className="fa-solid fa-gauge-high" style={{ color: '#34d399' }}></i>
+                      Transfer Speed
+                    </span>
+                    <span className="fm-telemetry-val speed">
+                      {transferSpeed || (speedBps > 0 ? `${formatBytes(speedBps)}/s` : 'Buffering...')}
+                    </span>
+                  </div>
+
+                  <div className="fm-telemetry-chip">
+                    <span className="fm-telemetry-label">
+                      <i className="fa-solid fa-chart-line" style={{ color: '#60a5fa' }}></i>
+                      Peak Speed
+                    </span>
+                    <span className="fm-telemetry-val" style={{ color: '#93c5fd' }}>
+                      {peakSpeedBps > 0 ? `${formatBytes(peakSpeedBps)}/s` : '---'}
+                    </span>
+                  </div>
+
+                  <div className="fm-telemetry-chip">
+                    <span className="fm-telemetry-label">
+                      <i className="fa-solid fa-hourglass-half" style={{ color: '#fbbf24' }}></i>
+                      Estimated Time
+                    </span>
+                    <span className="fm-telemetry-val eta">
+                      {formatEta(calculatedEta)}
+                    </span>
+                  </div>
+
+                  <div className="fm-telemetry-chip">
+                    <span className="fm-telemetry-label">
+                      <i className="fa-solid fa-arrows-spin" style={{ color: '#a78bfa' }}></i>
+                      Remaining
+                    </span>
+                    <span className="fm-telemetry-val" style={{ color: '#e2e8f0', fontSize: '12.5px' }}>
+                      {totalBytes > 0 ? formatBytes(Math.max(0, totalBytes - loadedBytes)) : 'Streaming'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Footer Status Text & Network Equalizer */}
+                <div className="fm-upload-live-footer">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="fm-network-equalizer" title="Direct Network Stream Active">
+                      <div className="fm-eq-bar"></div>
+                      <div className="fm-eq-bar"></div>
+                      <div className="fm-eq-bar"></div>
+                      <div className="fm-eq-bar"></div>
+                      <div className="fm-eq-bar"></div>
+                    </div>
+                    <span style={{ color: '#60a5fa', fontWeight: 600 }}>{statusMessage}</span>
+                  </div>
+
+                  <span className="fm-pipeline-pill">
+                    <i className="fa-solid fa-shield-halved" style={{ color: '#38bdf8' }}></i>
+                    0 Local Bandwidth • Cloudflare Direct Pipeline
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 2. FORM CONFIGURATION (Shown when configuring upload) */}
+            {status !== 'uploading' && status !== 'success' && (
+              <>
+                {/* Target Folder Location */}
+                <div className="admin-form-group">
+                  <label className="admin-label">Target Folder Location</label>
               <div
                 style={{
                   fontSize: '13px',
@@ -641,140 +905,10 @@ export default function UploadUrlModal({
                 </button>
               </div>
             </div>
+          </>
+        )}
 
-            {/* Live Progress / Status Info */}
-            {status === 'uploading' && (
-              <div
-                style={{
-                  background: 'rgba(59, 130, 246, 0.12)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  textAlign: 'left'
-                }}
-              >
-                {/* Header Row: Status and Badges */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#60a5fa', fontWeight: 600, fontSize: '13.5px' }}>
-                    <i className="fa-solid fa-cloud-arrow-down fa-bounce" style={{ color: 'var(--admin-blue)' }}></i>
-                    <span>{statusMessage}</span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    {transferSpeed && (
-                      <div
-                        style={{
-                          background: 'rgba(16, 185, 129, 0.18)',
-                          border: '1px solid rgba(52, 211, 153, 0.4)',
-                          padding: '3px 10px',
-                          borderRadius: '20px',
-                          fontSize: '11.5px',
-                          fontWeight: 700,
-                          color: '#6ee7b7',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <i className="fa-solid fa-bolt" style={{ color: '#34d399' }}></i>
-                        <span>{transferSpeed}</span>
-                      </div>
-                    )}
-
-                    {/* Live Seconds Counter Badge */}
-                    <div
-                      style={{
-                        background: 'rgba(37, 99, 235, 0.25)',
-                        border: '1px solid rgba(96, 165, 250, 0.5)',
-                        padding: '3px 10px',
-                        borderRadius: '20px',
-                        fontSize: '11.5px',
-                        fontWeight: 800,
-                        color: '#bfdbfe',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px'
-                      }}
-                    >
-                      <i className="fa-solid fa-stopwatch fa-spin" style={{ animationDuration: '4s', color: '#60a5fa' }}></i>
-                      <span>{formatTime(elapsedSeconds)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Percentage & Transferred Bytes Display */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '2px' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                    <span
-                      style={{
-                        fontSize: '28px',
-                        fontWeight: 900,
-                        color: '#fff',
-                        lineHeight: 1,
-                        textShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
-                        fontFamily: 'monospace, sans-serif'
-                      }}
-                    >
-                      {percent}%
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#93c5fd', fontWeight: 600 }}>Completed</span>
-                  </div>
-
-                  <div style={{ fontSize: '12.5px', color: '#cbd5e1', fontWeight: 600 }}>
-                    {totalBytes > 0 ? (
-                      <span>
-                        <strong style={{ color: '#fff' }}>{formatBytes(loadedBytes)}</strong> / {formatBytes(totalBytes)}
-                      </span>
-                    ) : loadedBytes > 0 ? (
-                      <span>
-                        <strong style={{ color: '#fff' }}>{formatBytes(loadedBytes)}</strong> transferred
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--admin-text-muted)' }}>Preparing stream...</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div
-                  style={{
-                    width: '100%',
-                    height: '10px',
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    borderRadius: '6px',
-                    overflow: 'hidden',
-                    position: 'relative',
-                    border: '1px solid rgba(255, 255, 255, 0.06)'
-                  }}
-                >
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${percent > 0 ? Math.min(100, percent) : (elapsedSeconds > 0 ? 2 : 0)}%`,
-                      background: 'linear-gradient(90deg, #2563eb 0%, #3b82f6 50%, #60a5fa 100%)',
-                      borderRadius: '6px',
-                      transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                      boxShadow: '0 0 12px rgba(59, 130, 246, 0.7)'
-                    }}
-                  ></div>
-                </div>
-
-                {/* Subtext info */}
-                <div style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Direct server-to-server Cloudflare stream (Zero local data usage)</span>
-                  {totalBytes > 0 && percent > 0 && percent < 100 && (
-                    <span style={{ color: '#93c5fd' }}>
-                      Remaining: {formatBytes(Math.max(0, totalBytes - loadedBytes))}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {status === 'success' && (
+        {status === 'success' && (
               <div
                 style={{
                   background: 'rgba(16, 185, 129, 0.15)',
@@ -870,7 +1004,7 @@ export default function UploadUrlModal({
                   {status === 'uploading' ? (
                     <>
                       <i className="fa-solid fa-spinner fa-spin"></i>
-                      <span>Importing ({percent > 0 ? `${percent}% • ` : ''}${formatTime(elapsedSeconds)})...</span>
+                      <span>Streaming ({percent > 0 ? `${percent.toFixed(percent % 1 === 0 ? 0 : 1)}% • ` : ''}{formatPreciseStopwatch(elapsedMs).mStr}:{formatPreciseStopwatch(elapsedMs).sStr})...</span>
                     </>
                   ) : (
                     <>
