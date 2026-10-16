@@ -38,6 +38,9 @@ export default function FileDetailsModal({
   if (!isOpen || !fileItem) return null;
 
   const item = details || fileItem;
+  const cleanKey = (fileItem.key || '').replace(/^\/+/, '');
+  const defaultDownloadUrl = `https://api-download.akatsuki-pvt-ltd.workers.dev/${cleanKey}`;
+  const displayUrl = mediaUrl || defaultDownloadUrl;
 
   const handleCopyKey = () => {
     navigator.clipboard.writeText(item.key);
@@ -45,15 +48,13 @@ export default function FileDetailsModal({
   };
 
   const handleCopyUrl = () => {
-    if (mediaUrl) {
-      navigator.clipboard.writeText(mediaUrl);
-      showToast('Media URL copied to clipboard', 'success');
-    }
+    navigator.clipboard.writeText(displayUrl);
+    showToast('Direct Stream & Download URL copied to clipboard!', 'success');
   };
 
   const handleDownload = async () => {
     const dUrl = await fileManagerApi.getDownloadUrl(item.key);
-    window.open(dUrl, '_blank');
+    window.open(dUrl || displayUrl, '_blank');
   };
 
   return (
@@ -113,17 +114,26 @@ export default function FileDetailsModal({
                   <span className="val">{formatDate(item.uploaded)}</span>
                 </div>
 
-                {mediaUrl && (
-                  <div className="fm-detail-row">
-                    <span className="label">Media URL</span>
-                    <div className="val-box">
-                      <code>{mediaUrl}</code>
-                      <button type="button" className="admin-btn text sm" onClick={handleCopyUrl} title="Copy URL">
+                <div className="fm-detail-row" style={{ background: 'rgba(59, 130, 246, 0.08)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span className="label" style={{ color: 'var(--admin-blue)', fontWeight: 600 }}>
+                      <i className="fa-solid fa-link" style={{ marginRight: '6px' }}></i>
+                      Direct URL (Stream & Download)
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--admin-text-muted)' }}>Public CDN Link</span>
+                  </div>
+                  <div className="val-box">
+                    <code style={{ wordBreak: 'break-all', fontSize: '12px', userSelect: 'all' }}>{displayUrl}</code>
+                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                      <button type="button" className="admin-btn text sm" onClick={handleCopyUrl} title="Copy Direct URL">
                         <i className="fa-solid fa-copy"></i>
                       </button>
+                      <a href={displayUrl} target="_blank" rel="noopener noreferrer" className="admin-btn text sm" title="Open / Test Link" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                      </a>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}

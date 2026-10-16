@@ -636,7 +636,7 @@ export default function FileManagerPage({ navigateTo }) {
           onCopyMediaUrl={async (key) => {
             const mUrl = await fileManagerApi.getMediaUrl(key);
             navigator.clipboard.writeText(mUrl);
-            showToast('Media URL copied to clipboard', 'success');
+            showToast('Direct Stream & Download URL copied to clipboard!', 'success');
           }}
         />
 

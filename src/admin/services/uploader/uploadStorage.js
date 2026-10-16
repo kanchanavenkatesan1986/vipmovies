@@ -21,6 +21,9 @@ class UploadStorage {
       if (cfg.apiBase && cfg.apiBase.includes('api-uploud')) {
         cfg.apiBase = DEFAULT_UPLOAD_CONFIG.apiBase;
       }
+      if (!cfg.mediaBaseUrl || cfg.mediaBaseUrl.includes('media.vipmovies.in')) {
+        cfg.mediaBaseUrl = DEFAULT_UPLOAD_CONFIG.mediaBaseUrl;
+      }
       return cfg;
     } catch {
       return DEFAULT_UPLOAD_CONFIG;

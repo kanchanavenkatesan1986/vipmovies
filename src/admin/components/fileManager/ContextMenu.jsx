@@ -103,7 +103,7 @@ export default function ContextMenu({
             <i className="fa-solid fa-key"></i> Copy Object Key
           </button>
           <button type="button" className="fm-menu-item" onClick={() => { onClose(); onCopyMediaUrl(item.key); }}>
-            <i className="fa-solid fa-link"></i> Copy Media URL
+            <i className="fa-solid fa-link" style={{ color: 'var(--admin-blue)' }}></i> Copy Direct URL (Stream & Download)
           </button>
           <div className="fm-menu-divider"></div>
           <button type="button" className="fm-menu-item" onClick={() => { onClose(); onRename(target); }}>

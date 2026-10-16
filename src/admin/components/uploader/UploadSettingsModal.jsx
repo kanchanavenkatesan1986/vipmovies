@@ -297,9 +297,9 @@ export default function UploadSettingsModal({ isOpen, onClose, onSettingsUpdated
                     value={config.mediaBaseUrl}
                     onChange={(e) => setConfig({ ...config, mediaBaseUrl: e.target.value })}
                     className="admin-input"
-                    placeholder="https://media.vipmovies.in"
+                    placeholder="https://api-download.akatsuki-pvt-ltd.workers.dev"
                   />
-                  <span className="field-hint">Used to construct instant playback links after completion</span>
+                  <span className="field-hint">Used to construct instant streaming & direct download links after completion</span>
                 </div>
 
                 {/* Worker Health Connection Tester */}

@@ -8,7 +8,7 @@ export const DEFAULT_UPLOAD_CONFIG = {
   apiBase: import.meta.env.VITE_UPLOAD_API_BASE || 'https://api-uploder.akatsuki-pvt-ltd.workers.dev',
 
   // Media / Playback Domain for previewing completed uploads
-  mediaBaseUrl: import.meta.env.VITE_MEDIA_BASE_URL || 'https://media.vipmovies.in',
+  mediaBaseUrl: import.meta.env.VITE_MEDIA_BASE_URL || 'https://api-download.akatsuki-pvt-ltd.workers.dev',
 
   // Endpoints matching worker.js
   endpoints: {

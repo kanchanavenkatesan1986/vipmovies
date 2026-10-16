@@ -251,27 +251,39 @@ class FileManagerApiClient {
    * Generate streaming playback URL for video previews
    */
   async getStreamUrl(key) {
-    const baseUrl = await this.getBaseUrl();
-    const token = this.getAuthToken();
-    return `${baseUrl}/stream-media?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+    const cleanKey = (key || '').replace(/^\/+/, '');
+    const config = await this.getConfig();
+    let mediaBase = (config.mediaBaseUrl || 'https://api-download.akatsuki-pvt-ltd.workers.dev').replace(/\/+$/, '');
+    if (mediaBase.includes('media.vipmovies.in')) {
+      mediaBase = 'https://api-download.akatsuki-pvt-ltd.workers.dev';
+    }
+    return `${mediaBase}/${cleanKey}`;
   }
 
   /**
    * Generate download URL
    */
   async getDownloadUrl(key) {
-    const baseUrl = await this.getBaseUrl();
-    const token = this.getAuthToken();
-    return `${baseUrl}/download?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+    const cleanKey = (key || '').replace(/^\/+/, '');
+    const config = await this.getConfig();
+    let mediaBase = (config.mediaBaseUrl || 'https://api-download.akatsuki-pvt-ltd.workers.dev').replace(/\/+$/, '');
+    if (mediaBase.includes('media.vipmovies.in')) {
+      mediaBase = 'https://api-download.akatsuki-pvt-ltd.workers.dev';
+    }
+    return `${mediaBase}/${cleanKey}`;
   }
 
   /**
    * Public Media CDN URL
    */
   async getMediaUrl(key) {
+    const cleanKey = (key || '').replace(/^\/+/, '');
     const config = await this.getConfig();
-    const mediaBase = (config.mediaBaseUrl || 'https://media.vipmovies.in').replace(/\/+$/, '');
-    return `${mediaBase}/${key.replace(/^\/+/, '')}`;
+    let mediaBase = (config.mediaBaseUrl || 'https://api-download.akatsuki-pvt-ltd.workers.dev').replace(/\/+$/, '');
+    if (mediaBase.includes('media.vipmovies.in')) {
+      mediaBase = 'https://api-download.akatsuki-pvt-ltd.workers.dev';
+    }
+    return `${mediaBase}/${cleanKey}`;
   }
 
   /**
