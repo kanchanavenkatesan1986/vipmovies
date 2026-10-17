@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { slideApi } from '../../services/slideApi';
 import { showToast } from '../common/ToastContainer';
+import { dispatchOptimisticUpdate } from '../../services/syncManager';
 
 export default function ArrangeSlidesModal({
   isOpen,
@@ -104,13 +105,7 @@ export default function ArrangeSlidesModal({
       onOptimisticUpdate(optimisticSlides);
     }
 
-    try {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-          detail: { type: 'slides', items: optimisticSlides }
-        }));
-      }
-    } catch (e) {}
+    dispatchOptimisticUpdate('slides', { items: optimisticSlides });
 
     showToast(`⚡ Rearranged ${orderedList.length} slides! Updating database...`);
     onClose();

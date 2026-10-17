@@ -163,7 +163,12 @@ export const AppProvider = ({ children }) => {
       try {
         bc = new BroadcastChannel('vip_catalog_sync');
         bc.onmessage = (msg) => {
-          handleCatalogRefresh(msg?.data);
+          const data = msg?.data || {};
+          if (data.type === 'OPTIMISTIC_UPDATE') {
+            handleOptimisticCatalog({ detail: { type: data.updateType, ...data } });
+          } else if (data.type === 'CATALOG_UPDATE' || data.type === 'UPDATE') {
+            handleCatalogRefresh(data);
+          }
         };
       } catch (e) {}
     }

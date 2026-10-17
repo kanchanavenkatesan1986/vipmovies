@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import AdminLayout from '../components/layout/AdminLayout';
 import { movieApi } from '../services/movieApi';
 import { VALID_TABLES, getMovieTable, dbToDisplayType, displayToDbType } from '../utils/tableMapper';
@@ -7,6 +7,7 @@ import MovieDetailsModal from '../components/movies/MovieDetailsModal';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import ArrangeMoviesModal from '../components/movies/ArrangeMoviesModal';
 import { showToast } from '../components/common/ToastContainer';
+import { dispatchOptimisticUpdate } from '../services/syncManager';
 
 export default function MoviesPage({ navigateTo, initialType = '', initialYear = '' }) {
   const [loading, setLoading] = useState(true);
@@ -64,7 +65,8 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
 
   // Fetch movies from tables based on current selection or all tables
   const loadMovies = async (force = false) => {
-    setLoading(true);
+    // Don't show full-page spinner during background refreshes (force=true)
+    if (!force) setLoading(true);
     try {
       let tablesToFetch = [];
       if (selectedType && selectedYear) {
@@ -91,7 +93,7 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
       }
 
       setAllMovies(combined);
-      setSelectedIds([]);
+      if (!force) setSelectedIds([]);
     } finally {
       setLoading(false);
     }
@@ -104,6 +106,43 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
 
   useEffect(() => {
     loadMovies(false);
+  }, [selectedType, selectedYear]);
+
+  // Listen for cross-tab catalog updates (from other admin operations or main website)
+  // and auto-refetch so admin table always shows the latest D1 data.
+  const refetchTimerRef = useRef(null);
+  useEffect(() => {
+    const onCatalogUpdated = (e) => {
+      // Debounce: only refetch once if multiple events fire quickly
+      if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+      refetchTimerRef.current = setTimeout(() => {
+        loadMovies(true);
+      }, 600);
+    };
+
+    // Listen for vip_catalog_updated fired by triggerCatalogSync
+    window.addEventListener('vip_catalog_updated', onCatalogUpdated);
+
+    // Also listen via BroadcastChannel for cross-tab updates
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('vip_catalog_sync');
+        bc.onmessage = (msg) => {
+          const data = msg?.data || {};
+          // Only react to full catalog updates (not optimistic-only ones from this same tab)
+          if (data.type === 'CATALOG_UPDATE') {
+            onCatalogUpdated();
+          }
+        };
+      }
+    } catch (e) {}
+
+    return () => {
+      window.removeEventListener('vip_catalog_updated', onCatalogUpdated);
+      if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+      if (bc) bc.close();
+    };
   }, [selectedType, selectedYear]);
 
   // Derived filtered & searched movies
@@ -221,13 +260,7 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
       showToast(`🎬 Added "${movieData.title}"! Updating database in background...`);
 
       // Dispatch instant optimistic sync across tabs
-      try {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-            detail: { type: 'movie_add', item: optimisticMovie, table: targetTable }
-          }));
-        }
-      } catch (e) {}
+      dispatchOptimisticUpdate('movie_add', { item: optimisticMovie, table: targetTable });
 
       // Background D1 creation
       movieApi.createMovie(targetTable, movieData).then(() => {
@@ -247,13 +280,7 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
       showToast(`✏️ Updated "${movieData.title}"! Updating database in background...`);
 
       // Dispatch instant optimistic sync across tabs
-      try {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-            detail: { type: 'movie_edit', item: updatedMovie, table }
-          }));
-        }
-      } catch (e) {}
+      dispatchOptimisticUpdate('movie_edit', { item: updatedMovie, table });
 
       // Background D1 update
       movieApi.updateMovie(table, movieData.id, movieData).then(() => {
@@ -282,13 +309,7 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
     showToast(`🗑️ Removed "${toDeleteTitle}"! Deleting in background...`);
 
     // Dispatch instant optimistic sync across tabs
-    try {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-          detail: { type: 'movie_delete', id: toDeleteId, table: toDeleteTable }
-        }));
-      }
-    } catch (e) {}
+    dispatchOptimisticUpdate('movie_delete', { id: toDeleteId, table: toDeleteTable });
 
     // Background D1 delete
     movieApi.deleteMovie(toDeleteTable, toDeleteId).then(() => {
@@ -319,13 +340,7 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
     showToast(`🗑️ Removed ${count} movies! Deleting in background...`);
 
     // Dispatch instant optimistic sync across tabs
-    try {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-          detail: { type: 'movie_bulk_delete', ids: Array.from(delSet) }
-        }));
-      }
-    } catch (e) {}
+    dispatchOptimisticUpdate('movie_bulk_delete', { ids: Array.from(delSet) });
 
     // Background D1 bulk delete
     movieApi.bulkDeleteMovies(itemsToDelete).then((res) => {

@@ -1,5 +1,6 @@
 import { api } from './api';
 import { cacheManager } from './cacheManager';
+import { notifyCatalogChanged } from './syncManager';
 
 const MOVIE_COLUMNS = [
   'id',
@@ -32,39 +33,9 @@ export function sanitizeMoviePayload(data) {
   return sanitized;
 }
 
-function triggerCatalogSync(table, action, detail = {}) {
-  try {
-    const versionTimestamp = Date.now();
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('vip_catalog_version', String(versionTimestamp));
-    }
-    if (typeof window !== 'undefined') {
-      if (window.VersionManager) {
-        // downloadAndStore re-pulls from D1 into IndexedDB
-        if (typeof window.VersionManager.downloadAndStore === 'function') {
-          window.VersionManager.downloadAndStore().catch(e => console.warn('Background IDB sync warning:', e));
-        }
-        // checkAndUpdate(true) force-bypasses the 10-min rate-limit so the main
-        // website auto-refreshes immediately after any admin change.
-        if (typeof window.VersionManager.checkAndUpdate === 'function') {
-          window.VersionManager.checkAndUpdate(true).catch(e => console.warn('Force version check warning:', e));
-        }
-      }
-      window.dispatchEvent(new CustomEvent('vip_catalog_updated', {
-        detail: { table, action, version: versionTimestamp, ...detail }
-      }));
-      if (typeof BroadcastChannel !== 'undefined') {
-        try {
-          const ch = new BroadcastChannel('vip_catalog_sync');
-          ch.postMessage({ type: 'UPDATE', action, table, version: versionTimestamp, ...detail });
-          ch.close();
-        } catch (e) {}
-      }
-    }
-  } catch (err) {
-    console.warn('Catalog sync broadcast error:', err);
-  }
-}
+// Use centralized syncManager for all catalog notifications
+const triggerCatalogSync = (table, action, detail = {}) =>
+  notifyCatalogChanged(table, action, detail);
 
 export const movieApi = {
   // Fetch all movies for a given table (using cache)
@@ -214,23 +185,7 @@ export const movieApi = {
 
     // Clear local cache for this table so fresh data is loaded
     cacheManager.clearCache(table);
-
-    // Sync IndexedDB & broadcast update event across all pages and tabs in milliseconds
-    try {
-      if (typeof window !== 'undefined') {
-        if (window.VersionManager) {
-          window.VersionManager.downloadAndStore().catch(e => console.warn('Sync IndexedDB warning:', e));
-        }
-        window.dispatchEvent(new CustomEvent('vip_catalog_updated', {
-          detail: { table, changes }
-        }));
-        if (typeof BroadcastChannel !== 'undefined') {
-          const ch = new BroadcastChannel('vip_catalog_sync');
-          ch.postMessage({ type: 'UPDATE', detail: { table, changes } });
-          ch.close();
-        }
-      }
-    } catch (e) {}
+    triggerCatalogSync(table, 'arrange', { changes });
 
     reportProgress('✅ All movie IDs successfully updated across database and pages!', 100);
     return { success: true, count: changes.length, changes };

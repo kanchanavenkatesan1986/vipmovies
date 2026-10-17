@@ -1,5 +1,6 @@
 import { api } from './api';
 import { cacheManager } from './cacheManager';
+import { notifyCatalogChanged } from './syncManager';
 
 const SLIDER_TABLE = 'slider';
 
@@ -32,39 +33,9 @@ export function sanitizeSlidePayload(data) {
   return sanitized;
 }
 
-function triggerSlideCatalogSync(action, detail = {}) {
-  try {
-    const versionTimestamp = Date.now();
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('vip_catalog_version', String(versionTimestamp));
-    }
-    if (typeof window !== 'undefined') {
-      if (window.VersionManager) {
-        // downloadAndStore re-pulls slider data from D1 into IndexedDB
-        if (typeof window.VersionManager.downloadAndStore === 'function') {
-          window.VersionManager.downloadAndStore().catch(e => console.warn('Background IDB sync warning:', e));
-        }
-        // checkAndUpdate(true) force-bypasses the 10-min rate-limit so the main
-        // website auto-refreshes immediately after any admin slide change.
-        if (typeof window.VersionManager.checkAndUpdate === 'function') {
-          window.VersionManager.checkAndUpdate(true).catch(e => console.warn('Force version check warning:', e));
-        }
-      }
-      window.dispatchEvent(new CustomEvent('vip_catalog_updated', {
-        detail: { table: SLIDER_TABLE, action, version: versionTimestamp, ...detail }
-      }));
-      if (typeof BroadcastChannel !== 'undefined') {
-        try {
-          const ch = new BroadcastChannel('vip_catalog_sync');
-          ch.postMessage({ type: 'UPDATE', action, table: SLIDER_TABLE, version: versionTimestamp, ...detail });
-          ch.close();
-        } catch (e) {}
-      }
-    }
-  } catch (err) {
-    console.warn('Slide sync broadcast error:', err);
-  }
-}
+// Use centralized syncManager for all slide catalog notifications
+const triggerSlideCatalogSync = (action, detail = {}) =>
+  notifyCatalogChanged(SLIDER_TABLE, action, detail);
 
 export const slideApi = {
   // Fetch all slider items
@@ -194,23 +165,7 @@ export const slideApi = {
 
     // Clear local cache for slider table so fresh data is loaded
     cacheManager.clearCache(SLIDER_TABLE);
-
-    // Sync IndexedDB & broadcast update event across all pages and tabs in milliseconds
-    try {
-      if (typeof window !== 'undefined') {
-        if (window.VersionManager) {
-          window.VersionManager.downloadAndStore().catch(e => console.warn('Sync IndexedDB warning:', e));
-        }
-        window.dispatchEvent(new CustomEvent('vip_catalog_updated', {
-          detail: { table: SLIDER_TABLE, changes }
-        }));
-        if (typeof BroadcastChannel !== 'undefined') {
-          const ch = new BroadcastChannel('vip_catalog_sync');
-          ch.postMessage({ type: 'UPDATE', detail: { table: SLIDER_TABLE, changes } });
-          ch.close();
-        }
-      }
-    } catch (e) {}
+    triggerSlideCatalogSync('arrange', { changes });
 
     reportProgress('✅ All slide IDs successfully updated across homepage and database!', 100);
     return { success: true, count: changes.length, changes };

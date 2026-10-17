@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import AdminLayout from '../components/layout/AdminLayout';
 import { slideApi } from '../services/slideApi';
 import SlideFormModal from '../components/slides/SlideFormModal';
 import ArrangeSlidesModal from '../components/slides/ArrangeSlidesModal';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { showToast } from '../components/common/ToastContainer';
+import { dispatchOptimisticUpdate } from '../services/syncManager';
 
 export default function SlidesPage({ navigateTo }) {
   const [loading, setLoading] = useState(true);
@@ -27,13 +28,14 @@ export default function SlidesPage({ navigateTo }) {
   const [actionLoading, setActionLoading] = useState(false);
 
   const loadSlides = async (force = true) => {
-    setLoading(true);
+    // Don't show full-page spinner on background refreshes
+    if (!force) setLoading(true);
     try {
       const records = await slideApi.getSlides(force);
       // Sort slides by ID ascending (matching homepage display order)
       const sorted = [...(records || [])].sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
       setSlides(sorted);
-      setSelectedIds([]);
+      if (!force) setSelectedIds([]);
     } catch (err) {
       showToast(err.message || 'Failed to load slider items', 'error');
     } finally {
@@ -43,6 +45,38 @@ export default function SlidesPage({ navigateTo }) {
 
   useEffect(() => {
     loadSlides(true);
+  }, []);
+
+  // Listen for cross-tab catalog updates and auto-refetch slide data
+  const refetchTimerRef = useRef(null);
+  useEffect(() => {
+    const onCatalogUpdated = (e) => {
+      if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+      refetchTimerRef.current = setTimeout(() => {
+        loadSlides(true);
+      }, 600);
+    };
+
+    window.addEventListener('vip_catalog_updated', onCatalogUpdated);
+
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('vip_catalog_sync');
+        bc.onmessage = (msg) => {
+          const data = msg?.data || {};
+          if (data.type === 'CATALOG_UPDATE') {
+            onCatalogUpdated();
+          }
+        };
+      }
+    } catch (e) {}
+
+    return () => {
+      window.removeEventListener('vip_catalog_updated', onCatalogUpdated);
+      if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+      if (bc) bc.close();
+    };
   }, []);
 
   // Selected slides in their exact clicked order (1, 2, 3...)
@@ -108,13 +142,7 @@ export default function SlidesPage({ navigateTo }) {
       showToast('🖼️ Slide added! Saving in background...');
 
       // Dispatch instant optimistic sync across tabs
-      try {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-            detail: { type: 'slide_add', item: optimisticSlide }
-          }));
-        }
-      } catch (e) {}
+      dispatchOptimisticUpdate('slide_add', { item: optimisticSlide });
 
       // Background D1 creation
       slideApi.createSlide(slideData).then(() => {
@@ -134,13 +162,7 @@ export default function SlidesPage({ navigateTo }) {
       showToast('✏️ Slide updated! Saving in background...');
 
       // Dispatch instant optimistic sync across tabs
-      try {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-            detail: { type: 'slide_edit', item: updatedSlide }
-          }));
-        }
-      } catch (e) {}
+      dispatchOptimisticUpdate('slide_edit', { item: updatedSlide });
 
       // Background D1 update
       slideApi.updateSlide(editingSlide.id, slideData).then(() => {
@@ -167,13 +189,7 @@ export default function SlidesPage({ navigateTo }) {
     showToast(`🗑️ Removed "${delTitle}"! Deleting in background...`);
 
     // Dispatch instant optimistic sync across tabs
-    try {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-          detail: { type: 'slide_delete', id: delId }
-        }));
-      }
-    } catch (e) {}
+    dispatchOptimisticUpdate('slide_delete', { id: delId });
 
     // Background D1 delete
     slideApi.deleteSlide(delId).then(() => {
@@ -197,13 +213,7 @@ export default function SlidesPage({ navigateTo }) {
     showToast(`🗑️ Removed ${idsToDelete.length} slides! Deleting in background...`);
 
     // Dispatch instant optimistic sync across tabs
-    try {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-          detail: { type: 'slide_bulk_delete', ids: idsToDelete }
-        }));
-      }
-    } catch (e) {}
+    dispatchOptimisticUpdate('slide_bulk_delete', { ids: idsToDelete });
 
     // Background D1 bulk delete
     slideApi.bulkDeleteSlides(idsToDelete).then((res) => {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { movieApi } from '../../services/movieApi';
 import { dbToDisplayType } from '../../utils/tableMapper';
 import { showToast } from '../common/ToastContainer';
+import { dispatchOptimisticUpdate } from '../../services/syncManager';
 
 export default function ArrangeMoviesModal({
   isOpen,
@@ -138,13 +139,7 @@ export default function ArrangeMoviesModal({
       onOptimisticUpdate(optimisticMovies);
     }
 
-    try {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
-          detail: { type: 'movies', table: tableCheck.table, items: optimisticMovies }
-        }));
-      }
-    } catch (e) {}
+    dispatchOptimisticUpdate('movies', { table: tableCheck.table, items: optimisticMovies });
 
     showToast(`⚡ Rearranged ${orderedList.length} movies! Updating database...`);
     onClose();
