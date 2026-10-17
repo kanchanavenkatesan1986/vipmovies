@@ -14,22 +14,7 @@ export default function HomeView() {
     return () => clearInterval(interval);
   }, [slider]);
 
-  // Load Advertisement Script
-  useEffect(() => {
-    try {
-      if (!document.querySelector('script[src*="ad-provider.js"]')) {
-        const script = document.createElement('script');
-        script.async = true;
-        script.type = 'application/javascript';
-        script.src = 'https://a.magsrv.com/ad-provider.js';
-        document.head.appendChild(script);
-      }
-      window.AdProvider = window.AdProvider || [];
-      window.AdProvider.push({ serve: {} });
-    } catch {
-      // ignore
-    }
-  }, []);
+  
 
   // Filter Tamil movies for 2026 and status active
   const tamilMovies = movies
