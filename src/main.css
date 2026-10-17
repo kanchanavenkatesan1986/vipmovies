@@ -232,51 +232,349 @@ body {
     text-align: center;
 }
 
-/* ================= SLIDER CONTAINER ================= */
+/* ================= SLIDER CONTAINER (PREMIUM CINEMATIC DESIGN) ================= */
 #slider {
-    margin: 0 auto 28px auto;
+    margin: 0 auto 32px auto;
     width: 100%;
     aspect-ratio: 21 / 9;
-    min-height: 180px;
-    max-height: 380px;
+    min-height: 220px;
+    max-height: 440px;
     overflow: hidden;
     position: relative;
     border-radius: var(--border-radius);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: #09090d;
+    box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 35px rgba(245, 197, 24, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    user-select: none;
 }
 
-#slidesContainer, .slides, .slides a {
+#slidesContainer {
     width: 100%;
     height: 100%;
+    position: relative;
 }
 
 .slides {
-    display: none;
-    animation: fade 0.6s ease-in-out;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.65s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.65s;
+    z-index: 1;
 }
 
+.slides.active {
+    opacity: 1;
+    visibility: visible;
+    z-index: 2;
+}
+
+.slides a {
+    display: block;
+    width: 100%;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+}
+
+/* Background image with Ken Burns subtle cinematic zoom */
 .imggg {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    transition: transform 6s ease;
+    transform: scale(1.0);
+    transition: transform 6s cubic-bezier(0.1, 0.9, 0.2, 1);
 }
 
-#slider:hover .imggg {
-    transform: scale(1.05);
+.slides.active .imggg {
+    transform: scale(1.04);
 }
 
-#dot {
-    width: 100%;
-    text-align: center;
+#slider:hover .slides.active .imggg {
+    transform: scale(1.07);
+}
+
+/* Soft, Non-Intrusive Bottom Shadow Overlay (keeps image 100% visible, bright, and vibrant) */
+.slider-shadow-overlay {
     position: absolute;
-    bottom: 12px;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    /* Soft, gentle bottom fade only where text sits - leaves image bright and unobstructed */
+    background: linear-gradient(to top, rgba(5, 5, 7, 0.9) 0%, rgba(5, 5, 7, 0.45) 25%, rgba(5, 5, 7, 0.08) 45%, transparent 60%);
+}
+
+/* Slide Content Container (Title, Badges, Buttons) */
+.slider-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 24px 28px;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-start;
+    gap: 10px;
+    max-width: 680px;
+    pointer-events: none;
+}
+
+.slider-content > * {
+    pointer-events: auto;
+}
+
+.slides.active .slider-content {
+    animation: sliderContentEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sliderContentEnter {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Badges Row */
+.slider-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.slider-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.slider-badge.badge-featured {
+    background: linear-gradient(135deg, rgba(234, 88, 12, 0.9), rgba(225, 29, 72, 0.9));
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 12px rgba(234, 88, 12, 0.4);
+}
+
+.slider-badge.badge-year {
+    background: rgba(245, 197, 24, 0.18);
+    color: var(--accent);
+    border: 1px solid rgba(245, 197, 24, 0.4);
+}
+
+.slider-badge.badge-quality {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.slider-badge.badge-genre {
+    background: rgba(13, 13, 18, 0.65);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Slide Title */
+.slider-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.2;
+    margin: 0;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9), 0 4px 20px rgba(0, 0, 0, 0.7);
+    letter-spacing: -0.5px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Action Buttons Row */
+.slider-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.slider-btn-play {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--accent), #ea580c);
+    color: #000000;
+    font-size: 13.5px;
+    font-weight: 800;
+    padding: 9px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(245, 197, 24, 0.35);
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    text-decoration: none;
+}
+
+.slider-btn-play:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 22px rgba(245, 197, 24, 0.55);
+    background: linear-gradient(135deg, var(--accent-hover), #f97316);
+    color: #000000;
+}
+
+.slider-btn-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-decoration: none;
+}
+
+.slider-btn-info:hover {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+    color: #ffffff;
+}
+
+/* Top Right Slide Counter Pill */
+.slider-top-counter {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    z-index: 10;
+    background: rgba(10, 10, 14, 0.65);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.5px;
+}
+
+/* Left & Right Glassmorphic Navigation Arrows */
+.slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(10, 10, 15, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    opacity: 0.85;
+}
+
+.slider-arrow:hover {
+    opacity: 1;
+    background: rgba(245, 197, 24, 0.2);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 20px rgba(245, 197, 24, 0.45);
+    transform: translateY(-50%) scale(1.12);
+}
+
+.slider-arrow:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.slider-arrow-left {
+    left: 14px;
+}
+
+.slider-arrow-right {
+    right: 14px;
+}
+
+/* Autoplay Countdown Progress Bar */
+.slider-progress-track {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    z-index: 8;
+    overflow: hidden;
+}
+
+.slider-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), #ea580c);
+    box-shadow: 0 0 8px rgba(245, 197, 24, 0.8);
+    animation: sliderProgress 4.5s linear infinite;
+}
+
+.slider-progress-bar.paused {
+    animation-play-state: paused;
+}
+
+@keyframes sliderProgress {
+    0% { width: 0%; }
+    100% { width: 100%; }
+}
+
+/* Glassmorphic Dot Indicators */
+#dot {
+    position: absolute;
+    bottom: 14px;
+    right: 24px;
     z-index: 10;
     display: flex;
-    justify-content: center;
-    gap: 8px;
+    align-items: center;
+    gap: 7px;
+    background: rgba(10, 10, 14, 0.55);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .dot {
@@ -286,19 +584,139 @@ body {
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.35);
     cursor: pointer;
-    transition: var(--transition);
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dot:hover {
+    background: rgba(255, 255, 255, 0.7);
+    transform: scale(1.2);
 }
 
 .dot.active {
-    background: var(--accent);
+    background: linear-gradient(90deg, var(--accent), #ea580c);
     width: 24px;
-    border-radius: 4px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(245, 197, 24, 0.7);
 }
 
-@keyframes fade {
-    from { opacity: 0.6; }
-    to { opacity: 1; }
+/* Responsive Rules for Tablet and Mobile (Compact elements, clear full image visibility) */
+@media (max-width: 768px) {
+    #slider {
+        aspect-ratio: 16 / 9;
+        min-height: 180px;
+        max-height: 280px;
+        margin-bottom: 20px;
+        border-radius: 12px;
+    }
+    .slider-shadow-overlay {
+        /* Soft, gentle bottom shadow so the image is fully visible and vibrant on mobile */
+        background: linear-gradient(to top, rgba(5, 5, 7, 0.88) 0%, rgba(5, 5, 7, 0.32) 22%, transparent 50%);
+    }
+    .slider-content {
+        padding: 10px 14px 14px 14px;
+        gap: 5px;
+        max-width: 100%;
+    }
+    .slider-title {
+        font-size: 16px;
+        font-weight: 700;
+        margin: 0;
+        -webkit-line-clamp: 1;
+        max-width: 78%;
+    }
+    .slider-badges {
+        gap: 5px;
+    }
+    .slider-badge {
+        font-size: 9px;
+        padding: 2.5px 7px;
+    }
+    /* Hide extra badges on mobile so image is not blocked */
+    .slider-badge.badge-quality,
+    .slider-badge.badge-genre {
+        display: none !important;
+    }
+    .slider-actions {
+        margin-top: 2px;
+        gap: 8px;
+    }
+    .slider-btn-play {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 5px 12px;
+        border-radius: 6px;
+    }
+    .slider-btn-info {
+        display: none !important; /* Hide secondary button to keep mobile view clean and uncluttered */
+    }
+    .slider-arrow {
+        width: 30px;
+        height: 30px;
+        font-size: 11px;
+        opacity: 0.7;
+    }
+    .slider-arrow-left {
+        left: 6px;
+    }
+    .slider-arrow-right {
+        right: 6px;
+    }
+    .slider-top-counter {
+        top: 6px;
+        right: 6px;
+        font-size: 9px;
+        padding: 2px 7px;
+    }
+    #dot {
+        right: 10px;
+        bottom: 8px;
+        padding: 2px 6px;
+        gap: 4px;
+    }
+    .dot {
+        width: 5px;
+        height: 5px;
+    }
+    .dot.active {
+        width: 15px;
+    }
 }
+
+@media (max-width: 480px) {
+    #slider {
+        aspect-ratio: 16 / 9;
+        min-height: 160px;
+        max-height: 240px;
+    }
+    .slider-content {
+        padding: 8px 10px 12px 10px;
+        gap: 4px;
+    }
+    .slider-title {
+        font-size: 14px;
+        max-width: 75%;
+    }
+    .slider-badge {
+        font-size: 8.5px;
+        padding: 2px 6px;
+    }
+    .slider-btn-play {
+        padding: 4px 10px;
+        font-size: 10.5px;
+    }
+    .slider-arrow {
+        width: 26px;
+        height: 26px;
+        font-size: 10px;
+    }
+    .slider-arrow-left {
+        left: 4px;
+    }
+    .slider-arrow-right {
+        right: 4px;
+    }
+}
+
 
 /* ================= INFO / HEADER ROW ================= */
 .info {

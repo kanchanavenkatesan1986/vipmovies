@@ -34,7 +34,17 @@ export default function ListView({ type = '', year = '' }) {
     if (aComing !== bComing) {
       return aComing - bComing;
     }
-    return window.getMovieNumber(a.id) - window.getMovieNumber(b.id);
+    const getNum = (id) => {
+      if (!id) return 0;
+      if (typeof window !== 'undefined' && typeof window.getMovieNumber === 'function') {
+        const num = window.getMovieNumber(id);
+        if (!isNaN(num) && num !== 0) return num;
+      }
+      const parts = String(id).split(/[-_]/);
+      const last = parseInt(parts[parts.length - 1], 10);
+      return isNaN(last) ? 0 : last;
+    };
+    return getNum(a.id) - getNum(b.id);
   });
 
   const totalMovies = sortedMovies.length;

@@ -78,6 +78,103 @@ export const AppProvider = ({ children }) => {
     };
   }, []);
 
+  // Live cross-tab & cross-page catalog synchronization with instant optimistic updates
+  useEffect(() => {
+    const handleOptimisticCatalog = (event) => {
+      try {
+        const { type, item, items, id, ids } = event.detail || {};
+
+        // Movies Optimistic Handlers
+        if (type === 'movie_add' && item) {
+          setMovies(prev => [item, ...prev.filter(m => String(m.id) !== String(item.id))]);
+        } else if (type === 'movie_edit' && item) {
+          setMovies(prev => prev.map(m => String(m.id) === String(item.id) ? { ...m, ...item } : m));
+        } else if (type === 'movie_delete' && id) {
+          setMovies(prev => prev.filter(m => String(m.id) !== String(id)));
+        } else if (type === 'movie_bulk_delete' && Array.isArray(ids)) {
+          const idSet = new Set(ids.map(String));
+          setMovies(prev => prev.filter(m => !idSet.has(String(m.id))));
+        } else if ((type === 'movies' || type === 'movies_arrange') && Array.isArray(items)) {
+          const itemMap = new Map(items.map(m => [String(m.id), m]));
+          setMovies(prev => {
+            const updated = prev.map(m => itemMap.has(String(m.id)) ? itemMap.get(String(m.id)) : m);
+            return [...updated];
+          });
+        }
+
+        // Slides Optimistic Handlers
+        if (type === 'slide_add' && item) {
+          setSlider(prev => [...prev.filter(s => Number(s.id) !== Number(item.id)), item].sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0)));
+        } else if (type === 'slide_edit' && item) {
+          setSlider(prev => prev.map(s => Number(s.id) === Number(item.id) ? { ...s, ...item } : s));
+        } else if (type === 'slide_delete' && id) {
+          setSlider(prev => prev.filter(s => Number(s.id) !== Number(id)));
+        } else if (type === 'slide_bulk_delete' && Array.isArray(ids)) {
+          const idSet = new Set(ids.map(Number));
+          setSlider(prev => prev.filter(s => !idSet.has(Number(s.id))));
+        } else if ((type === 'slides' || type === 'slides_arrange') && Array.isArray(items)) {
+          const itemMap = new Map(items.map(s => [Number(s.id), s]));
+          setSlider(prev => {
+            const updated = prev.map(s => itemMap.has(Number(s.id)) ? itemMap.get(Number(s.id)) : s);
+            return [...updated].sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+          });
+        }
+      } catch (err) {
+        console.warn('Optimistic sync error:', err);
+      }
+    };
+
+    const handleCatalogRefresh = async (event) => {
+      try {
+        const detail = event?.detail || {};
+        if (window.MovieStore && typeof window.MovieStore.refresh === 'function') {
+          const freshMovies = await window.MovieStore.refresh();
+          const freshSlider = window.MovieRepository ? window.MovieRepository.getSlider() : null;
+          if (freshMovies) setMovies([...freshMovies]);
+          if (freshSlider) setSlider([...freshSlider]);
+        } else if (window.MovieRepository) {
+          const freshMovies = window.MovieRepository.getAll();
+          const freshSlider = window.MovieRepository.getSlider();
+          if (freshMovies) setMovies([...freshMovies]);
+          if (freshSlider) setSlider([...freshSlider]);
+        }
+
+        // Update dbInfo metadata state
+        if (window.DatabaseManager) {
+          const version = await window.DatabaseManager.get('metadata', 'version');
+          const updated = await window.DatabaseManager.get('metadata', 'updated');
+          const count = await window.DatabaseManager.get('metadata', 'count');
+          setDbInfo({
+            version: version ? version.value : (detail.version || Date.now()),
+            updated: updated ? updated.value : new Date().toISOString(),
+            count: count ? count.value : 0
+          });
+        }
+      } catch (e) {
+        console.warn('Catalog auto-sync warning:', e);
+      }
+    };
+
+    window.addEventListener('vip_catalog_optimistic_update', handleOptimisticCatalog);
+    window.addEventListener('vip_catalog_updated', handleCatalogRefresh);
+
+    let bc = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('vip_catalog_sync');
+        bc.onmessage = (msg) => {
+          handleCatalogRefresh(msg?.data);
+        };
+      } catch (e) {}
+    }
+
+    return () => {
+      window.removeEventListener('vip_catalog_optimistic_update', handleOptimisticCatalog);
+      window.removeEventListener('vip_catalog_updated', handleCatalogRefresh);
+      if (bc) bc.close();
+    };
+  }, []);
+
   // Favorite operations
   const toggleFavorite = async (movie) => {
     try {

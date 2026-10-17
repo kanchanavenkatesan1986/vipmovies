@@ -5,6 +5,7 @@ import { VALID_TABLES, getMovieTable, dbToDisplayType, displayToDbType } from '.
 import MovieFormModal from '../components/movies/MovieFormModal';
 import MovieDetailsModal from '../components/movies/MovieDetailsModal';
 import ConfirmationModal from '../components/common/ConfirmationModal';
+import ArrangeMoviesModal from '../components/movies/ArrangeMoviesModal';
 import { showToast } from '../components/common/ToastContainer';
 
 export default function MoviesPage({ navigateTo, initialType = '', initialYear = '' }) {
@@ -23,10 +24,12 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // Bulk Selection
+  // Bulk / Sequence Selection (Order 1, 2, 3...)
   const [selectedIds, setSelectedIds] = useState([]);
+  const [isOrderMode, setIsOrderMode] = useState(false);
 
   // Modals state
+  const [isArrangeModalOpen, setIsArrangeModalOpen] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
   const [editingMovie, setEditingMovie] = useState(null);
@@ -39,6 +42,25 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
 
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Selected movies in their exact clicked order (1, 2, 3...)
+  const selectedMoviesList = useMemo(() => {
+    return selectedIds
+      .map(id => allMovies.find(m => String(m.id) === String(id)))
+      .filter(Boolean);
+  }, [selectedIds, allMovies]);
+
+  // Optimistic instant millisecond UI update when movies are rearranged or swapped
+  const handleOptimisticMoviesUpdate = (optimisticMovies) => {
+    if (!optimisticMovies || optimisticMovies.length === 0) return;
+    const optimisticIdSet = new Set(optimisticMovies.map(m => String(m.id)));
+    setAllMovies(prev => {
+      // Remove previous versions of movies occupying these target IDs
+      const unchanged = prev.filter(m => !optimisticIdSet.has(String(m.id)));
+      return [...unchanged, ...optimisticMovies];
+    });
+    setSelectedIds([]);
+  };
 
   // Fetch movies from tables based on current selection or all tables
   const loadMovies = async (force = false) => {
@@ -115,6 +137,19 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
     }
 
     return [...result].sort((a, b) => {
+      const getNum = (id) => {
+        if (!id) return 0;
+        if (typeof window !== 'undefined' && typeof window.getMovieNumber === 'function') {
+          const num = window.getMovieNumber(id);
+          if (!isNaN(num) && num !== 0) return num;
+        }
+        const parts = String(id).split(/[-_]/);
+        const last = parseInt(parts[parts.length - 1], 10);
+        return isNaN(last) ? 0 : last;
+      };
+      const numA = getNum(a.id);
+      const numB = getNum(b.id);
+      if (numA !== numB) return numA - numB;
       const dateA = a.created_at || '';
       const dateB = b.created_at || '';
       return dateB.localeCompare(dateA);
@@ -169,67 +204,138 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
     setIsFormModalOpen(true);
   };
 
-  // Save Movie (Create or Update)
+  // Save Movie (Create or Update) with instant millisecond UI response
   const handleSaveMovie = async (movieData, targetTable) => {
-    setActionLoading(true);
-    try {
-      if (formMode === 'create') {
-        await movieApi.createMovie(targetTable, movieData);
-        showToast(`🎬 Created movie "${movieData.title}" in ${targetTable}!`);
-      } else {
-        const table = editingMovie._sourceTable || getMovieTable(editingMovie.type, editingMovie.year);
-        await movieApi.updateMovie(table, movieData.id, movieData);
-        showToast(`✏️ Updated movie "${movieData.title}"!`);
-      }
-      setIsFormModalOpen(false);
-      loadMovies(false);
-    } catch (err) {
-      showToast(err.message || 'Failed to save movie', 'error');
-    } finally {
-      setActionLoading(false);
+    setIsFormModalOpen(false);
+
+    if (formMode === 'create') {
+      const optimisticMovie = {
+        ...movieData,
+        id: movieData.id || `${targetTable.replace('_', '-')}-${Date.now()}`,
+        _sourceTable: targetTable,
+        created_at: new Date().toISOString()
+      };
+
+      // Instantly show in admin table in milliseconds
+      setAllMovies(prev => [optimisticMovie, ...prev.filter(m => String(m.id) !== String(optimisticMovie.id))]);
+      showToast(`🎬 Added "${movieData.title}"! Updating database in background...`);
+
+      // Dispatch instant optimistic sync across tabs
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
+            detail: { type: 'movie_add', item: optimisticMovie, table: targetTable }
+          }));
+        }
+      } catch (e) {}
+
+      // Background D1 creation
+      movieApi.createMovie(targetTable, movieData).then(() => {
+        showToast(`✅ "${movieData.title}" saved successfully to database!`);
+        loadMovies(true);
+      }).catch(err => {
+        console.error('Failed to create movie in D1:', err);
+        showToast(err.message || 'Failed to save movie', 'error');
+        loadMovies(true);
+      });
+    } else {
+      const table = editingMovie._sourceTable || getMovieTable(editingMovie.type, editingMovie.year);
+      const updatedMovie = { ...editingMovie, ...movieData };
+
+      // Instantly update in admin table in milliseconds
+      setAllMovies(prev => prev.map(m => String(m.id) === String(movieData.id) ? updatedMovie : m));
+      showToast(`✏️ Updated "${movieData.title}"! Updating database in background...`);
+
+      // Dispatch instant optimistic sync across tabs
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
+            detail: { type: 'movie_edit', item: updatedMovie, table }
+          }));
+        }
+      } catch (e) {}
+
+      // Background D1 update
+      movieApi.updateMovie(table, movieData.id, movieData).then(() => {
+        showToast(`✅ "${movieData.title}" updated successfully in database!`);
+        loadMovies(true);
+      }).catch(err => {
+        console.error('Failed to update movie in D1:', err);
+        showToast(err.message || 'Failed to update movie', 'error');
+        loadMovies(true);
+      });
     }
   };
 
-  // Confirm Single Delete
+  // Confirm Single Delete with instant millisecond UI response
   const handleConfirmDelete = async () => {
     if (!deletingMovie) return;
-    setActionLoading(true);
+    const toDeleteId = deletingMovie.id;
+    const toDeleteTable = deletingMovie._sourceTable || getMovieTable(deletingMovie.type, deletingMovie.year);
+    const toDeleteTitle = deletingMovie.title;
+
+    // Instantly remove from admin table in milliseconds
+    setAllMovies(prev => prev.filter(m => String(m.id) !== String(toDeleteId)));
+    setSelectedIds(prev => prev.filter(id => String(id) !== String(toDeleteId)));
+    setIsDeleteModalOpen(false);
+    setDeletingMovie(null);
+    showToast(`🗑️ Removed "${toDeleteTitle}"! Deleting in background...`);
+
+    // Dispatch instant optimistic sync across tabs
     try {
-      const table = deletingMovie._sourceTable || getMovieTable(deletingMovie.type, deletingMovie.year);
-      await movieApi.deleteMovie(table, deletingMovie.id);
-      showToast(`🗑️ Deleted movie "${deletingMovie.title}"`);
-      setIsDeleteModalOpen(false);
-      setDeletingMovie(null);
-      loadMovies(false);
-    } catch (err) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
+          detail: { type: 'movie_delete', id: toDeleteId, table: toDeleteTable }
+        }));
+      }
+    } catch (e) {}
+
+    // Background D1 delete
+    movieApi.deleteMovie(toDeleteTable, toDeleteId).then(() => {
+      loadMovies(true);
+    }).catch(err => {
+      console.error('Failed to delete movie:', err);
       showToast(err.message || 'Failed to delete movie', 'error');
-    } finally {
-      setActionLoading(false);
-    }
+      loadMovies(true);
+    });
   };
 
-  // Confirm Bulk Delete
+  // Confirm Bulk Delete with instant millisecond UI response
   const handleConfirmBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    setActionLoading(true);
-    try {
-      const itemsToDelete = allMovies
-        .filter(m => selectedIds.includes(m.id))
-        .map(m => ({
-          id: m.id,
-          table: m._sourceTable || getMovieTable(m.type, m.year)
-        }));
+    const delSet = new Set(selectedIds.map(String));
+    const count = selectedIds.length;
+    const itemsToDelete = allMovies
+      .filter(m => delSet.has(String(m.id)))
+      .map(m => ({
+        id: m.id,
+        table: m._sourceTable || getMovieTable(m.type, m.year)
+      }));
 
-      const res = await movieApi.bulkDeleteMovies(itemsToDelete);
-      showToast(`🗑️ Bulk delete completed: ${res.successCount} deleted, ${res.failCount} failed.`);
-      setIsBulkDeleteModalOpen(false);
-      setSelectedIds([]);
-      loadMovies(false);
-    } catch (err) {
+    // Instantly remove from admin table in milliseconds
+    setAllMovies(prev => prev.filter(m => !delSet.has(String(m.id))));
+    setSelectedIds([]);
+    setIsBulkDeleteModalOpen(false);
+    showToast(`🗑️ Removed ${count} movies! Deleting in background...`);
+
+    // Dispatch instant optimistic sync across tabs
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
+          detail: { type: 'movie_bulk_delete', ids: Array.from(delSet) }
+        }));
+      }
+    } catch (e) {}
+
+    // Background D1 bulk delete
+    movieApi.bulkDeleteMovies(itemsToDelete).then((res) => {
+      showToast(`🗑️ Permanently removed ${res.successCount} movies from database.`);
+      loadMovies(true);
+    }).catch(err => {
+      console.error('Failed to bulk delete movies:', err);
       showToast(err.message || 'Bulk delete failed', 'error');
-    } finally {
-      setActionLoading(false);
-    }
+      loadMovies(true);
+    });
   };
 
   const getPosterUrl = (movie) => {
@@ -255,15 +361,45 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--admin-text-muted)', margin: '4px 0 0 0' }}>
             Showing {filteredMovies.length} total records from D1 database
+            {selectedIds.length > 0 && (
+              <span style={{ marginLeft: '8px', color: 'var(--admin-gold)', fontWeight: 700 }}>
+                • {selectedIds.length} movie{selectedIds.length !== 1 ? 's' : ''} selected in sequence (1 to {selectedIds.length})
+              </span>
+            )}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {selectedIds.length > 0 && (
-            <button className="admin-btn danger" onClick={() => setIsBulkDeleteModalOpen(true)}>
-              <i className="fa-solid fa-trash-can"></i> Delete Selected ({selectedIds.length})
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {selectedIds.length >= 2 && (
+            <button
+              className="admin-btn primary"
+              onClick={() => setIsArrangeModalOpen(true)}
+              style={{
+                background: selectedIds.length === 2
+                  ? 'linear-gradient(135deg, var(--admin-blue), var(--admin-purple))'
+                  : 'linear-gradient(135deg, var(--admin-gold), #ea580c)',
+                color: selectedIds.length === 2 ? '#fff' : '#000',
+                fontWeight: 800,
+                boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+              }}
+              title="Arrange movie sequence and swap IDs in database"
+            >
+              <i className={`fa-solid ${selectedIds.length === 2 ? 'fa-right-left' : 'fa-arrow-down-up-across-line'}`}></i>
+              {selectedIds.length === 2 ? ' Swap Both Movies (1 ↔ 2)' : ` Arrange Movies (${selectedIds.length})`}
             </button>
           )}
+
+          {selectedIds.length > 0 && (
+            <>
+              <button className="admin-btn danger" onClick={() => setIsBulkDeleteModalOpen(true)}>
+                <i className="fa-solid fa-trash-can"></i> Delete Selected ({selectedIds.length})
+              </button>
+              <button className="admin-btn" onClick={() => setSelectedIds([])} title="Clear all selections">
+                <i className="fa-solid fa-xmark"></i> Clear ({selectedIds.length})
+              </button>
+            </>
+          )}
+
           <button className="admin-btn primary" onClick={handleOpenCreate}>
             <i className="fa-solid fa-circle-plus"></i> Add Movie
           </button>
@@ -326,10 +462,53 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
           <option value="Telugu">Telugu</option>
         </select>
 
+        <button
+          type="button"
+          className={`admin-btn ${isOrderMode ? 'primary' : ''}`}
+          onClick={() => setIsOrderMode(prev => !prev)}
+          style={isOrderMode ? { background: 'linear-gradient(135deg, var(--admin-gold), #ea580c)', color: '#000', fontWeight: 800 } : {}}
+          title="When ON, clicking anywhere on a movie row ticks it in sequence (1, 2, 3...)"
+        >
+          <i className="fa-solid fa-list-ol"></i> Sequence Select: {isOrderMode ? 'ON' : 'OFF'}
+        </button>
+
         <button className="admin-btn" onClick={handleResetFilters} title="Reset all filters">
           <i className="fa-solid fa-rotate-left"></i> Reset
         </button>
       </div>
+
+      {/* Sequence Selection Helper Banner */}
+      {isOrderMode && (
+        <div
+          style={{
+            background: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            borderRadius: '10px',
+            padding: '10px 16px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+            animation: 'adminFadeIn 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#fef3c7', fontSize: '13px' }}>
+            <i className="fa-solid fa-hand-pointer" style={{ color: 'var(--admin-gold)', fontSize: '16px' }}></i>
+            <span>
+              <strong>Sequence Mode Active:</strong> Click any movie rows 1 by 1 to tick them with counts (1, 2, 3...). Then click <strong>{selectedIds.length === 2 ? 'Swap Both Movies' : 'Arrange Movies'}</strong> to update their IDs in D1 and reorder them across the main website!
+            </span>
+          </div>
+          <button
+            className="admin-btn"
+            style={{ padding: '4px 10px', fontSize: '12px' }}
+            onClick={() => setIsOrderMode(false)}
+          >
+            Exit Sequence Mode
+          </button>
+        </div>
+      )}
 
       {/* Movie Data Table */}
       {loading ? (
@@ -342,7 +521,7 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
           <table className="admin-table">
             <thead>
               <tr>
-                <th style={{ width: '40px' }}>
+                <th style={{ width: '65px' }}>
                   <input
                     type="checkbox"
                     checked={selectedIds.length > 0 && selectedIds.length === paginatedMovies.length}
@@ -366,16 +545,36 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
               {paginatedMovies.map((movie) => {
                 const isComingSoon = String(movie.status || '').toLowerCase() === 'coming soon';
                 const isSelected = selectedIds.includes(movie.id);
+                const selectionIndex = selectedIds.indexOf(movie.id);
+                const selectionRank = selectionIndex !== -1 ? selectionIndex + 1 : null;
 
                 return (
-                  <tr key={movie.id} style={isSelected ? { background: 'rgba(229,9,20,0.08)' } : {}}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleSelectOne(movie.id)}
-                        style={{ accentColor: 'var(--admin-accent)', cursor: 'pointer' }}
-                      />
+                  <tr
+                    key={movie.id}
+                    className={`${isOrderMode ? 'order-mode-row' : ''} ${isSelected ? 'is-selected-row' : ''}`}
+                    onClick={() => isOrderMode && handleSelectOne(movie.id)}
+                    style={isSelected ? { background: 'rgba(59, 130, 246, 0.12)' } : {}}
+                  >
+                    <td style={{ width: '65px' }} onClick={(e) => isOrderMode && e.stopPropagation()}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleSelectOne(movie.id);
+                          }}
+                          style={{ accentColor: 'var(--admin-accent)', cursor: 'pointer', width: '16px', height: '16px' }}
+                        />
+                        {isSelected && (
+                          <span
+                            className="admin-order-count-badge"
+                            title={`Selected order count: #${selectionRank}`}
+                          >
+                            {selectionRank}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <img
@@ -534,6 +733,99 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
         onConfirm={handleConfirmBulkDelete}
         onCancel={() => setIsBulkDeleteModalOpen(false)}
       />
+
+      {/* Arrange / Swap Movies Modal */}
+      <ArrangeMoviesModal
+        isOpen={isArrangeModalOpen}
+        selectedMovies={selectedMoviesList}
+        targetTable={selectedType && selectedYear ? getMovieTable(selectedType, selectedYear) : (selectedMoviesList[0]?._sourceTable || '')}
+        onClose={() => setIsArrangeModalOpen(false)}
+        onOptimisticUpdate={handleOptimisticMoviesUpdate}
+        onSuccess={() => {
+          setSelectedIds([]);
+          loadMovies(true);
+        }}
+      />
+
+      {/* Floating Bottom Selection Bar (1 by 1 count sequence) */}
+      {selectedIds.length > 0 && (
+        <div className="admin-floating-selection-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--admin-gold)', display: 'inline-block', boxShadow: '0 0 10px var(--admin-gold)' }}></span>
+              <strong style={{ color: '#fff', fontSize: '13.5px', whiteSpace: 'nowrap' }}>
+                {selectedIds.length} {selectedIds.length === 1 ? 'Movie' : 'Movies'} Selected (Count 1 to {selectedIds.length})
+              </strong>
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '2px 0' }}>
+              {selectedMoviesList.slice(0, 6).map((m, idx) => (
+                <div key={m.id} style={{ position: 'relative', flexShrink: 0 }} title={`#${idx + 1}: ${m.title}`}>
+                  <img
+                    src={getPosterUrl(m)}
+                    alt=""
+                    style={{ width: '26px', height: '36px', borderRadius: '4px', objectFit: 'cover', background: '#111' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-5px',
+                      right: '-5px',
+                      background: 'linear-gradient(135deg, var(--admin-gold), #ea580c)',
+                      color: '#000',
+                      fontSize: '9px',
+                      fontWeight: 900,
+                      borderRadius: '50%',
+                      width: '15px',
+                      height: '15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                    }}
+                  >
+                    {idx + 1}
+                  </span>
+                </div>
+              ))}
+              {selectedMoviesList.length > 6 && (
+                <span style={{ fontSize: '11px', color: 'var(--admin-text-muted)', display: 'flex', alignItems: 'center' }}>
+                  +{selectedMoviesList.length - 6} more
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            {selectedIds.length >= 2 && (
+              <button
+                className="admin-btn primary"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12.5px',
+                  background: selectedIds.length === 2
+                    ? 'linear-gradient(135deg, var(--admin-blue), var(--admin-purple))'
+                    : 'linear-gradient(135deg, var(--admin-gold), #ea580c)',
+                  color: selectedIds.length === 2 ? '#fff' : '#000',
+                  fontWeight: 800
+                }}
+                onClick={() => setIsArrangeModalOpen(true)}
+              >
+                <i className={`fa-solid ${selectedIds.length === 2 ? 'fa-right-left' : 'fa-arrow-down-up-across-line'}`}></i>
+                {selectedIds.length === 2 ? ' Swap Both Movies' : ` Arrange (${selectedIds.length})`}
+              </button>
+            )}
+            <button
+              className="admin-btn"
+              style={{ padding: '6px 10px', fontSize: '12px' }}
+              onClick={() => setSelectedIds([])}
+            >
+              <i className="fa-solid fa-xmark"></i> Clear
+            </button>
+          </div>
+        </div>
+      )}
 
     </AdminLayout>
   );

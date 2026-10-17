@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import AdminLayout from '../components/layout/AdminLayout';
 import { slideApi } from '../services/slideApi';
 import SlideFormModal from '../components/slides/SlideFormModal';
+import ArrangeSlidesModal from '../components/slides/ArrangeSlidesModal';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { showToast } from '../components/common/ToastContainer';
 
@@ -9,7 +10,12 @@ export default function SlidesPage({ navigateTo }) {
   const [loading, setLoading] = useState(true);
   const [slides, setSlides] = useState([]);
 
+  // Sequence selection state (Order 1, 2, 3...)
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isOrderMode, setIsOrderMode] = useState(false);
+
   // Modals state
+  const [isArrangeModalOpen, setIsArrangeModalOpen] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
   const [editingSlide, setEditingSlide] = useState(null);
@@ -17,13 +23,17 @@ export default function SlidesPage({ navigateTo }) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingSlide, setDeletingSlide] = useState(null);
 
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const loadSlides = async (force = false) => {
+  const loadSlides = async (force = true) => {
     setLoading(true);
     try {
       const records = await slideApi.getSlides(force);
-      setSlides(records);
+      // Sort slides by ID ascending (matching homepage display order)
+      const sorted = [...(records || [])].sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+      setSlides(sorted);
+      setSelectedIds([]);
     } catch (err) {
       showToast(err.message || 'Failed to load slider items', 'error');
     } finally {
@@ -32,8 +42,43 @@ export default function SlidesPage({ navigateTo }) {
   };
 
   useEffect(() => {
-    loadSlides(false);
+    loadSlides(true);
   }, []);
+
+  // Selected slides in their exact clicked order (1, 2, 3...)
+  const selectedSlidesList = useMemo(() => {
+    return selectedIds
+      .map(id => slides.find(s => Number(s.id) === Number(id)))
+      .filter(Boolean);
+  }, [selectedIds, slides]);
+
+  // Optimistic instant millisecond UI update when slides are rearranged or swapped
+  const handleOptimisticSlidesUpdate = (optimisticSlides) => {
+    if (!optimisticSlides || optimisticSlides.length === 0) return;
+    const optimisticIdSet = new Set(optimisticSlides.map(s => Number(s.id)));
+    setSlides(prev => {
+      const unchanged = prev.filter(s => !optimisticIdSet.has(Number(s.id)));
+      const merged = [...unchanged, ...optimisticSlides];
+      return merged.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+    });
+    setSelectedIds([]);
+  };
+
+  // Checkbox handlers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(slides.map(s => Number(s.id)));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id) => {
+    const numId = Number(id);
+    setSelectedIds(prev =>
+      prev.includes(numId) ? prev.filter(i => i !== numId) : [...prev, numId]
+    );
+  };
 
   const handleOpenCreate = () => {
     setFormMode('create');
@@ -48,38 +93,127 @@ export default function SlidesPage({ navigateTo }) {
   };
 
   const handleSaveSlide = async (slideData) => {
-    setActionLoading(true);
-    try {
-      if (formMode === 'create') {
-        await slideApi.createSlide(slideData);
-        showToast('🖼️ Created new banner slide!');
-      } else {
-        await slideApi.updateSlide(editingSlide.id, slideData);
-        showToast('✏️ Updated banner slide!');
-      }
-      setIsFormModalOpen(false);
-      loadSlides(false);
-    } catch (err) {
-      showToast(err.message || 'Failed to save slide', 'error');
-    } finally {
-      setActionLoading(false);
+    setIsFormModalOpen(false);
+
+    if (formMode === 'create') {
+      const nextId = slides.length > 0 ? Math.max(...slides.map(s => Number(s.id) || 0)) + 1 : 1;
+      const optimisticSlide = {
+        ...slideData,
+        id: slideData.id ? Number(slideData.id) : nextId,
+        created_at: new Date().toISOString()
+      };
+
+      // Instantly update admin table in milliseconds
+      setSlides(prev => [...prev.filter(s => Number(s.id) !== optimisticSlide.id), optimisticSlide].sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0)));
+      showToast('🖼️ Slide added! Saving in background...');
+
+      // Dispatch instant optimistic sync across tabs
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
+            detail: { type: 'slide_add', item: optimisticSlide }
+          }));
+        }
+      } catch (e) {}
+
+      // Background D1 creation
+      slideApi.createSlide(slideData).then(() => {
+        showToast('✅ Slide successfully saved in database!');
+        loadSlides(true);
+      }).catch(err => {
+        console.error('Failed to create slide:', err);
+        showToast(err.message || 'Failed to save slide', 'error');
+        loadSlides(true);
+      });
+    } else {
+      const updatedSlide = { ...editingSlide, ...slideData, id: Number(editingSlide.id) };
+
+      // Instantly update admin table in milliseconds
+      setSlides(prev => prev.map(s => Number(s.id) === updatedSlide.id ? updatedSlide : s));
+      setEditingSlide(null);
+      showToast('✏️ Slide updated! Saving in background...');
+
+      // Dispatch instant optimistic sync across tabs
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
+            detail: { type: 'slide_edit', item: updatedSlide }
+          }));
+        }
+      } catch (e) {}
+
+      // Background D1 update
+      slideApi.updateSlide(editingSlide.id, slideData).then(() => {
+        showToast('✅ Slide updated successfully in database!');
+        loadSlides(true);
+      }).catch(err => {
+        console.error('Failed to update slide:', err);
+        showToast(err.message || 'Failed to update slide', 'error');
+        loadSlides(true);
+      });
     }
   };
 
   const handleConfirmDelete = async () => {
     if (!deletingSlide) return;
-    setActionLoading(true);
+    const delId = Number(deletingSlide.id);
+    const delTitle = deletingSlide.title;
+
+    // Instantly remove from admin table in milliseconds
+    setSlides(prev => prev.filter(s => Number(s.id) !== delId));
+    setSelectedIds(prev => prev.filter(id => Number(id) !== delId));
+    setIsDeleteModalOpen(false);
+    setDeletingSlide(null);
+    showToast(`🗑️ Removed "${delTitle}"! Deleting in background...`);
+
+    // Dispatch instant optimistic sync across tabs
     try {
-      await slideApi.deleteSlide(deletingSlide.id);
-      showToast('🗑️ Deleted banner slide');
-      setIsDeleteModalOpen(false);
-      setDeletingSlide(null);
-      loadSlides(false);
-    } catch (err) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
+          detail: { type: 'slide_delete', id: delId }
+        }));
+      }
+    } catch (e) {}
+
+    // Background D1 delete
+    slideApi.deleteSlide(delId).then(() => {
+      loadSlides(true);
+    }).catch(err => {
+      console.error('Failed to delete slide:', err);
       showToast(err.message || 'Failed to delete slide', 'error');
-    } finally {
-      setActionLoading(false);
-    }
+      loadSlides(true);
+    });
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    const delSet = new Set(selectedIds.map(Number));
+    const idsToDelete = [...selectedIds];
+
+    // Instantly remove from admin table in milliseconds
+    setSlides(prev => prev.filter(s => !delSet.has(Number(s.id))));
+    setSelectedIds([]);
+    setIsBulkDeleteModalOpen(false);
+    showToast(`🗑️ Removed ${idsToDelete.length} slides! Deleting in background...`);
+
+    // Dispatch instant optimistic sync across tabs
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vip_catalog_optimistic_update', {
+          detail: { type: 'slide_bulk_delete', ids: idsToDelete }
+        }));
+      }
+    } catch (e) {}
+
+    // Background D1 bulk delete
+    slideApi.bulkDeleteSlides(idsToDelete).then((res) => {
+      showToast(`🗑️ Permanently removed ${res.successCount} slides from database.`);
+      loadSlides(true);
+    }).catch(err => {
+      console.error('Failed to bulk delete slides:', err);
+      showToast(err.message || 'Bulk delete failed', 'error');
+      loadSlides(true);
+    });
   };
 
   return (
@@ -91,20 +225,100 @@ export default function SlidesPage({ navigateTo }) {
       onRefresh={() => loadSlides(true)}
     >
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#fff', margin: 0 }}>
             Homepage Slide Banners
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--admin-text-muted)', margin: '4px 0 0 0' }}>
             Manage promotional hero banners and target watch URLs (`/api/slider`)
+            {selectedIds.length > 0 && (
+              <span style={{ marginLeft: '8px', color: 'var(--admin-gold)', fontWeight: 700 }}>
+                • {selectedIds.length} banner{selectedIds.length !== 1 ? 's' : ''} selected in sequence (1 to {selectedIds.length})
+              </span>
+            )}
           </p>
         </div>
 
-        <button className="admin-btn primary" onClick={handleOpenCreate}>
-          <i className="fa-solid fa-circle-plus"></i> Add New Slide
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {selectedIds.length >= 2 && (
+            <button
+              className="admin-btn primary"
+              onClick={() => setIsArrangeModalOpen(true)}
+              style={{
+                background: selectedIds.length === 2
+                  ? 'linear-gradient(135deg, var(--admin-blue), var(--admin-purple))'
+                  : 'linear-gradient(135deg, var(--admin-gold), #ea580c)',
+                color: selectedIds.length === 2 ? '#fff' : '#000',
+                fontWeight: 800,
+                boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+              }}
+              title="Arrange slide sequence and swap IDs in database"
+            >
+              <i className={`fa-solid ${selectedIds.length === 2 ? 'fa-right-left' : 'fa-arrow-down-up-across-line'}`}></i>
+              {selectedIds.length === 2 ? ' Swap Both Slides (1 ↔ 2)' : ` Arrange Slides (${selectedIds.length})`}
+            </button>
+          )}
+
+          {selectedIds.length > 0 && (
+            <>
+              <button className="admin-btn danger" onClick={() => setIsBulkDeleteModalOpen(true)}>
+                <i className="fa-solid fa-trash-can"></i> Delete Selected ({selectedIds.length})
+              </button>
+              <button className="admin-btn" onClick={() => setSelectedIds([])} title="Clear all selections">
+                <i className="fa-solid fa-xmark"></i> Clear ({selectedIds.length})
+              </button>
+            </>
+          )}
+
+          <button
+            type="button"
+            className={`admin-btn ${isOrderMode ? 'primary' : ''}`}
+            onClick={() => setIsOrderMode(prev => !prev)}
+            style={isOrderMode ? { background: 'linear-gradient(135deg, var(--admin-gold), #ea580c)', color: '#000', fontWeight: 800 } : {}}
+            title="When ON, clicking anywhere on a slide row ticks it in sequence (1, 2, 3...)"
+          >
+            <i className="fa-solid fa-list-ol"></i> Sequence Select: {isOrderMode ? 'ON' : 'OFF'}
+          </button>
+
+          <button className="admin-btn primary" onClick={handleOpenCreate}>
+            <i className="fa-solid fa-circle-plus"></i> Add New Slide
+          </button>
+        </div>
       </div>
+
+      {/* Sequence Selection Helper Banner */}
+      {isOrderMode && (
+        <div
+          style={{
+            background: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            borderRadius: '10px',
+            padding: '10px 16px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+            animation: 'adminFadeIn 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#fef3c7', fontSize: '13px' }}>
+            <i className="fa-solid fa-hand-pointer" style={{ color: 'var(--admin-gold)', fontSize: '16px' }}></i>
+            <span>
+              <strong>Sequence Mode Active:</strong> Click any banner rows 1 by 1 to tick them with counts (1, 2, 3...). Then click <strong>{selectedIds.length === 2 ? 'Swap Both Slides' : 'Arrange Slides'}</strong> to swap their IDs in D1 and reorder the hero carousel on the homepage!
+            </span>
+          </div>
+          <button
+            className="admin-btn"
+            style={{ padding: '4px 10px', fontSize: '12px' }}
+            onClick={() => setIsOrderMode(false)}
+          >
+            Exit Sequence Mode
+          </button>
+        </div>
+      )}
 
       {/* Slide Table */}
       {loading ? (
@@ -117,8 +331,16 @@ export default function SlidesPage({ navigateTo }) {
           <table className="admin-table">
             <thead>
               <tr>
+                <th style={{ width: '65px' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.length > 0 && selectedIds.length === slides.length}
+                    onChange={handleSelectAll}
+                    style={{ accentColor: 'var(--admin-accent)', cursor: 'pointer' }}
+                  />
+                </th>
                 <th>Banner Preview</th>
-                <th>Slide ID</th>
+                <th>Slide ID (Order)</th>
                 <th>Title</th>
                 <th>Target URL</th>
                 <th>Status</th>
@@ -129,9 +351,38 @@ export default function SlidesPage({ navigateTo }) {
             <tbody>
               {slides.map((slide) => {
                 const isComingSoon = String(slide.status || '').toLowerCase() === 'comingsoon';
+                const isSelected = selectedIds.includes(Number(slide.id));
+                const selectionIndex = selectedIds.indexOf(Number(slide.id));
+                const selectionRank = selectionIndex !== -1 ? selectionIndex + 1 : null;
 
                 return (
-                  <tr key={slide.id}>
+                  <tr
+                    key={slide.id}
+                    className={`${isOrderMode ? 'order-mode-row' : ''} ${isSelected ? 'is-selected-row' : ''}`}
+                    onClick={() => isOrderMode && handleSelectOne(slide.id)}
+                    style={isSelected ? { background: 'rgba(59, 130, 246, 0.12)' } : {}}
+                  >
+                    <td style={{ width: '65px' }} onClick={(e) => isOrderMode && e.stopPropagation()}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleSelectOne(slide.id);
+                          }}
+                          style={{ accentColor: 'var(--admin-accent)', cursor: 'pointer', width: '16px', height: '16px' }}
+                        />
+                        {isSelected && (
+                          <span
+                            className="admin-order-count-badge"
+                            title={`Selected order count: #${selectionRank}`}
+                          >
+                            {selectionRank}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td>
                       <img
                         src={slide.image}
@@ -208,7 +459,19 @@ export default function SlidesPage({ navigateTo }) {
         loading={actionLoading}
       />
 
-      {/* Delete Confirmation Modal */}
+      {/* Arrange / Swap Slides Modal */}
+      <ArrangeSlidesModal
+        isOpen={isArrangeModalOpen}
+        selectedSlides={selectedSlidesList}
+        onClose={() => setIsArrangeModalOpen(false)}
+        onOptimisticUpdate={handleOptimisticSlidesUpdate}
+        onSuccess={() => {
+          setSelectedIds([]);
+          loadSlides(true);
+        }}
+      />
+
+      {/* Single Delete Confirmation Modal */}
       <ConfirmationModal
         isOpen={isDeleteModalOpen}
         title="Delete Slide?"
@@ -218,6 +481,97 @@ export default function SlidesPage({ navigateTo }) {
         onConfirm={handleConfirmDelete}
         onCancel={() => setIsDeleteModalOpen(false)}
       />
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isBulkDeleteModalOpen}
+        title={`Delete ${selectedIds.length} Selected Slides?`}
+        message={`This action will permanently remove all ${selectedIds.length} selected slide banners from the database. This action cannot be undone.`}
+        confirmText={`Delete ${selectedIds.length} Slides`}
+        loading={actionLoading}
+        onConfirm={handleConfirmBulkDelete}
+        onCancel={() => setIsBulkDeleteModalOpen(false)}
+      />
+
+      {/* Floating Bottom Selection Bar (1 by 1 count sequence) */}
+      {selectedIds.length > 0 && (
+        <div className="admin-floating-selection-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--admin-gold)', display: 'inline-block', boxShadow: '0 0 10px var(--admin-gold)' }}></span>
+              <strong style={{ color: '#fff', fontSize: '13.5px', whiteSpace: 'nowrap' }}>
+                {selectedIds.length} {selectedIds.length === 1 ? 'Slide' : 'Slides'} Selected (Count 1 to {selectedIds.length})
+              </strong>
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '2px 0' }}>
+              {selectedSlidesList.slice(0, 5).map((s, idx) => (
+                <div key={s.id} style={{ position: 'relative', flexShrink: 0 }} title={`#${idx + 1}: ${s.title}`}>
+                  <img
+                    src={s.image}
+                    alt=""
+                    style={{ width: '48px', height: '24px', borderRadius: '4px', objectFit: 'cover', background: '#000', border: '1px solid var(--admin-border)' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-5px',
+                      right: '-5px',
+                      background: 'linear-gradient(135deg, var(--admin-gold), #ea580c)',
+                      color: '#000',
+                      fontSize: '9px',
+                      fontWeight: 900,
+                      borderRadius: '50%',
+                      width: '15px',
+                      height: '15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                    }}
+                  >
+                    {idx + 1}
+                  </span>
+                </div>
+              ))}
+              {selectedSlidesList.length > 5 && (
+                <span style={{ fontSize: '11px', color: 'var(--admin-text-muted)', display: 'flex', alignItems: 'center' }}>
+                  +{selectedSlidesList.length - 5} more
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            {selectedIds.length >= 2 && (
+              <button
+                className="admin-btn primary"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12.5px',
+                  background: selectedIds.length === 2
+                    ? 'linear-gradient(135deg, var(--admin-blue), var(--admin-purple))'
+                    : 'linear-gradient(135deg, var(--admin-gold), #ea580c)',
+                  color: selectedIds.length === 2 ? '#fff' : '#000',
+                  fontWeight: 800
+                }}
+                onClick={() => setIsArrangeModalOpen(true)}
+              >
+                <i className={`fa-solid ${selectedIds.length === 2 ? 'fa-right-left' : 'fa-arrow-down-up-across-line'}`}></i>
+                {selectedIds.length === 2 ? ' Swap Both Slides' : ` Arrange (${selectedIds.length})`}
+              </button>
+            )}
+            <button
+              className="admin-btn"
+              style={{ padding: '6px 10px', fontSize: '12px' }}
+              onClick={() => setSelectedIds([])}
+            >
+              <i className="fa-solid fa-xmark"></i> Clear
+            </button>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

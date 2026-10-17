@@ -54,7 +54,14 @@ export default function SlideFormModal({
       return;
     }
 
-    onSave(formData);
+    const payload = {
+      ...formData,
+      title: formData.title.trim(),
+      image: formData.image.trim(),
+      url: (formData.url && formData.url.trim()) ? formData.url.trim() : '#'
+    };
+
+    onSave(payload);
   };
 
   if (!isOpen) return null;

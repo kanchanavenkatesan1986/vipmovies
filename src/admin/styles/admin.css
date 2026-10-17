@@ -3497,3 +3497,69 @@ textarea.admin-input {
   overflow-y: auto;
   max-height: calc(90vh - 140px);
 }
+
+/* ============================================================
+   MOVIE SELECTION COUNT & ARRANGE BAR STYLES
+   ============================================================ */
+.admin-order-count-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--admin-gold), #ea580c);
+  color: #000;
+  font-size: 11px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+  animation: adminBadgePop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+@keyframes adminBadgePop {
+  0% { transform: scale(0.4); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.admin-floating-selection-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 14, 26, 0.96);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), 0 0 25px rgba(59, 130, 246, 0.25);
+  backdrop-filter: blur(14px);
+  border-radius: 16px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  z-index: 150;
+  max-width: 92%;
+  width: 680px;
+  animation: adminSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes adminSlideUp {
+  from { transform: translate(-50%, 40px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.admin-table tbody tr.order-mode-row {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.admin-table tbody tr.order-mode-row:hover {
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+.admin-table tbody tr.is-selected-row {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-left: 3px solid var(--admin-blue) !important;
+}
+

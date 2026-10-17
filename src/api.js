@@ -402,10 +402,20 @@ var VersionManager = (function() {
     }
 
     function saveMetadata(data) {
+        // Prefer the admin-side revision timestamp that was written to localStorage
+        // during any CRUD operation so the local version always reflects the latest change.
+        var localRev = null;
+        try {
+            localRev = (typeof localStorage !== 'undefined') ? localStorage.getItem('vip_catalog_version') : null;
+        } catch(e) {}
+        var versionVal = localRev ? Number(localRev) : (data.version || Date.now());
+        var updatedVal = localRev
+            ? new Date(Number(localRev)).toISOString()
+            : (data.updated || new Date().toISOString());
         return Promise.all([
-            DatabaseManager.put('metadata', { key: 'version', value: data.version }),
-            DatabaseManager.put('metadata', { key: 'updated', value: data.updated }),
-            DatabaseManager.put('metadata', { key: 'count',   value: data.count   })
+            DatabaseManager.put('metadata', { key: 'version', value: versionVal }),
+            DatabaseManager.put('metadata', { key: 'updated', value: updatedVal }),
+            DatabaseManager.put('metadata', { key: 'count',   value: data.count || 0 })
         ]);
     }
 
@@ -439,14 +449,18 @@ var VersionManager = (function() {
      * If different — download, store, show toast, reload page.
      * Rate-limited to once every 10 minutes to prevent multiple request problem on page navigation.
      */
-    function checkAndUpdate() {
+    /**
+     * @param {boolean} [force=false] – when true, bypasses the 10-minute rate-limit
+     *   so admin-triggered CRUD syncs always refresh immediately.
+     */
+    function checkAndUpdate(force) {
         var now = Date.now();
         var CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
         return DatabaseManager.get('metadata', 'lastVersionCheck').then(function(rec) {
             var lastCheck = rec ? Number(rec.value) : 0;
-            if (now - lastCheck < CHECK_INTERVAL) {
-                // Checked recently - skip checking to avoid spamming the worker
+            if (!force && (now - lastCheck < CHECK_INTERVAL)) {
+                // Checked recently and not a forced refresh - skip to avoid spamming the worker
                 return false;
             }
 
@@ -482,7 +496,7 @@ var VersionManager = (function() {
         });
     }
 
-    return { getLocalVersion, downloadAndStore, checkAndUpdate };
+    return { getLocalVersion, downloadAndStore, checkAndUpdate, saveMetadata };
 }());
 
 // ─── MOVIE REPOSITORY ────────────────────────────────────────────────────────
