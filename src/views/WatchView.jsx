@@ -11,6 +11,44 @@ function getMovieImageUrl(movie) {
   return img;
 }
 
+/**
+ * Automatically finds file size from URL/filename or estimates from duration
+ */
+function getQualityFileSize(rawUrl, durationStr, quality) {
+  if (!rawUrl || rawUrl === '#' || !rawUrl.trim()) return '';
+
+  // 1. Try to find size directly in filename or URL: e.g. __950_MB_, (2.8_GB), _450MB, 1.4GB
+  const regex = /(?:__|_|\(|\b)(\d+(?:\.\d+)?)\s*[_]?(GB|MB|KB)(?:__|_|\)|\b)/i;
+  const match = rawUrl.match(regex);
+  if (match) {
+    return `${match[1]} ${match[2].toUpperCase()}`;
+  }
+
+  // 2. Fallback to estimation based on duration
+  let totalMinutes = 115;
+  if (durationStr) {
+    const parts = String(durationStr).match(/(\d+)\s*:\s*(\d+)(?:\s*:\s*(\d+))?/);
+    if (parts) {
+      if (parts[3] !== undefined) {
+        totalMinutes = parseInt(parts[1], 10) * 60 + parseInt(parts[2], 10);
+      } else {
+        totalMinutes = parseInt(parts[1], 10);
+      }
+    }
+  }
+
+  if (quality === '460p') {
+    return `${Math.round(totalMinutes * 3.6)} MB`;
+  } else if (quality === '720p') {
+    const mb = Math.round(totalMinutes * 8.0);
+    return mb >= 1000 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`;
+  } else if (quality === '1080p') {
+    const mb = Math.round(totalMinutes * 17.5);
+    return `${(mb / 1024).toFixed(1)} GB`;
+  }
+  return '950 MB';
+}
+
 export default function WatchView({ movieId }) {
   const { movies, favorites, toggleFavorite, recordHistory, isMovieUnlocked } = useApp();
   const movie = movies.find(m => String(m.id || m.movieId).trim() === String(movieId || '').trim());
@@ -63,10 +101,19 @@ export default function WatchView({ movieId }) {
   };
 
   // Direct download links
-  const p460Link = movie.p360 || movie.p460 || '#';
-  const p720Link = movie.p720 || '#';
-  const p1080Link = movie.p1080 || '#';
-  const directDownloadLink = p1080Link !== '#' ? p1080Link : p720Link !== '#' ? p720Link : p460Link;
+  const p460Link = movie.p360 || movie.p460 || '';
+  const p720Link = movie.p720 || '';
+  const p1080Link = movie.p1080 || '';
+
+  const has460 = Boolean(p460Link && p460Link !== '#' && p460Link.trim() !== '');
+  const has720 = Boolean(p720Link && p720Link !== '#' && p720Link.trim() !== '');
+  const has1080 = Boolean(p1080Link && p1080Link !== '#' && p1080Link.trim() !== '');
+
+  const size460 = has460 ? getQualityFileSize(p460Link, movie.duration, '460p') : '';
+  const size720 = has720 ? getQualityFileSize(p720Link, movie.duration, '720p') : '';
+  const size1080 = has1080 ? getQualityFileSize(p1080Link, movie.duration, '1080p') : '';
+
+  const directDownloadLink = has1080 ? p1080Link : has720 ? p720Link : has460 ? p460Link : '#';
 
   return (
     <>
@@ -164,74 +211,104 @@ export default function WatchView({ movieId }) {
           <p className="story-text" id="story">{movie.story || 'No description available.'}</p>
         </div>
 
-        {/* ── QUALITY BOX: Play opens separate player page with selected quality, Download downloads ── */}
+        {/* ── QUALITY BOX: Old simple style with Movie Name - Quality - Size ── */}
         <div className="quality-box">
           <h3 className="quality-header">Watch &amp; Download (Select Quality)</h3>
           <div className="quality-list">
 
             {/* 460p / SD */}
-            <div className="quality-row">
+            <div className="quality-row" style={!has460 ? { opacity: 0.6 } : {}}>
               <div className="quality-info">
                 <i className="fa-solid fa-film"></i>
-                <span className="quality-label">Movie Quality - 460p (SD)</span>
+                <span className="quality-label">
+                  {movie.title} - 460p (SD){size460 ? ` - ${size460}` : (has460 ? '' : ' - Not Available')}
+                </span>
               </div>
               <div className="quality-actions">
-                <button
-                  type="button"
-                  className="quality-btn-play p460"
-                  title="Play 460p in Player"
-                  onClick={() => navigateToPlayer('460p')}
-                  style={{ border: 'none', cursor: 'pointer' }}
-                >
-                  <i className="fa-solid fa-play"></i>
-                </button>
-                <a className="quality-btn-down p460" href={p460Link} target="_blank" rel="noopener noreferrer" title="Download 460p">
-                  <i className="fa-solid fa-download"></i>
-                </a>
+                {has460 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="quality-btn-play p460"
+                      title="Play 460p in Player"
+                      onClick={() => navigateToPlayer('460p')}
+                      style={{ border: 'none', cursor: 'pointer' }}
+                    >
+                      <i className="fa-solid fa-play"></i>
+                    </button>
+                    <a className="quality-btn-down p460" href={p460Link} target="_blank" rel="noopener noreferrer" title="Download 460p">
+                      <i className="fa-solid fa-download"></i>
+                    </a>
+                  </>
+                ) : (
+                  <span style={{ fontSize: '11px', color: '#9ca3af', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+                    Unavailable
+                  </span>
+                )}
               </div>
             </div>
 
             {/* 720p / HD */}
-            <div className="quality-row">
+            <div className="quality-row" style={!has720 ? { opacity: 0.6 } : {}}>
               <div className="quality-info">
                 <i className="fa-solid fa-video"></i>
-                <span className="quality-label">Movie Quality - 720p (HD)</span>
+                <span className="quality-label">
+                  {movie.title} - 720p (HD){size720 ? ` - ${size720}` : (has720 ? '' : ' - Not Available')}
+                </span>
               </div>
               <div className="quality-actions">
-                <button
-                  type="button"
-                  className="quality-btn-play p720"
-                  title="Play 720p in Player"
-                  onClick={() => navigateToPlayer('720p')}
-                  style={{ border: 'none', cursor: 'pointer' }}
-                >
-                  <i className="fa-solid fa-play"></i>
-                </button>
-                <a className="quality-btn-down p720" href={p720Link} target="_blank" rel="noopener noreferrer" title="Download 720p">
-                  <i className="fa-solid fa-download"></i>
-                </a>
+                {has720 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="quality-btn-play p720"
+                      title="Play 720p in Player"
+                      onClick={() => navigateToPlayer('720p')}
+                      style={{ border: 'none', cursor: 'pointer' }}
+                    >
+                      <i className="fa-solid fa-play"></i>
+                    </button>
+                    <a className="quality-btn-down p720" href={p720Link} target="_blank" rel="noopener noreferrer" title="Download 720p">
+                      <i className="fa-solid fa-download"></i>
+                    </a>
+                  </>
+                ) : (
+                  <span style={{ fontSize: '11px', color: '#9ca3af', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+                    Unavailable
+                  </span>
+                )}
               </div>
             </div>
 
             {/* 1080p / FHD */}
-            <div className="quality-row">
+            <div className="quality-row" style={!has1080 ? { opacity: 0.6 } : {}}>
               <div className="quality-info">
                 <i className="fa-solid fa-tv"></i>
-                <span className="quality-label">Movie Quality - 1080p (Full HD)</span>
+                <span className="quality-label">
+                  {movie.title} - 1080p (Full HD){size1080 ? ` - ${size1080}` : (has1080 ? '' : ' - Not Available')}
+                </span>
               </div>
               <div className="quality-actions">
-                <button
-                  type="button"
-                  className="quality-btn-play p1080"
-                  title="Play 1080p in Player"
-                  onClick={() => navigateToPlayer('1080p')}
-                  style={{ border: 'none', cursor: 'pointer' }}
-                >
-                  <i className="fa-solid fa-play"></i>
-                </button>
-                <a className="quality-btn-down p1080" href={p1080Link} target="_blank" rel="noopener noreferrer" title="Download 1080p">
-                  <i className="fa-solid fa-download"></i>
-                </a>
+                {has1080 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="quality-btn-play p1080"
+                      title="Play 1080p in Player"
+                      onClick={() => navigateToPlayer('1080p')}
+                      style={{ border: 'none', cursor: 'pointer' }}
+                    >
+                      <i className="fa-solid fa-play"></i>
+                    </button>
+                    <a className="quality-btn-down p1080" href={p1080Link} target="_blank" rel="noopener noreferrer" title="Download 1080p">
+                      <i className="fa-solid fa-download"></i>
+                    </a>
+                  </>
+                ) : (
+                  <span style={{ fontSize: '11px', color: '#9ca3af', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+                    Unavailable
+                  </span>
+                )}
               </div>
             </div>
 
