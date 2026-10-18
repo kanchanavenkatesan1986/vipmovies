@@ -28,8 +28,14 @@ export default function MovieUnlockModal() {
         {/* Top Header bar with Close Button */}
         <div className="glass-modal-header">
           <div className="glass-modal-title-group">
-            <span className="glass-badge-type">{normalizedType}</span>
-            <span className="glass-badge-year">{previewMovie.year || '2026'}</span>
+            <span className="glass-badge-type">
+              <i className="fa-solid fa-clapperboard" style={{ marginRight: '5px', fontSize: '9px' }}></i>
+              {normalizedType}
+            </span>
+            <span className="glass-badge-year">
+              <i className="fa-solid fa-calendar-days" style={{ marginRight: '4px', fontSize: '9px', opacity: 0.85 }}></i>
+              {previewMovie.year || '2026'}
+            </span>
           </div>
           <button 
             className="glass-modal-close-btn" 
@@ -57,13 +63,24 @@ export default function MovieUnlockModal() {
           <h2 className="glass-movie-title">{previewMovie.title}</h2>
           
           <div className="glass-meta-pills">
-            <span className="glass-pill"><i className="fa-solid fa-globe"></i> {previewMovie.language || 'Tamil'}</span>
-            <span className="glass-pill highlight"><i className="fa-solid fa-film"></i> HD 1080p</span>
+            <span className="glass-pill">
+              <i className="fa-solid fa-language"></i> {previewMovie.language || 'Tamil'}
+            </span>
+            {previewMovie.duration && (
+              <span className="glass-pill">
+                <i className="fa-regular fa-clock"></i> {previewMovie.duration}
+              </span>
+            )}
+            <span className="glass-pill highlight">
+              <i className="fa-solid fa-film"></i> HD 1080p
+            </span>
           </div>
 
           {/* AdMob Policy Disclosure Glass Box */}
           <div className="glass-policy-box">
-            <i className="fa-solid fa-shield-halved glass-policy-icon"></i>
+            <div className="glass-policy-icon-wrap">
+              <i className="fa-solid fa-shield-halved glass-policy-icon"></i>
+            </div>
             <div className="glass-policy-text">
               <strong>AdMob User Choice Policy</strong>
               <span>Watch a short ad to unlock full movie streaming & downloads.</span>
@@ -85,7 +102,7 @@ export default function MovieUnlockModal() {
                 {isAdLoading ? (
                   <><i className="fa-solid fa-spinner fa-spin"></i> Preparing Ad...</>
                 ) : (
-                  <><i className="fa-solid fa-circle-play"></i> Watch Ad to Unlock Movie</>
+                  <><i className="fa-solid fa-play"></i> Watch Ad to Unlock Movie</>
                 )}
               </button>
             )}

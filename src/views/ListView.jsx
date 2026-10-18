@@ -154,6 +154,11 @@ export default function ListView({ type = '', year = '' }) {
                       alt={movie.title} 
                       loading="lazy" 
                     />
+                    <div className="movie-card-overlay">
+                      <div className="movie-card-play-btn">
+                        <i className="fa-solid fa-play"></i>
+                      </div>
+                    </div>
                     {isComingSoon && <span className="coming-soon-badge">Coming Soon</span>}
                   </div>
                   <div className="list-card-details">
@@ -167,7 +172,7 @@ export default function ListView({ type = '', year = '' }) {
                       {isComingSoon ? (
                         <><i className="fa-solid fa-lock"></i> Watch Ads - Unlock</>
                       ) : (
-                        <>Watch Ads - Unlock <i className="fa-solid fa-arrow-right"></i></>
+                        <><i className="fa-solid fa-circle-play"></i> Watch Ads - Unlock <i className="fa-solid fa-arrow-right"></i></>
                       )}
                     </div>
                   </div>

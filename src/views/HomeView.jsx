@@ -46,7 +46,7 @@ export default function HomeView() {
     // Extract year: from matchedMovie, or 4 consecutive digits in title (e.g. 2024, 2025, 2026), or default
     let year = matchedMovie?.year;
     if (!year) {
-      const match = title.match(/\b(202[0-9])\b/);
+      const match = title.match(/\b(19\d\d|20\d\d)\b/);
       if (match) year = match[1];
     }
     if (!year) year = '2026';
@@ -189,12 +189,6 @@ export default function HomeView() {
             ></div>
           </div>
 
-          {/* Top Right Slide Counter Pill */}
-          <div className="slider-top-counter">
-            <i className="fa-solid fa-film" style={{ color: 'var(--accent)', fontSize: '10px' }}></i>
-            <span>{slideIndex + 1} / {sortedSlider.length}</span>
-          </div>
-
           {/* Left Arrow Button (Manual Left Click) */}
           {sortedSlider.length > 1 && (
             <button
@@ -254,45 +248,25 @@ export default function HomeView() {
                       }}
                     />
 
-                    {/* Multi-Layer Cinematic Gradient Shadow Overlay */}
+                    {/* Bottom Black Shadow Overlay */}
                     <div className="slider-shadow-overlay"></div>
 
-                    {/* Rich Content Area (Badges, Title, Action Buttons) */}
+                    {/* Content Area: Title, then Watch + Year Badge inline */}
                     <div className="slider-content">
-                      <div className="slider-badges">
-                        <span className="slider-badge badge-featured">
-                          <i className="fa-solid fa-fire"></i> FEATURED
-                        </span>
-                        <span className="slider-badge badge-year">
-                          <i className="fa-solid fa-calendar-days"></i> {meta.year}
-                        </span>
-                        <span className="slider-badge badge-quality">
-                          <i className="fa-solid fa-sparkles"></i> {meta.quality}
-                        </span>
-                        {meta.category && (
-                          <span className="slider-badge badge-genre">
-                            {meta.category}
-                          </span>
-                        )}
-                      </div>
-
                       <h2 className="slider-title">{meta.title}</h2>
-
                       <div className="slider-actions">
                         <button
                           type="button"
                           className="slider-btn-play"
                           onClick={(e) => handleSlideActionClick(e, meta)}
                         >
-                          <i className="fa-solid fa-play"></i> Watch Now
+                          <i className="fa-solid fa-play"></i> Watch
                         </button>
-                        <button
-                          type="button"
-                          className="slider-btn-info"
-                          onClick={(e) => handleSlideActionClick(e, meta)}
-                        >
-                          <i className="fa-solid fa-circle-info"></i> More Info
-                        </button>
+                        {meta.year && (
+                          <span className="slider-year-badge">
+                            <i className="fa-solid fa-calendar-days"></i> {meta.year}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </a>
@@ -364,6 +338,16 @@ export default function HomeView() {
                   alt={movie.title} 
                   loading="lazy"
                 />
+                {movie.year && (
+                  <span className="movie-card-year-badge">
+                    {movie.year}
+                  </span>
+                )}
+                <div className="movie-card-overlay">
+                  <div className="movie-card-play-btn">
+                    <i className="fa-solid fa-play"></i>
+                  </div>
+                </div>
               </div>
               <h1 className="movie-card-title">{movie.title}</h1>
             </div>
@@ -395,6 +379,16 @@ export default function HomeView() {
                   alt={movie.title} 
                   loading="lazy"
                 />
+                {movie.year && (
+                  <span className="movie-card-year-badge">
+                    {movie.year}
+                  </span>
+                )}
+                <div className="movie-card-overlay">
+                  <div className="movie-card-play-btn">
+                    <i className="fa-solid fa-play"></i>
+                  </div>
+                </div>
               </div>
               <h1 className="movie-card-title">{movie.title}</h1>
             </div>

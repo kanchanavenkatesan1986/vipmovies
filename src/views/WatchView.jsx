@@ -167,26 +167,26 @@ export default function WatchView({ movieId }) {
         {/* ── META GRID ── */}
         <div className="meta-grid">
           <div className="meta-item">
-            <span className="meta-label">Language:</span>
+            <span className="meta-label"><i className="fa-solid fa-language"></i> Language:</span>
             <span id="language"> {movie.language || '-'}</span>
           </div>
           <div className="meta-item">
-            <span className="meta-label">Release:</span>
+            <span className="meta-label"><i className="fa-regular fa-calendar-days"></i> Release:</span>
             <span id="release"> {movie.release || '-'}</span>
           </div>
           <div className="meta-item">
-            <span className="meta-label">Duration:</span>
+            <span className="meta-label"><i className="fa-regular fa-clock"></i> Duration:</span>
             <span id="duration"> {movie.duration || '-'}</span>
           </div>
           <div className="meta-item">
-            <span className="meta-label">Director:</span>
+            <span className="meta-label"><i className="fa-solid fa-clapperboard"></i> Director:</span>
             <span id="director"> {movie.director || '-'}</span>
           </div>
         </div>
 
         {/* Starring full-width */}
         <div className="meta-item meta-item-full">
-          <span className="meta-label">Starring:</span>
+          <span className="meta-label"><i className="fa-solid fa-users"></i> Starring:</span>
           <span id="starring"> {movie.starring || '-'}</span>
         </div>
 
@@ -207,22 +207,28 @@ export default function WatchView({ movieId }) {
 
         {/* ── STORYLINE ── */}
         <div className="story-container">
-          <h3 className="story-title">Storyline / Overview</h3>
+          <h3 className="story-title"><i className="fa-solid fa-book-open"></i> Storyline / Overview</h3>
           <p className="story-text" id="story">{movie.story || 'No description available.'}</p>
         </div>
 
-        {/* ── QUALITY BOX: Old simple style with Movie Name - Quality - Size ── */}
+        {/* ── QUALITY BOX: 3 Distinct Quality Options (460p SD, 720p HD, 1080p FHD) ── */}
         <div className="quality-box">
-          <h3 className="quality-header">Watch &amp; Download (Select Quality)</h3>
+          <h3 className="quality-header">
+            <i className="fa-solid fa-sliders"></i> Watch &amp; Download (Select Quality)
+          </h3>
           <div className="quality-list">
 
-            {/* 460p / SD */}
-            <div className="quality-row" style={!has460 ? { opacity: 0.6 } : {}}>
+            {/* 460p / SD — Emerald Green Theme */}
+            <div className={`quality-row quality-row-460${!has460 ? ' disabled' : ''}`}>
               <div className="quality-info">
-                <i className="fa-solid fa-film"></i>
-                <span className="quality-label">
-                  {movie.title} - 460p (SD){size460 ? ` - ${size460}` : (has460 ? '' : ' - Not Available')}
+                <span className="quality-res-badge res-460">
+                  <i className="fa-solid fa-film"></i> 460p SD
                 </span>
+                <div className="quality-text-group">
+                  <span className="quality-label">{movie.title}</span>
+                  {size460 && <span className="quality-size-badge"><i className="fa-solid fa-hard-drive"></i> {size460}</span>}
+                  {!has460 && <span className="quality-size-badge unavailable">Not Available</span>}
+                </div>
               </div>
               <div className="quality-actions">
                 {has460 ? (
@@ -232,29 +238,38 @@ export default function WatchView({ movieId }) {
                       className="quality-btn-play p460"
                       title="Play 460p in Player"
                       onClick={() => navigateToPlayer('460p')}
-                      style={{ border: 'none', cursor: 'pointer' }}
                     >
                       <i className="fa-solid fa-play"></i>
+                      <span>Play</span>
                     </button>
-                    <a className="quality-btn-down p460" href={p460Link} target="_blank" rel="noopener noreferrer" title="Download 460p">
+                    <a
+                      className="quality-btn-down p460"
+                      href={p460Link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Download 460p"
+                    >
                       <i className="fa-solid fa-download"></i>
+                      <span>Download</span>
                     </a>
                   </>
                 ) : (
-                  <span style={{ fontSize: '11px', color: '#9ca3af', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
-                    Unavailable
-                  </span>
+                  <span className="quality-unavailable-tag">Unavailable</span>
                 )}
               </div>
             </div>
 
-            {/* 720p / HD */}
-            <div className="quality-row" style={!has720 ? { opacity: 0.6 } : {}}>
+            {/* 720p / HD — Electric Sky Blue Theme */}
+            <div className={`quality-row quality-row-720${!has720 ? ' disabled' : ''}`}>
               <div className="quality-info">
-                <i className="fa-solid fa-video"></i>
-                <span className="quality-label">
-                  {movie.title} - 720p (HD){size720 ? ` - ${size720}` : (has720 ? '' : ' - Not Available')}
+                <span className="quality-res-badge res-720">
+                  <i className="fa-solid fa-video"></i> 720p HD
                 </span>
+                <div className="quality-text-group">
+                  <span className="quality-label">{movie.title}</span>
+                  {size720 && <span className="quality-size-badge"><i className="fa-solid fa-hard-drive"></i> {size720}</span>}
+                  {!has720 && <span className="quality-size-badge unavailable">Not Available</span>}
+                </div>
               </div>
               <div className="quality-actions">
                 {has720 ? (
@@ -264,29 +279,38 @@ export default function WatchView({ movieId }) {
                       className="quality-btn-play p720"
                       title="Play 720p in Player"
                       onClick={() => navigateToPlayer('720p')}
-                      style={{ border: 'none', cursor: 'pointer' }}
                     >
                       <i className="fa-solid fa-play"></i>
+                      <span>Play</span>
                     </button>
-                    <a className="quality-btn-down p720" href={p720Link} target="_blank" rel="noopener noreferrer" title="Download 720p">
+                    <a
+                      className="quality-btn-down p720"
+                      href={p720Link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Download 720p"
+                    >
                       <i className="fa-solid fa-download"></i>
+                      <span>Download</span>
                     </a>
                   </>
                 ) : (
-                  <span style={{ fontSize: '11px', color: '#9ca3af', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
-                    Unavailable
-                  </span>
+                  <span className="quality-unavailable-tag">Unavailable</span>
                 )}
               </div>
             </div>
 
-            {/* 1080p / FHD */}
-            <div className="quality-row" style={!has1080 ? { opacity: 0.6 } : {}}>
+            {/* 1080p / Full HD — Vibrant Gold Theme */}
+            <div className={`quality-row quality-row-1080${!has1080 ? ' disabled' : ''}`}>
               <div className="quality-info">
-                <i className="fa-solid fa-tv"></i>
-                <span className="quality-label">
-                  {movie.title} - 1080p (Full HD){size1080 ? ` - ${size1080}` : (has1080 ? '' : ' - Not Available')}
+                <span className="quality-res-badge res-1080">
+                  <i className="fa-solid fa-tv"></i> 1080p FHD
                 </span>
+                <div className="quality-text-group">
+                  <span className="quality-label">{movie.title}</span>
+                  {size1080 && <span className="quality-size-badge"><i className="fa-solid fa-hard-drive"></i> {size1080}</span>}
+                  {!has1080 && <span className="quality-size-badge unavailable">Not Available</span>}
+                </div>
               </div>
               <div className="quality-actions">
                 {has1080 ? (
@@ -296,18 +320,23 @@ export default function WatchView({ movieId }) {
                       className="quality-btn-play p1080"
                       title="Play 1080p in Player"
                       onClick={() => navigateToPlayer('1080p')}
-                      style={{ border: 'none', cursor: 'pointer' }}
                     >
                       <i className="fa-solid fa-play"></i>
+                      <span>Play</span>
                     </button>
-                    <a className="quality-btn-down p1080" href={p1080Link} target="_blank" rel="noopener noreferrer" title="Download 1080p">
+                    <a
+                      className="quality-btn-down p1080"
+                      href={p1080Link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Download 1080p"
+                    >
                       <i className="fa-solid fa-download"></i>
+                      <span>Download</span>
                     </a>
                   </>
                 ) : (
-                  <span style={{ fontSize: '11px', color: '#9ca3af', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
-                    Unavailable
-                  </span>
+                  <span className="quality-unavailable-tag">Unavailable</span>
                 )}
               </div>
             </div>

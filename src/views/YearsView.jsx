@@ -16,13 +16,15 @@ export default function YearsView() {
   return (
     <>
       {/* Page Hero */}
-      <div className="page-hero">
+      <div className="page-hero years-hero">
         <h1><i className="fa-solid fa-calendar-days"></i> Movie Collections</h1>
-        <p>Browse Tamil and Hollywood movies grouped by release years</p>
+        <p>Explore Tamil & Hollywood blockbusters by release year</p>
       </div>
 
       {/* Tamil Movie Collections */}
-      <h2 className="category-heading">Tamil Movie Collections</h2>
+      <h2 className="category-heading">
+        <i className="fa-solid fa-film"></i> Tamil Movie Collections
+      </h2>
       <div className="years-grid">
         {years.map(yr => (
           <div
@@ -30,14 +32,24 @@ export default function YearsView() {
             className="year-card tamil-card"
             onClick={() => handleYearClick('tamil', yr)}
           >
-            <i className="fa-solid fa-calendar-days"></i>
-            <span>{yr} Tamil Movies</span>
+            <div className="year-card-icon">
+              <i className="fa-solid fa-calendar-days"></i>
+            </div>
+            <div className="year-card-content">
+              <span className="year-card-title">{yr} Tamil Movies</span>
+              <span className="year-card-sub">Browse {yr} Releases</span>
+            </div>
+            <div className="year-card-arrow">
+              <i className="fa-solid fa-arrow-right"></i>
+            </div>
           </div>
         ))}
       </div>
 
       {/* Hollywood Movie Collections */}
-      <h2 className="category-heading">Hollywood Movie Collections</h2>
+      <h2 className="category-heading">
+        <i className="fa-solid fa-clapperboard"></i> Hollywood Movie Collections
+      </h2>
       <div className="years-grid">
         {years.map(yr => (
           <div
@@ -45,8 +57,16 @@ export default function YearsView() {
             className="year-card hollywood-card"
             onClick={() => handleYearClick('hollywood', yr)}
           >
-            <i className="fa-solid fa-film"></i>
-            <span>{yr} Hollywood Movies</span>
+            <div className="year-card-icon">
+              <i className="fa-solid fa-film"></i>
+            </div>
+            <div className="year-card-content">
+              <span className="year-card-title">{yr} Hollywood Movies</span>
+              <span className="year-card-sub">Browse {yr} Releases</span>
+            </div>
+            <div className="year-card-arrow">
+              <i className="fa-solid fa-arrow-right"></i>
+            </div>
           </div>
         ))}
       </div>

@@ -122,7 +122,14 @@ export default function SearchView({ query = '' }) {
                       alt={movie.title}
                       loading="lazy"
                     />
-                    <span className="list-card-badge">{movie.year || '-'}</span>
+                    {movie.year && (
+                      <span className="movie-card-year-badge">{movie.year}</span>
+                    )}
+                    <div className="movie-card-overlay">
+                      <div className="movie-card-play-btn">
+                        <i className="fa-solid fa-play"></i>
+                      </div>
+                    </div>
                     {isComingSoon && <span className="coming-soon-badge">Coming Soon</span>}
                   </div>
                   <div className="list-card-details">
