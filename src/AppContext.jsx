@@ -127,16 +127,33 @@ export const AppProvider = ({ children }) => {
     const handleCatalogRefresh = async (event) => {
       try {
         const detail = event?.detail || {};
+
+        // Always fetch fresh slider data directly from API to ensure full sync with D1 database
+        try {
+          const sliderRes = await fetch('https://api-movies.akatsuki-pvt-ltd.workers.dev/api/slider?t=' + Date.now(), { cache: 'no-store' });
+          if (sliderRes.ok) {
+            const sliderData = await sliderRes.json();
+            const slidesList = Array.isArray(sliderData) ? sliderData : (sliderData.value || sliderData.data || []);
+            const sortedSlides = [...slidesList].sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+            setSlider(sortedSlides);
+            if (window.DatabaseManager) {
+              window.DatabaseManager.replaceAll('slider', sortedSlides).catch(() => {});
+            }
+            if (window.CacheManager) {
+              window.CacheManager.populate(window.CacheManager.getMovies(), sortedSlides);
+            }
+          }
+        } catch (sliderErr) {
+          console.warn('Failed to fetch fresh slider in AppContext:', sliderErr);
+        }
+
+        // Refresh movies if MovieStore or MovieRepository is available
         if (window.MovieStore && typeof window.MovieStore.refresh === 'function') {
           const freshMovies = await window.MovieStore.refresh();
-          const freshSlider = window.MovieRepository ? window.MovieRepository.getSlider() : null;
           if (freshMovies) setMovies([...freshMovies]);
-          if (freshSlider) setSlider([...freshSlider]);
         } else if (window.MovieRepository) {
           const freshMovies = window.MovieRepository.getAll();
-          const freshSlider = window.MovieRepository.getSlider();
           if (freshMovies) setMovies([...freshMovies]);
-          if (freshSlider) setSlider([...freshSlider]);
         }
 
         // Update dbInfo metadata state

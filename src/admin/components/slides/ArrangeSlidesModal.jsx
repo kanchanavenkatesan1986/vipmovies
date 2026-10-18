@@ -200,6 +200,10 @@ export default function ArrangeSlidesModal({
                 </strong>
               </div>
             </div>
+            <div style={{ fontSize: '11.5px', color: '#10b981', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <i className="fa-solid fa-circle-check"></i>
+              Both IDs and D1 database rows in slider are safely rearranged. Movie detail pages in the movie catalogue remain completely unchanged.
+            </div>
           </div>
 
           {/* Controls Bar */}

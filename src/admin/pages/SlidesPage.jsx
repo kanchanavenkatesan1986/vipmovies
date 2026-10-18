@@ -3,6 +3,7 @@ import AdminLayout from '../components/layout/AdminLayout';
 import { slideApi } from '../services/slideApi';
 import SlideFormModal from '../components/slides/SlideFormModal';
 import ArrangeSlidesModal from '../components/slides/ArrangeSlidesModal';
+import MoviePickerModal from '../components/slides/MoviePickerModal';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { showToast } from '../components/common/ToastContainer';
 import { dispatchOptimisticUpdate } from '../services/syncManager';
@@ -13,11 +14,12 @@ export default function SlidesPage({ navigateTo }) {
 
   // Sequence selection state (Order 1, 2, 3...)
   const [selectedIds, setSelectedIds] = useState([]);
-  const [isOrderMode, setIsOrderMode] = useState(false);
+  const [isOrderMode, setIsOrderMode] = useState(true);
 
   // Modals state
   const [isArrangeModalOpen, setIsArrangeModalOpen] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isMoviePickerOpen, setIsMoviePickerOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
   const [editingSlide, setEditingSlide] = useState(null);
 
@@ -112,6 +114,20 @@ export default function SlidesPage({ navigateTo }) {
     setSelectedIds(prev =>
       prev.includes(numId) ? prev.filter(i => i !== numId) : [...prev, numId]
     );
+  };
+
+  const handleSelectMovieForSlider = (movie) => {
+    setFormMode('create');
+    setEditingSlide({
+      title: movie.title || '',
+      image: movie.image || '',
+      targetUrl: movie.targetUrl || `https://vip-movies.pages.dev/watch?reward=${movie.id}`,
+      url: movie.targetUrl || `https://vip-movies.pages.dev/watch?reward=${movie.id}`,
+      id: null,
+      status: 'active'
+    });
+    setIsMoviePickerOpen(false);
+    setIsFormModalOpen(true);
   };
 
   const handleOpenCreate = () => {
@@ -283,12 +299,17 @@ export default function SlidesPage({ navigateTo }) {
 
           <button
             type="button"
-            className={`admin-btn ${isOrderMode ? 'primary' : ''}`}
-            onClick={() => setIsOrderMode(prev => !prev)}
-            style={isOrderMode ? { background: 'linear-gradient(135deg, var(--admin-gold), #ea580c)', color: '#000', fontWeight: 800 } : {}}
-            title="When ON, clicking anywhere on a slide row ticks it in sequence (1, 2, 3...)"
+            className="admin-btn primary"
+            onClick={() => setIsMoviePickerOpen(true)}
+            style={{
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              color: '#fff',
+              fontWeight: 800,
+              boxShadow: '0 2px 10px rgba(16, 185, 129, 0.3)'
+            }}
+            title="Pick a movie from catalogue to feature on homepage slider"
           >
-            <i className="fa-solid fa-list-ol"></i> Sequence Select: {isOrderMode ? 'ON' : 'OFF'}
+            <i className="fa-solid fa-clapperboard"></i> Add Movie to Slider
           </button>
 
           <button className="admin-btn primary" onClick={handleOpenCreate}>
@@ -298,37 +319,37 @@ export default function SlidesPage({ navigateTo }) {
       </div>
 
       {/* Sequence Selection Helper Banner */}
-      {isOrderMode && (
-        <div
-          style={{
-            background: 'rgba(245, 158, 11, 0.1)',
-            border: '1px solid rgba(245, 158, 11, 0.3)',
-            borderRadius: '10px',
-            padding: '10px 16px',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '10px',
-            animation: 'adminFadeIn 0.2s ease'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#fef3c7', fontSize: '13px' }}>
-            <i className="fa-solid fa-hand-pointer" style={{ color: 'var(--admin-gold)', fontSize: '16px' }}></i>
-            <span>
-              <strong>Sequence Mode Active:</strong> Click any banner rows 1 by 1 to tick them with counts (1, 2, 3...). Then click <strong>{selectedIds.length === 2 ? 'Swap Both Slides' : 'Arrange Slides'}</strong> to swap their IDs in D1 and reorder the hero carousel on the homepage!
-            </span>
-          </div>
+      <div
+        style={{
+          background: 'rgba(245, 158, 11, 0.08)',
+          border: '1px solid rgba(245, 158, 11, 0.25)',
+          borderRadius: '10px',
+          padding: '10px 16px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px',
+          animation: 'adminFadeIn 0.2s ease'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#fef3c7', fontSize: '13px' }}>
+          <i className="fa-solid fa-hand-pointer" style={{ color: 'var(--admin-gold)', fontSize: '16px' }}></i>
+          <span>
+            <strong>1-by-1 Sequence Select:</strong> Click any banner rows 1 by 1 to tick them with sequence counts (1, 2, 3...). Then click <strong>{selectedIds.length === 2 ? 'Swap Both Slides' : 'Arrange Slides'}</strong> to rearrange both ID and D1 database rows. Adding a new movie detail page only assigns a new slider ID and does not modify the movie's own D1 database row.
+          </span>
+        </div>
+        {selectedIds.length > 0 && (
           <button
             className="admin-btn"
             style={{ padding: '4px 10px', fontSize: '12px' }}
-            onClick={() => setIsOrderMode(false)}
+            onClick={() => setSelectedIds([])}
           >
-            Exit Sequence Mode
+            Clear Selection ({selectedIds.length})
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Slide Table */}
       {loading ? (
@@ -368,20 +389,22 @@ export default function SlidesPage({ navigateTo }) {
                 return (
                   <tr
                     key={slide.id}
-                    className={`${isOrderMode ? 'order-mode-row' : ''} ${isSelected ? 'is-selected-row' : ''}`}
-                    onClick={() => isOrderMode && handleSelectOne(slide.id)}
-                    style={isSelected ? { background: 'rgba(59, 130, 246, 0.12)' } : {}}
+                    className={`selectable-row ${isSelected ? 'is-selected-row' : ''}`}
+                    onClick={() => handleSelectOne(slide.id)}
+                    style={{
+                      cursor: 'pointer',
+                      background: isSelected ? 'rgba(59, 130, 246, 0.12)' : undefined,
+                      transition: 'background 0.15s ease'
+                    }}
+                    title="Click row to select/unselect in 1-by-1 sequence (1, 2, 3...)"
                   >
-                    <td style={{ width: '65px' }} onClick={(e) => isOrderMode && e.stopPropagation()}>
+                    <td style={{ width: '65px' }} onClick={(e) => e.stopPropagation()}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            handleSelectOne(slide.id);
-                          }}
-                          style={{ accentColor: 'var(--admin-accent)', cursor: 'pointer', width: '16px', height: '16px' }}
+                          onChange={() => handleSelectOne(slide.id)}
+                          style={{ accentColor: 'var(--admin-accent)', cursor: 'pointer', width: '18px', height: '18px' }}
                         />
                         {isSelected && (
                           <span
@@ -401,15 +424,39 @@ export default function SlidesPage({ navigateTo }) {
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
                     </td>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'var(--admin-accent)' }}>
-                      #{slide.id}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'var(--admin-accent)' }}>
+                          #{slide.id}
+                        </span>
+                        {isSelected && (
+                          <span
+                            style={{
+                              background: 'linear-gradient(135deg, var(--admin-gold), #ea580c)',
+                              color: '#000',
+                              fontSize: '10px',
+                              fontWeight: 900,
+                              padding: '1px 6px',
+                              borderRadius: '10px'
+                            }}
+                          >
+                            Order: #{selectionRank}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ fontWeight: 700, color: '#fff', maxWidth: '200px' }}>
                       {slide.title}
                     </td>
                     <td style={{ maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {slide.url ? (
-                        <a href={slide.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)', fontSize: '12px' }}>
+                        <a
+                          href={slide.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ color: 'var(--admin-purple)', fontSize: '12px' }}
+                        >
                           {slide.url}
                         </a>
                       ) : (
@@ -422,13 +469,13 @@ export default function SlidesPage({ navigateTo }) {
                       </span>
                     </td>
                     <td style={{ color: 'var(--admin-text-dim)' }}>{slide.created_at || '-'}</td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                         <button
                           className="admin-btn"
                           style={{ padding: '5px 9px', fontSize: '12px' }}
                           title="Edit Slide"
-                          onClick={() => handleOpenEdit(slide)}
+                          onClick={(e) => { e.stopPropagation(); handleOpenEdit(slide); }}
                         >
                           <i className="fa-solid fa-pen-to-square"></i>
                         </button>
@@ -436,7 +483,7 @@ export default function SlidesPage({ navigateTo }) {
                           className="admin-btn danger"
                           style={{ padding: '5px 9px', fontSize: '12px' }}
                           title="Delete Slide"
-                          onClick={() => { setDeletingSlide(slide); setIsDeleteModalOpen(true); }}
+                          onClick={(e) => { e.stopPropagation(); setDeletingSlide(slide); setIsDeleteModalOpen(true); }}
                         >
                           <i className="fa-solid fa-trash-can"></i>
                         </button>
@@ -467,6 +514,13 @@ export default function SlidesPage({ navigateTo }) {
         onSave={handleSaveSlide}
         onCancel={() => setIsFormModalOpen(false)}
         loading={actionLoading}
+      />
+
+      {/* Movie Picker Modal for adding movie detail page to slider */}
+      <MoviePickerModal
+        isOpen={isMoviePickerOpen}
+        onClose={() => setIsMoviePickerOpen(false)}
+        onSelectMovie={handleSelectMovieForSlider}
       />
 
       {/* Arrange / Swap Slides Modal */}

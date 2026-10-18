@@ -106,7 +106,7 @@ export const slideApi = {
       if (typeof onProgress === 'function') onProgress(msg, pct);
     };
 
-    reportProgress('Analyzing selected banner sequence...', 5);
+    reportProgress('Analyzing selected banner sequence...', 10);
 
     // Current IDs in their given order
     const currentIds = orderedSlides.map(s => Number(s.id));
@@ -123,9 +123,7 @@ export const slideApi = {
         changes.push({
           slide,
           oldId: Number(slide.id),
-          newId: targetId,
-          // Use safe negative temporary IDs so autoincrement sequence is not affected
-          tempId: -100 - i
+          newId: targetId
         });
       }
     }
@@ -135,40 +133,32 @@ export const slideApi = {
       return { success: true, count: 0, changes: [] };
     }
 
-    // Step 1: Backup records to negative temporary slots in parallel
-    reportProgress(`Step 1/4: Backing up ${changes.length} slides to temporary slots...`, 25);
-    await Promise.all(changes.map(item => {
-      const tempPayload = sanitizeSlidePayload({ ...item.slide, id: item.tempId });
-      return api.post(`/api/${SLIDER_TABLE}`, tempPayload);
-    }));
-
-    // Step 2: Delete original records to release the IDs in parallel
-    reportProgress(`Step 2/4: Freeing slide ID slots in database...`, 50);
-    await Promise.all(changes.map(item => {
-      return api.delete(`/api/${SLIDER_TABLE}/${item.oldId}`);
-    }));
-
-    // Step 3: Insert records with new target IDs in parallel
-    reportProgress(`Step 3/4: Writing slides with updated IDs...`, 75);
-    await Promise.all(changes.map(item => {
-      const newPayload = sanitizeSlidePayload({ ...item.slide, id: item.newId });
-      return api.post(`/api/${SLIDER_TABLE}`, newPayload);
-    }));
-
-    // Step 4: Clean up temporary backup records in parallel
-    reportProgress(`Step 4/4: Finalizing & cleaning up temporary slots...`, 92);
-    await Promise.all(changes.map(item => {
-      return api.delete(`/api/${SLIDER_TABLE}/${item.tempId}`).catch(err => {
-        console.warn(`Could not delete temporary slot ${item.tempId}:`, err);
+    // Update each target slot in D1 with the ordered slide's content
+    // This updates the D1 database rows directly so targetIds[i] row contains orderedSlides[i]'s data
+    reportProgress(`Updating ${orderedSlides.length} slide rows in D1 database...`, 40);
+    await Promise.all(orderedSlides.map(async (slide, index) => {
+      const targetId = targetIds[index];
+      const payload = sanitizeSlidePayload({
+        ...slide,
+        id: targetId
       });
+      try {
+        return await api.put(`/api/${SLIDER_TABLE}/${targetId}`, payload);
+      } catch (putErr) {
+        // Fallback: If record at targetId didn't exist, post it
+        return await api.post(`/api/${SLIDER_TABLE}`, payload);
+      }
     }));
+
+    reportProgress('Finalizing and synchronizing caches...', 85);
 
     // Clear local cache for slider table so fresh data is loaded
     cacheManager.clearCache(SLIDER_TABLE);
-    triggerSlideCatalogSync('arrange', { changes });
+    const updatedItems = orderedSlides.map((s, idx) => ({ ...s, id: targetIds[idx] }));
+    triggerSlideCatalogSync('arrange', { changes, items: updatedItems });
 
-    reportProgress('✅ All slide IDs successfully updated across homepage and database!', 100);
-    return { success: true, count: changes.length, changes };
+    reportProgress('✅ All slide IDs and D1 database rows successfully updated across admin and website!', 100);
+    return { success: true, count: changes.length, changes, items: updatedItems };
   },
 
   // Swap IDs of exactly 2 slides

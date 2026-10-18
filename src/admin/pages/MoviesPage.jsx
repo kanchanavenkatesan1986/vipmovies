@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import AdminLayout from '../components/layout/AdminLayout';
 import { movieApi } from '../services/movieApi';
+import { slideApi } from '../services/slideApi';
 import { VALID_TABLES, getMovieTable, dbToDisplayType, displayToDbType } from '../utils/tableMapper';
 import MovieFormModal from '../components/movies/MovieFormModal';
 import MovieDetailsModal from '../components/movies/MovieDetailsModal';
@@ -43,6 +44,10 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
 
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Add Movie to Homepage Slider state
+  const [sliderCandidate, setSliderCandidate] = useState(null);
+  const [isSliderConfirmOpen, setIsSliderConfirmOpen] = useState(false);
 
   // Selected movies in their exact clicked order (1, 2, 3...)
   const selectedMoviesList = useMemo(() => {
@@ -227,6 +232,33 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
     setSelectedCategory('');
     setSelectedLanguage('');
     setCurrentPage(1);
+  };
+
+  // Prompt to feature movie on homepage slider
+  const handlePromptAddToSlider = (movie) => {
+    setSliderCandidate(movie);
+    setIsSliderConfirmOpen(true);
+  };
+
+  // Confirm adding movie to homepage slider
+  const handleConfirmAddToSlider = async () => {
+    if (!sliderCandidate) return;
+    const movie = sliderCandidate;
+    setIsSliderConfirmOpen(false);
+    setSliderCandidate(null);
+
+    try {
+      const slidePayload = {
+        title: movie.title || '',
+        image: movie.image || '',
+        url: `https://vip-movies.pages.dev/watch?reward=${movie.id}`,
+        status: 'active'
+      };
+      await slideApi.createSlide(slidePayload);
+      showToast(`🖼️ Added "${movie.title}" to Homepage Slider! (Movie database row was not changed).`);
+    } catch (err) {
+      showToast(err.message || 'Failed to add movie to slider', 'error');
+    }
   };
 
   // Open Form Modal for Create
@@ -621,6 +653,14 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                         <button
                           className="admin-btn"
+                          style={{ padding: '5px 9px', fontSize: '12px', color: 'var(--admin-gold)' }}
+                          title="Feature on Homepage Slider"
+                          onClick={() => handlePromptAddToSlider(movie)}
+                        >
+                          <i className="fa-solid fa-images"></i>
+                        </button>
+                        <button
+                          className="admin-btn"
                           style={{ padding: '5px 9px', fontSize: '12px' }}
                           title="View Movie Details"
                           onClick={() => { setViewingMovie(movie); setIsDetailsModalOpen(true); }}
@@ -760,6 +800,16 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
           setSelectedIds([]);
           loadMovies(true);
         }}
+      />
+
+      {/* Add Movie to Slider Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isSliderConfirmOpen}
+        title={`Feature "${sliderCandidate?.title}" on Homepage Slider?`}
+        message={`This will add "${sliderCandidate?.title}" as a promotional hero banner on the homepage carousel. A new slider ID will be created in the slider database. The original movie detail page and its D1 database row will NOT be modified.`}
+        confirmText="Add to Slider"
+        onConfirm={handleConfirmAddToSlider}
+        onCancel={() => { setIsSliderConfirmOpen(false); setSliderCandidate(null); }}
       />
 
       {/* Floating Bottom Selection Bar (1 by 1 count sequence) */}

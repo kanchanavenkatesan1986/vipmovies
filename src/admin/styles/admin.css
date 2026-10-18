@@ -3549,12 +3549,14 @@ textarea.admin-input {
   to { transform: translate(-50%, 0); opacity: 1; }
 }
 
-.admin-table tbody tr.order-mode-row {
+.admin-table tbody tr.order-mode-row,
+.admin-table tbody tr.selectable-row {
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
-.admin-table tbody tr.order-mode-row:hover {
+.admin-table tbody tr.order-mode-row:hover,
+.admin-table tbody tr.selectable-row:hover {
   background: rgba(59, 130, 246, 0.08) !important;
 }
 
