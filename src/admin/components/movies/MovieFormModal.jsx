@@ -70,30 +70,26 @@ export default function MovieFormModal({
       const table = getMovieTable(dbType, yr);
       setTargetTable(table);
 
-      // Auto generate ID
-      movieApi.getMovies(table).then((existing) => {
-        const nextId = generateNextMovieId(dbType, yr, existing);
-        setFormData({
-          id: nextId,
-          title: '',
-          image: '',
-          release: '',
-          language: dbType === 'tamil' ? 'Tamil' : 'English',
-          year: yr,
-          category: 'Action',
-          duration: '',
-          director: '',
-          starring: '',
-          story: '',
-          p360: '',
-          p720: '',
-          p1080: '',
-          created_at: new Date().toISOString().split('T')[0],
-          type: dbType,
-          status: 'active'
-        });
-      }).catch(() => {
-        setFormData(prev => ({ ...prev, id: `${dbType}-${yr}-00001` }));
+      // Default new movie ID is always position #1 (00001)
+      const defaultId = `${dbType}-${yr}-00001`;
+      setFormData({
+        id: defaultId,
+        title: '',
+        image: '',
+        release: '',
+        language: dbType === 'tamil' ? 'Tamil' : 'English',
+        year: yr,
+        category: 'Action',
+        duration: '',
+        director: '',
+        starring: '',
+        story: '',
+        p360: '',
+        p720: '',
+        p1080: '',
+        created_at: new Date().toISOString().split('T')[0],
+        type: dbType,
+        status: 'active'
       });
     }
     setErrors({});
@@ -103,22 +99,12 @@ export default function MovieFormModal({
   const handleTypeOrYearChange = (newType, newYear) => {
     const table = getMovieTable(newType, newYear);
     setTargetTable(table);
-    movieApi.getMovies(table).then((existing) => {
-      const nextId = generateNextMovieId(newType, newYear, existing);
-      setFormData(prev => ({
-        ...prev,
-        type: newType,
-        year: newYear,
-        id: nextId
-      }));
-    }).catch(() => {
-      setFormData(prev => ({
-        ...prev,
-        type: newType,
-        year: newYear,
-        id: `${newType}-${newYear}-00001`
-      }));
-    });
+    setFormData(prev => ({
+      ...prev,
+      type: newType,
+      year: newYear,
+      id: `${newType}-${newYear}-00001`
+    }));
   };
 
   const handleChange = (field, value) => {
@@ -210,10 +196,15 @@ export default function MovieFormModal({
               </div>
 
               <div className="admin-form-group">
-                <label>Movie ID</label>
+                <label>Movie ID {!isEdit && <span style={{ color: 'var(--admin-gold)', fontSize: '11px' }}>(Position #1)</span>}</label>
                 <input className="admin-input" value={formData.id} disabled readOnly style={{ color: 'var(--admin-accent)', fontWeight: 'bold' }} />
               </div>
             </div>
+            {!isEdit && (
+              <div style={{ fontSize: '11px', color: 'var(--admin-gold)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <i className="fa-solid fa-arrow-down-wide-short"></i> New movie will be inserted as ID 1 (Row 1). All existing movies will automatically shift +1 (1 → 2, 2 → 3...).
+              </div>
+            )}
             {isEdit && (
               <div style={{ fontSize: '11px', color: 'var(--admin-text-dim)', marginTop: '8px' }}>
                 <i className="fa-solid fa-lock"></i> Type and Year are locked during edit to prevent table mismatches.

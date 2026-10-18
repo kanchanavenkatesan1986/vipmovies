@@ -280,16 +280,31 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
     setIsFormModalOpen(false);
 
     if (formMode === 'create') {
+      const prefix = String(targetTable).replace(/_/g, '-');
+      const newId = `${prefix}-00001`;
       const optimisticMovie = {
         ...movieData,
-        id: movieData.id || `${targetTable.replace('_', '-')}-${Date.now()}`,
+        id: newId,
         _sourceTable: targetTable,
         created_at: new Date().toISOString()
       };
 
-      // Instantly show in admin table in milliseconds
-      setAllMovies(prev => [optimisticMovie, ...prev.filter(m => String(m.id) !== String(optimisticMovie.id))]);
-      showToast(`🎬 Added "${movieData.title}"! Updating database in background...`);
+      // Instantly show in admin table: new movie gets ID 00001, existing movies in targetTable shift +1
+      setAllMovies(prev => {
+        const shifted = prev.map(m => {
+          const mTable = m._sourceTable || (m.type && m.year ? `${String(m.type).toLowerCase()}_${m.year}` : '');
+          if (mTable === targetTable) {
+            const parts = String(m.id).split(/[-_]/);
+            const num = parseInt(parts[parts.length - 1], 10) || 0;
+            if (num > 0) {
+              return { ...m, id: `${prefix}-${String(num + 1).padStart(5, '0')}` };
+            }
+          }
+          return m;
+        });
+        return [optimisticMovie, ...shifted];
+      });
+      showToast(`🎬 Added "${movieData.title}" as #1! Existing movies shifted down...`);
 
       // Dispatch instant optimistic sync across tabs
       dispatchOptimisticUpdate('movie_add', { item: optimisticMovie, table: targetTable });
@@ -793,6 +808,11 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
       <ArrangeMoviesModal
         isOpen={isArrangeModalOpen}
         selectedMovies={selectedMoviesList}
+        allMoviesInTable={allMovies.filter(m => {
+          const activeTable = selectedType && selectedYear ? getMovieTable(selectedType, selectedYear) : (selectedMoviesList[0]?._sourceTable || '');
+          const mTable = m._sourceTable || (m.type && m.year ? `${String(m.type).toLowerCase()}_${m.year}` : '');
+          return mTable === activeTable;
+        })}
         targetTable={selectedType && selectedYear ? getMovieTable(selectedType, selectedYear) : (selectedMoviesList[0]?._sourceTable || '')}
         onClose={() => setIsArrangeModalOpen(false)}
         onOptimisticUpdate={handleOptimisticMoviesUpdate}

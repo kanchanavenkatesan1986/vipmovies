@@ -7,6 +7,7 @@ import { dispatchOptimisticUpdate } from '../../services/syncManager';
 export default function ArrangeMoviesModal({
   isOpen,
   selectedMovies = [],
+  allMoviesInTable = [],
   targetTable = '',
   onClose,
   onSuccess,
@@ -40,11 +41,13 @@ export default function ArrangeMoviesModal({
     return isNaN(last) ? 0 : last;
   };
 
-  // Determine available target slot IDs (sorted in ascending sequence)
+  // Target IDs are SEQUENTIAL: 1st movie in orderedList → prefix-00001, 2nd → prefix-00002, ...
+  // This matches the user's click order exactly.
   const targetIds = useMemo(() => {
-    const ids = orderedList.map(m => m.id);
-    return [...ids].sort((a, b) => getMovieNumericOrder(a) - getMovieNumericOrder(b));
-  }, [orderedList]);
+    const table = tableCheck.table || targetTable || 'tamil_2026';
+    const prefix = String(table).replace(/_/g, '-');
+    return orderedList.map((_, index) => `${prefix}-${String(index + 1).padStart(5, '0')}`);
+  }, [orderedList, tableCheck.table, targetTable]);
 
   // Check if all movies belong to the same table
   const tableCheck = useMemo(() => {
@@ -144,10 +147,11 @@ export default function ArrangeMoviesModal({
     showToast(`⚡ Rearranged ${orderedList.length} movies! Updating database...`);
     onClose();
 
-    // 3. Parallel D1 update in background (~300ms)
+    // 3. D1 update in background — passes allMoviesInTable so unselected movies are repositioned too
     movieApi.arrangeMovieIds(
       tableCheck.table,
-      orderedList
+      orderedList,
+      allMoviesInTable.length > 0 ? allMoviesInTable : null
     ).then((res) => {
       showToast(`🎬 Successfully updated ${res.count} movie rows in ${tableCheck.table}!`);
       if (typeof onSuccess === 'function') onSuccess();
@@ -254,8 +258,8 @@ export default function ArrangeMoviesModal({
                 <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--admin-gold)' }}></i>
                 <span>
                   {isPair
-                    ? 'Both movies will exchange IDs. Movie #1 takes the earlier slot, Movie #2 takes the second slot.'
-                    : `Movies are ordered 1 to ${orderedList.length}. Position #1 receives the earliest ID, position #${orderedList.length} receives the latest ID.`}
+                    ? 'Both movies will exchange IDs. 1st clicked movie gets ID 00001 (Row 1), 2nd gets 00002 (Row 2).'
+                    : `1st clicked movie → ID 00001 (Row 1), 2nd → ID 00002 (Row 2), ..., ${orderedList.length}th → ID 000${String(orderedList.length).padStart(2, '0')}. Unselected movies follow in their existing relative order.`}
                 </span>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>

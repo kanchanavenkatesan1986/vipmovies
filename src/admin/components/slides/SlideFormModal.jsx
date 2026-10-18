@@ -182,6 +182,12 @@ export default function SlideFormModal({
               </div>
             )}
 
+            {!isEdit && (
+              <div style={{ fontSize: '11px', color: 'var(--admin-gold)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <i className="fa-solid fa-arrow-down-wide-short"></i> New slide will be assigned ID 1 (Position #1). Existing slides will automatically shift down +1 (1 → 2, 2 → 3...).
+              </div>
+            )}
+
             <div className="admin-form-group full">
               <label>Slide Title *</label>
               <input

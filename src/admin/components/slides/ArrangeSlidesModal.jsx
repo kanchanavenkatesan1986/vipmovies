@@ -6,6 +6,7 @@ import { dispatchOptimisticUpdate } from '../../services/syncManager';
 export default function ArrangeSlidesModal({
   isOpen,
   selectedSlides = [],
+  allSlides = [],
   onClose,
   onSuccess,
   onOptimisticUpdate
@@ -27,10 +28,10 @@ export default function ArrangeSlidesModal({
     }
   }, [isOpen, selectedSlides]);
 
-  // Determine available target slot IDs (sorted in ascending numeric order)
+  // Target IDs are SEQUENTIAL: 1st slide in orderedList → ID 1, 2nd → ID 2, ...
+  // This matches the user's click order exactly.
   const targetIds = useMemo(() => {
-    const ids = orderedList.map(s => Number(s.id));
-    return [...ids].sort((a, b) => a - b);
+    return orderedList.map((_, index) => index + 1);
   }, [orderedList]);
 
   // Count how many IDs will actually change
@@ -94,10 +95,10 @@ export default function ArrangeSlidesModal({
       return;
     }
 
-    // 1. Immediately compute new slide card objects with new target IDs assigned
+    // 1. Immediately compute new slide card objects with new target IDs assigned (1, 2, 3...)
     const optimisticSlides = orderedList.map((slide, index) => ({
       ...slide,
-      id: Number(targetIds[index])
+      id: index + 1
     }));
 
     // 2. Trigger instant UI update in milliseconds
@@ -110,9 +111,10 @@ export default function ArrangeSlidesModal({
     showToast(`⚡ Rearranged ${orderedList.length} slides! Updating database...`);
     onClose();
 
-    // 3. Parallel D1 database update in background (~300ms)
+    // 3. D1 database update in background — passes allSlides so unselected slides are repositioned too
     slideApi.arrangeSlideIds(
-      orderedList
+      orderedList,
+      allSlides.length > 0 ? allSlides : null
     ).then((res) => {
       showToast(`🖼️ Successfully updated ${res.count} slide rows in database!`);
       if (typeof onSuccess === 'function') onSuccess();
@@ -189,8 +191,8 @@ export default function ArrangeSlidesModal({
                 <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--admin-gold)' }}></i>
                 <span>
                   {isPair
-                    ? 'Both slides will exchange IDs. Slide #1 will show earlier on the homepage carousel, Slide #2 later.'
-                    : `Slides are ordered 1 to ${orderedList.length}. Position #1 receives the earliest ID, position #${orderedList.length} receives the latest ID.`}
+                    ? 'Both slides will exchange IDs. 1st clicked slide gets ID 1 (shows first), 2nd clicked gets ID 2.'
+                    : `1st clicked slide → ID 1, 2nd → ID 2, ..., ${orderedList.length}th → ID ${orderedList.length}. Unselected slides follow in their existing relative order.`}
                 </span>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>

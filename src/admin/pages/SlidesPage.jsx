@@ -146,16 +146,21 @@ export default function SlidesPage({ navigateTo }) {
     setIsFormModalOpen(false);
 
     if (formMode === 'create') {
-      const nextId = slides.length > 0 ? Math.max(...slides.map(s => Number(s.id) || 0)) + 1 : 1;
       const optimisticSlide = {
         ...slideData,
-        id: slideData.id ? Number(slideData.id) : nextId,
+        id: 1,
         created_at: new Date().toISOString()
       };
 
-      // Instantly update admin table in milliseconds
-      setSlides(prev => [...prev.filter(s => Number(s.id) !== optimisticSlide.id), optimisticSlide].sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0)));
-      showToast('🖼️ Slide added! Saving in background...');
+      // Instantly update admin table: new slide gets ID 1, existing slides shift +1
+      setSlides(prev => {
+        const shifted = prev.map(s => ({
+          ...s,
+          id: (Number(s.id) || 0) + 1
+        }));
+        return [optimisticSlide, ...shifted].sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+      });
+      showToast('🖼️ Slide added as #1! Existing slides shifted down...');
 
       // Dispatch instant optimistic sync across tabs
       dispatchOptimisticUpdate('slide_add', { item: optimisticSlide });
@@ -527,6 +532,7 @@ export default function SlidesPage({ navigateTo }) {
       <ArrangeSlidesModal
         isOpen={isArrangeModalOpen}
         selectedSlides={selectedSlidesList}
+        allSlides={slides}
         onClose={() => setIsArrangeModalOpen(false)}
         onOptimisticUpdate={handleOptimisticSlidesUpdate}
         onSuccess={() => {

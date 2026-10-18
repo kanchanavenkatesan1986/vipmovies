@@ -1,20 +1,40 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api-movies.akatsuki-pvt-ltd.workers.dev';
 
 export async function request(endpoint, options = {}) {
-  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+  let url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+
+  const method = (options.method || 'GET').toUpperCase();
+
+  // For GET requests in admin: always bypass any server/browser cache
+  if (method === 'GET') {
+    const sep = url.includes('?') ? '&' : '?';
+    url = `${url}${sep}_t=${Date.now()}`;
+  }
 
   const defaultHeaders = {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   };
 
+  // For GET: add no-cache headers so admin always gets live data
+  if (method === 'GET') {
+    defaultHeaders['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    defaultHeaders['Pragma'] = 'no-cache';
+  }
+
   const config = {
     ...options,
+    method,
     headers: {
       ...defaultHeaders,
       ...options.headers
     }
   };
+
+  // For GET: bypass browser HTTP cache
+  if (method === 'GET') {
+    config.cache = 'no-store';
+  }
 
   // Timeout handling (15 seconds)
   const controller = new AbortController();

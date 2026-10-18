@@ -1,88 +1,50 @@
 import { api } from './api';
 
-const cache = {};
-const inFlightRequests = {};
-
+/**
+ * cacheManager — Admin panel live-fetch manager.
+ *
+ * IMPORTANT: The admin panel must ALWAYS fetch live data from the API.
+ * No in-memory or localStorage caching for table data.
+ * This ensures admin changes are always reflected immediately.
+ *
+ * The public website uses its own IndexedDB/localStorage caching (src/api.js)
+ * which is NOT affected by this file.
+ */
 export const cacheManager = {
-  // Fetch table data with caching & request deduplication
-  async getTable(tableName, forceRefresh = false) {
+  // Always live-fetch from API — no caching in admin
+  async getTable(tableName, _forceRefresh = true) {
     if (!tableName) return [];
 
-    // 1. Return cached if available and not forced
-    if (!forceRefresh && cache[tableName] && cache[tableName].loaded) {
-      return cache[tableName].data;
-    }
+    try {
+      const response = await api.get(`/api/${tableName}`);
+      let records = [];
 
-    // 2. Return in-flight promise if already fetching
-    if (inFlightRequests[tableName]) {
-      return inFlightRequests[tableName];
-    }
-
-    // 3. Initiate API request
-    const promise = (async () => {
-      try {
-        const response = await api.get(`/api/${tableName}`);
-        let records = [];
-
-        if (Array.isArray(response)) {
-          records = response;
-        } else if (response && Array.isArray(response.data)) {
-          records = response.data;
-        }
-
-        cache[tableName] = {
-          data: records,
-          loaded: true,
-          lastFetched: Date.now()
-        };
-
-        delete inFlightRequests[tableName];
-        return records;
-      } catch (err) {
-        delete inFlightRequests[tableName];
-        throw err;
+      if (Array.isArray(response)) {
+        records = response;
+      } else if (response && Array.isArray(response.data)) {
+        records = response.data;
       }
-    })();
 
-    inFlightRequests[tableName] = promise;
-    return promise;
-  },
-
-  // Get cached data synchronously if available
-  getCached(tableName) {
-    return cache[tableName]?.data || null;
-  },
-
-  // Mutate cache locally after CREATE
-  addRecord(tableName, newRecord) {
-    if (!cache[tableName]) {
-      cache[tableName] = { data: [], loaded: false, lastFetched: Date.now() };
+      return records;
+    } catch (err) {
+      throw err;
     }
-    // Insert at beginning
-    cache[tableName].data = [newRecord, ...cache[tableName].data.filter(r => String(r.id) !== String(newRecord.id))];
-    cache[tableName].loaded = true;
   },
 
-  // Mutate cache locally after UPDATE
-  updateRecord(tableName, updatedRecord) {
-    if (!cache[tableName]) return;
-    cache[tableName].data = cache[tableName].data.map(r =>
-      String(r.id) === String(updatedRecord.id) ? { ...r, ...updatedRecord } : r
-    );
+  // Always returns null — admin uses live fetches only
+  getCached(_tableName) {
+    return null;
   },
 
-  // Mutate cache locally after DELETE
-  removeRecord(tableName, recordId) {
-    if (!cache[tableName]) return;
-    cache[tableName].data = cache[tableName].data.filter(r => String(r.id) !== String(recordId));
-  },
+  // No-op: admin doesn't cache table data locally
+  addRecord(_tableName, _newRecord) {},
 
-  // Clear specific table cache or all cache
-  clearCache(tableName) {
-    if (tableName) {
-      delete cache[tableName];
-    } else {
-      Object.keys(cache).forEach(k => delete cache[k]);
-    }
-  }
+  // No-op: admin doesn't cache table data locally
+  updateRecord(_tableName, _updatedRecord) {},
+
+  // No-op: admin doesn't cache table data locally
+  removeRecord(_tableName, _recordId) {},
+
+  // No-op: admin doesn't cache table data locally
+  clearCache(_tableName) {}
 };
