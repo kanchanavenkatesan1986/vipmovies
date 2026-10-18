@@ -5,36 +5,27 @@ export async function request(endpoint, options = {}) {
 
   const method = (options.method || 'GET').toUpperCase();
 
-  // For GET requests in admin: always bypass any server/browser cache
+  // For GET requests in admin: always append _t timestamp to bypass server/CDN caching safely without CORS preflight
   if (method === 'GET') {
     const sep = url.includes('?') ? '&' : '?';
     url = `${url}${sep}_t=${Date.now()}`;
   }
 
-  const defaultHeaders = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
+  const headers = {
+    'Accept': 'application/json',
+    ...options.headers
   };
 
-  // For GET: add no-cache headers so admin always gets live data
-  if (method === 'GET') {
-    defaultHeaders['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-    defaultHeaders['Pragma'] = 'no-cache';
+  // Only set Content-Type if there is a body to send (POST / PUT)
+  if (method !== 'GET' && method !== 'HEAD') {
+    headers['Content-Type'] = 'application/json';
   }
 
   const config = {
     ...options,
     method,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers
-    }
+    headers
   };
-
-  // For GET: bypass browser HTTP cache
-  if (method === 'GET') {
-    config.cache = 'no-store';
-  }
 
   // Timeout handling (15 seconds)
   const controller = new AbortController();

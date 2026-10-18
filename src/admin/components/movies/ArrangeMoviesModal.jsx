@@ -41,14 +41,6 @@ export default function ArrangeMoviesModal({
     return isNaN(last) ? 0 : last;
   };
 
-  // Target IDs are SEQUENTIAL: 1st movie in orderedList → prefix-00001, 2nd → prefix-00002, ...
-  // This matches the user's click order exactly.
-  const targetIds = useMemo(() => {
-    const table = tableCheck.table || targetTable || 'tamil_2026';
-    const prefix = String(table).replace(/_/g, '-');
-    return orderedList.map((_, index) => `${prefix}-${String(index + 1).padStart(5, '0')}`);
-  }, [orderedList, tableCheck.table, targetTable]);
-
   // Check if all movies belong to the same table
   const tableCheck = useMemo(() => {
     if (orderedList.length === 0) return { isValid: true, table: targetTable };
@@ -64,6 +56,14 @@ export default function ArrangeMoviesModal({
     }
     return { isValid: true, table: tableList[0] || targetTable };
   }, [orderedList, targetTable]);
+
+  // Target IDs are SEQUENTIAL: 1st movie in orderedList → prefix-00001, 2nd → prefix-00002, ...
+  // This matches the user's click order exactly.
+  const targetIds = useMemo(() => {
+    const table = tableCheck.table || targetTable || 'tamil_2026';
+    const prefix = String(table).replace(/_/g, '-');
+    return orderedList.map((_, index) => `${prefix}-${String(index + 1).padStart(5, '0')}`);
+  }, [orderedList, tableCheck.table, targetTable]);
 
   // Count how many IDs will actually change
   const changesCount = useMemo(() => {
