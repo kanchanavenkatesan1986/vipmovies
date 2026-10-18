@@ -442,22 +442,22 @@ body {
     top: 50%;
     transform: translateY(-50%);
     z-index: 10;
-    width: 44px;
-    height: 44px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
-    background: rgba(10, 10, 15, 0.6);
+    background: rgba(10, 10, 15, 0.65);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 1.5px solid rgba(255, 255, 255, 0.22);
     color: #ffffff;
-    font-size: 16px;
+    font-size: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 4px 22px rgba(0, 0, 0, 0.5);
     transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-    opacity: 0.85;
+    opacity: 0.9;
 }
 
 .slider-arrow:hover {
@@ -465,8 +465,8 @@ body {
     background: rgba(245, 197, 24, 0.2);
     border-color: var(--accent);
     color: var(--accent);
-    box-shadow: 0 0 20px rgba(245, 197, 24, 0.45);
-    transform: translateY(-50%) scale(1.12);
+    box-shadow: 0 0 24px rgba(245, 197, 24, 0.5);
+    transform: translateY(-50%) scale(1.14);
 }
 
 .slider-arrow:active {
@@ -602,10 +602,10 @@ body {
         border-radius: 6px;
     }
     .slider-arrow {
-        width: 30px;
-        height: 30px;
-        font-size: 11px;
-        opacity: 0.7;
+        width: 36px;
+        height: 36px;
+        font-size: 13px;
+        opacity: 0.75;
     }
     .slider-arrow-left {
         left: 6px;
@@ -666,15 +666,23 @@ body {
         font-size: 11px;
     }
     .slider-arrow {
-        width: 26px;
-        height: 26px;
-        font-size: 10px;
+        width: 30px;
+        height: 30px;
+        font-size: 11px;
     }
     .slider-arrow-left {
         left: 4px;
     }
     .slider-arrow-right {
         right: 4px;
+    }
+    /* Smaller year badge on mobile movie cards */
+    .movie-card-year-badge {
+        font-size: 8px;
+        padding: 1.5px 5px;
+        top: 5px;
+        right: 5px;
+        letter-spacing: 0.2px;
     }
     .movie-card {
         width: 135px;

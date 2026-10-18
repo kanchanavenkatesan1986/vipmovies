@@ -686,6 +686,10 @@ export default function AdvancedVideoPlayer({
           setSettings(next);
         }}
         onOpenStats={() => setIsStatsOpen(true)}
+        volume={volume}
+        onVolumeChange={changeVolume}
+        brightness={brightness}
+        onBrightnessChange={setBrightness}
       />
 
       {/* ── TECHNICAL STATS OVERLAY ── */}

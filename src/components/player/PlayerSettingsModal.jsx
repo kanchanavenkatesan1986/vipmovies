@@ -25,7 +25,11 @@ export default function PlayerSettingsModal({
   subtitles = [],
   currentSubtitle = 'off',
   onSelectSubtitle,
-  onOpenStats
+  onOpenStats,
+  volume = 1.0,
+  onVolumeChange,
+  brightness = 100,
+  onBrightnessChange
 }) {
   const [activeTab, setActiveTab] = useState('main'); // 'main' | 'speed' | 'quality' | 'aspect' | 'subtitles'
 
@@ -70,6 +74,45 @@ export default function PlayerSettingsModal({
           {/* 1. MAIN MENU */}
           {activeTab === 'main' && (
             <div className="vip-settings-list">
+
+              {/* Volume Slider */}
+              <div className="vip-settings-slider-row">
+                <div className="vip-settings-slider-label">
+                  <span>
+                    <i className={`fa-solid ${(volume === 0) ? 'fa-volume-xmark' : volume < 0.5 ? 'fa-volume-low' : 'fa-volume-high'}`}></i>
+                    Volume
+                  </span>
+                  <span className="val">{Math.round(volume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  className="vip-settings-range"
+                  min="0" max="1" step="0.05"
+                  value={volume}
+                  onChange={(e) => onVolumeChange && onVolumeChange(parseFloat(e.target.value))}
+                />
+              </div>
+
+              {/* Brightness Slider */}
+              <div className="vip-settings-slider-row" style={{ paddingTop: 0 }}>
+                <div className="vip-settings-slider-label">
+                  <span>
+                    <i className="fa-solid fa-sun"></i>
+                    Brightness
+                  </span>
+                  <span className="val">{brightness}%</span>
+                </div>
+                <input
+                  type="range"
+                  className="vip-settings-range"
+                  min="20" max="100" step="5"
+                  value={brightness}
+                  onChange={(e) => onBrightnessChange && onBrightnessChange(parseInt(e.target.value))}
+                />
+              </div>
+
+              <div className="vip-settings-divider" />
+
               {/* Quality Row */}
               <button
                 type="button"
