@@ -87,6 +87,16 @@ export default function AdvancedVideoPlayer({
     }
   });
 
+  const clearedMilestonesRef = useRef(clearedMilestones);
+  useEffect(() => {
+    clearedMilestonesRef.current = clearedMilestones;
+  }, [clearedMilestones]);
+
+  const adsWatchedCountRef = useRef(adsWatchedCount);
+  useEffect(() => {
+    adsWatchedCountRef.current = adsWatchedCount;
+  }, [adsWatchedCount]);
+
   const activeWatchSecondsRef = useRef(0);
   const pendingResumeTimeRef = useRef(null);
   const targetMilestoneRef = useRef(null);
@@ -673,7 +683,7 @@ export default function AdvancedVideoPlayer({
       if (isTimelineMode) {
         // ── Timeline Position Mode: check movie's current playback timestamp ──
         const curr = videoRef.current.currentTime || 0;
-        const nextMilestone = adMilestones.find((m) => !clearedMilestones.includes(m));
+        const nextMilestone = adMilestones.find((m) => !clearedMilestonesRef.current.includes(m));
 
         if (nextMilestone) {
           const warnSecs = adsConfig?.warningCountdownSeconds || 15;
@@ -682,6 +692,7 @@ export default function AdvancedVideoPlayer({
           if (diff <= warnSecs && diff > 0) {
             setShowWarningPill(true);
             setWarningSecondsLeft(Math.ceil(diff));
+            targetMilestoneRef.current = nextMilestone;
           } else if (diff <= 0) {
             setShowWarningPill(false);
             if (!videoRef.current.paused) {
@@ -699,7 +710,7 @@ export default function AdvancedVideoPlayer({
         activeWatchSecondsRef.current += 1;
         const currentSecs = activeWatchSecondsRef.current;
 
-        const isFirst = adsWatchedCount === 0;
+        const isFirst = (adsWatchedCountRef.current || 0) === 0;
         const targetMins = isFirst ? (adsConfig?.firstAdDelayMinutes || 15) : (adsConfig?.adIntervalMinutes || 25);
         const targetSecs = targetMins * 60;
         const warnSecs = adsConfig?.warningCountdownSeconds || 15;
@@ -752,8 +763,9 @@ export default function AdvancedVideoPlayer({
     } else {
       // Browser / Desktop grace simulation
       setTimeout(() => {
-        const nextCount = adsWatchedCount + 1;
+        const nextCount = (adsWatchedCountRef.current || 0) + 1;
         setAdsWatchedCount(nextCount);
+        adsWatchedCountRef.current = nextCount;
         try {
           sessionStorage.setItem(`vip_session_ads_${mid}`, String(nextCount));
         } catch {}
@@ -761,11 +773,19 @@ export default function AdvancedVideoPlayer({
         // Unlock milestone in timeline mode
         if (adMilestones.length > 0) {
           const targetPos = pendingResumeTimeRef.current !== null ? pendingResumeTimeRef.current : (videoRef.current?.currentTime || 0);
-          const toClear = adMilestones.filter(m => targetPos >= (m - 30) || (targetMilestoneRef.current && m === targetMilestoneRef.current));
+          const nextMilestoneToClear = targetMilestoneRef.current || adMilestones.find((m) => !clearedMilestonesRef.current.includes(m));
+          const toClear = adMilestones.filter(
+            (m) =>
+              (nextMilestoneToClear && m === nextMilestoneToClear) ||
+              targetPos >= (m - 30) ||
+              m <= targetPos
+          );
+
           if (toClear.length > 0) {
-            setClearedMilestones(prev => {
+            setClearedMilestones((prev) => {
               const set = new Set([...prev, ...toClear]);
               const arr = Array.from(set);
+              clearedMilestonesRef.current = arr;
               try {
                 sessionStorage.setItem(`vip_cleared_milestones_${mid}`, JSON.stringify(arr));
               } catch {}
@@ -778,10 +798,13 @@ export default function AdvancedVideoPlayer({
         setIsAdBreakModalOpen(false);
         setShowWarningPill(false);
 
-        if (pendingResumeTimeRef.current !== null && videoRef.current) {
-          videoRef.current.currentTime = pendingResumeTimeRef.current;
-          setCurrentTime(pendingResumeTimeRef.current);
-          pendingResumeTimeRef.current = null;
+        const resumeTime = pendingResumeTimeRef.current;
+        pendingResumeTimeRef.current = null;
+        targetMilestoneRef.current = null;
+
+        if (resumeTime !== null && videoRef.current) {
+          videoRef.current.currentTime = resumeTime;
+          setCurrentTime(resumeTime);
         }
 
         if (window.UIManager?.showToast) {
@@ -793,7 +816,7 @@ export default function AdvancedVideoPlayer({
         }
       }, 1500);
     }
-  }, [movie, currentTime, currentQuality, duration, playbackRate, adsWatchedCount, adsConfig, adMilestones]);
+  }, [movie, currentTime, currentQuality, duration, playbackRate, adsWatchedCount, adsConfig, adMilestones, clearedMilestones]);
 
   const handleWatchAhead = useCallback(() => {
     if (videoRef.current && !videoRef.current.paused) {

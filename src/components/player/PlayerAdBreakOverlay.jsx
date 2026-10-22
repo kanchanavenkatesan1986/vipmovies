@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * PlayerAdBreakOverlay
@@ -19,6 +19,20 @@ export default function PlayerAdBreakOverlay({
 }) {
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Automatically reset isProcessing state whenever the modal opens or closes
+  useEffect(() => {
+    setIsProcessing(false);
+  }, [isOpen]);
+
+  // Safety net: auto-recover from stuck loading spinner after 6s
+  useEffect(() => {
+    if (!isProcessing) return;
+    const timer = setTimeout(() => {
+      setIsProcessing(false);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [isProcessing]);
+
   const uiCopy = adsConfig?.uiCopy || {};
   const warningText = (uiCopy.warningText || 'Ad break in {sec}s').replace('{sec}', countdownSeconds);
   const modalTitle = uiCopy.modalTitle || 'Short Break';
@@ -27,8 +41,19 @@ export default function PlayerAdBreakOverlay({
   const buttonText = uiCopy.buttonText || 'Watch & Continue';
 
   const handleTriggerAd = () => {
+    if (isProcessing) return;
     setIsProcessing(true);
-    if (onWatchAd) onWatchAd();
+    try {
+      if (onWatchAd) onWatchAd();
+    } catch (e) {
+      console.error('Error triggering ad:', e);
+      setIsProcessing(false);
+    }
+  };
+
+  const handleKeepPaused = () => {
+    setIsProcessing(false);
+    if (onKeepPaused) onKeepPaused();
   };
 
   return (
@@ -85,7 +110,7 @@ export default function PlayerAdBreakOverlay({
                 <button
                   type="button"
                   className="vip-ad-close-corner-btn"
-                  onClick={onKeepPaused}
+                  onClick={handleKeepPaused}
                   title="Close"
                   aria-label="Close"
                 >
@@ -158,7 +183,7 @@ export default function PlayerAdBreakOverlay({
                       <button
                         type="button"
                         className="vip-ad-btn-secondary"
-                        onClick={onKeepPaused}
+                        onClick={handleKeepPaused}
                         disabled={isProcessing}
                       >
                         Pause for now
