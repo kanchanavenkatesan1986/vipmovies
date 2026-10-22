@@ -11,6 +11,7 @@ export default function PlayerAdsPage({ navigateTo }) {
   const [activePreset, setActivePreset] = useState('balanced');
   const [storageSource, setStorageSource] = useState('r2'); // 'd1', 'r2', 'default'
   const [hasChanges, setHasChanges] = useState(false);
+  const [previewTab, setPreviewTab] = useState('modal'); // 'pill' | 'modal'
 
   useEffect(() => {
     loadConfig();
@@ -110,6 +111,17 @@ export default function PlayerAdsPage({ navigateTo }) {
     }
   };
 
+  if (loading) {
+    return (
+      <AdminLayout currentRoute="admin/ads" navigateTo={navigateTo} pageTitle="In-Player Ads Control" breadcrumb="Monetization / Player Ads" onRefresh={loadConfig}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: '16px', color: '#94a3b8' }}>
+          <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '32px', color: '#10b981' }}></i>
+          <span style={{ fontSize: '15px' }}>Loading Ads Configuration...</span>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout
       currentRoute="admin/ads"
@@ -124,17 +136,17 @@ export default function PlayerAdsPage({ navigateTo }) {
         <div className="ads-admin-header">
           <div className="ads-admin-title">
             <h1>
-              <i className="fa-solid fa-rectangle-ad" style={{ color: '#10b981' }}></i>
-              Player Ads Control (AdMob)
+              <i className="fa-solid fa-sliders" style={{ color: '#10b981' }}></i>
+              Player Ads Control
             </h1>
             <p>
-              Manage mid-roll rewarded ads frequency, countdown alerts, and UX policies for movies streaming on Android WebView & Web.
+              Manage in-player sponsor break frequency, countdown alerts, and playback rules for movies streaming on Web & Android.
             </p>
           </div>
 
           <div className="ads-admin-badges">
             <span className="policy-badge">
-              <i className="fa-solid fa-shield-check"></i> 100% AdMob Compliant
+              <i className="fa-solid fa-sparkles"></i> High-Retention Policy
             </span>
             <span className="r2-badge" style={{ background: storageSource === 'd1' ? 'rgba(16, 185, 129, 0.15)' : undefined, color: storageSource === 'd1' ? '#10b981' : undefined, borderColor: storageSource === 'd1' ? 'rgba(16, 185, 129, 0.3)' : undefined }}>
               <i className={`fa-solid ${storageSource === 'd1' ? 'fa-database' : 'fa-cloud'}`}></i> {storageSource === 'd1' ? 'Cloudflare D1 Table Active' : 'Synced to Cloudflare R2'}
@@ -539,7 +551,7 @@ export default function PlayerAdsPage({ navigateTo }) {
                   {previewTab === 'modal' && (
                     <div className="preview-modal-card">
                       <div className="preview-modal-badge">
-                        <i className="fa-solid fa-shield-halved"></i> AdMob Policy Compliant
+                        <i className="fa-solid fa-sparkles"></i> Sponsor Break
                       </div>
                       <h4 className="preview-modal-title">
                         {config.uiCopy?.modalTitle || 'Break Time'}

@@ -63,7 +63,7 @@ export default function AdvancedVideoPlayer({
   const [resumePrompt, setResumePrompt] = useState(null);
   const [showUpNext, setShowUpNext] = useState(false);
 
-  // ─── ADMOB REWARDED ADS IN-PLAYER ENGINE ───
+  // ─── IN-PLAYER SPONSOR BREAK ENGINE ───
   const [adsConfig, setAdsConfig] = useState(() => adsConfigService.getStoredConfigSync());
   const [showWarningPill, setShowWarningPill] = useState(false);
   const [warningSecondsLeft, setWarningSecondsLeft] = useState(15);
@@ -747,7 +747,7 @@ export default function AdvancedVideoPlayer({
         quality: currentQuality,
         playbackRate: playbackRate
       });
-      // Android WebView shouldOverrideUrlLoading catches ?reward= and presents native AdMob Rewarded ad
+      // Android WebView shouldOverrideUrlLoading catches ?reward= and triggers the native rewarded ad
       window.location.href = `/watch?reward=${encodeURIComponent(resumeUrl)}`;
     } else {
       // Browser / Desktop grace simulation
@@ -873,7 +873,7 @@ export default function AdvancedVideoPlayer({
         </video>
       </PlayerGestureHandler>
 
-      {/* ── IN-PLAYER AD BREAK & WARNING OVERLAY (ADMOB) ── */}
+      {/* ── IN-PLAYER SPONSOR BREAK OVERLAY ── */}
       <PlayerAdBreakOverlay
         isOpen={isAdBreakModalOpen}
         countdownSeconds={warningSecondsLeft}

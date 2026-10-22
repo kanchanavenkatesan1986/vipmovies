@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 
 /**
  * PlayerAdBreakOverlay
- * 100% Google AdMob Policy Compliant Rewarded Ad Break Overlay
+ * Professional In-Player Sponsor Break Overlay
  * 
  * Features:
- * - 15-second non-intrusive countdown pill before ad break
- * - Explicit user opt-in modal with reward disclosure
+ * - 15-second non-intrusive countdown pill before sponsor break
+ * - Clean opt-in modal with reward disclosure
  * - Android WebView ?reward= navigation trigger
  * - Grace Pass fallback for offline / no-fill
  * - Auto-resume at exact timestamp
@@ -79,11 +79,11 @@ export default function PlayerAdBreakOverlay({
         <div className={`vip-player-ad-backdrop animate-fade-in ${isHorizontal ? 'is-horizontal' : ''}`} onClick={(e) => e.stopPropagation()}>
           <div className={`vip-player-ad-card animate-scale-up ${isHorizontal ? 'is-horizontal' : ''}`} onClick={(e) => e.stopPropagation()}>
             
-            {/* Top Header Row with Policy Badge and Close */}
+            {/* Top Header Row with Clean Glass Tag and Close */}
             <div className="vip-ad-card-top-row">
-              <div className="vip-ad-compliance-badge">
-                <i className="fa-solid fa-shield-halved"></i>
-                <span>AdMob User Choice</span>
+              <div className="vip-ad-glass-tag">
+                <i className="fa-solid fa-sparkles" style={{ color: '#10b981' }}></i>
+                <span>Sponsor Intermission</span>
               </div>
               {onKeepPaused && (
                 <button
@@ -104,7 +104,7 @@ export default function PlayerAdBreakOverlay({
               <div className="vip-ad-card-info-col">
                 <div className="vip-ad-header-flex">
                   <div className="vip-ad-icon-halo">
-                    <i className="fa-solid fa-film"></i>
+                    <i className="fa-solid fa-circle-play"></i>
                   </div>
                   <div className="vip-ad-header-text">
                     <h3 className="vip-ad-modal-title">{modalTitle}</h3>
@@ -114,17 +114,17 @@ export default function PlayerAdBreakOverlay({
 
                 <div className="vip-ad-feature-box">
                   <div className="vip-ad-feature-item">
-                    <i className="fa-solid fa-forward-step" style={{ color: '#10b981' }}></i>
-                    <span>Resumes exactly where you left off</span>
+                    <i className="fa-solid fa-rotate-right" style={{ color: '#10b981' }}></i>
+                    <span>Resumes automatically at this scene</span>
                   </div>
                   <div className="vip-ad-feature-item">
-                    <i className="fa-solid fa-bolt" style={{ color: '#f59e0b' }}></i>
-                    <span>+{adsConfig?.rewardDurationMinutes || 25} minutes ad-free streaming</span>
+                    <i className="fa-solid fa-unlock-keyhole" style={{ color: '#38bdf8' }}></i>
+                    <span>+{adsConfig?.rewardDurationMinutes || 25} minutes uninterrupted playback</span>
                   </div>
                 </div>
               </div>
 
-              {/* Right Column: CTA Buttons & Footer Notice */}
+              {/* Right Column: CTA Buttons & Clean Footer Notice */}
               <div className="vip-ad-card-actions-col">
                 <div className="vip-ad-modal-actions">
                   <button
@@ -135,7 +135,7 @@ export default function PlayerAdBreakOverlay({
                   >
                     {isProcessing ? (
                       <>
-                        <i className="fa-solid fa-spinner fa-spin"></i> Loading Sponsor Video...
+                        <i className="fa-solid fa-spinner fa-spin"></i> Unlocking Playback...
                       </>
                     ) : (
                       <>
@@ -159,8 +159,8 @@ export default function PlayerAdBreakOverlay({
                 </div>
 
                 <div className="vip-ad-modal-footer">
-                  <i className="fa-solid fa-circle-info"></i>
-                  <span>Rewarded ads support free 1080p streaming.</span>
+                  <i className="fa-solid fa-film"></i>
+                  <span>Free High-Speed 1080p Cloud Streaming</span>
                 </div>
               </div>
             </div>

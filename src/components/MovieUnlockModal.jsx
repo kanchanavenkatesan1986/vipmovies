@@ -76,14 +76,14 @@ export default function MovieUnlockModal() {
             </span>
           </div>
 
-          {/* AdMob Policy Disclosure Glass Box */}
+          {/* Sponsor Access Glass Box */}
           <div className="glass-policy-box">
             <div className="glass-policy-icon-wrap">
               <i className="fa-solid fa-shield-halved glass-policy-icon"></i>
             </div>
             <div className="glass-policy-text">
-              <strong>AdMob User Choice Policy</strong>
-              <span>Watch a short ad to unlock full movie streaming & downloads.</span>
+              <strong><i className="fa-solid fa-sparkles" style={{ color: '#10b981', marginRight: '5px' }}></i> Sponsor Access</strong>
+              <span>Watch a short sponsor message to unlock full movie streaming &amp; downloads.</span>
             </div>
           </div>
 

@@ -162,7 +162,7 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
           onClick={() => go('admin/ads')}
         >
           <i className="fa-solid fa-rectangle-ad" style={{ color: '#10b981' }}></i>
-          <span>Player Ads (AdMob)</span>
+          <span>Player Ads Control</span>
         </div>
 
       </div>

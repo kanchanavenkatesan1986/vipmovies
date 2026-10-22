@@ -5905,7 +5905,7 @@ a:focus-visible, button:focus-visible {
     color: var(--accent);
 }
 
-/* AdMob Policy Disclosure Box */
+/* Sponsor Access Box */
 .glass-policy-box {
     background: linear-gradient(135deg, rgba(245, 197, 24, 0.08) 0%, rgba(18, 18, 28, 0.7) 100%);
     border: 1px dashed rgba(245, 197, 24, 0.4);

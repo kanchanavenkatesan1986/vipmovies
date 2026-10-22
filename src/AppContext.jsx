@@ -386,11 +386,11 @@ export const AppProvider = ({ children }) => {
       window.UIManager.showToast('🎉 Movie Unlocked! Enjoy watching');
     }
 
-    // Full window location navigation so Android WebView shouldOverrideUrlLoading triggers native AdMob Rewarded Ad
+    // Full window location navigation so Android WebView shouldOverrideUrlLoading triggers the native rewarded ad
     window.location.href = `/watch?reward=${encodeURIComponent(strId)}`;
   };
 
-  // Trigger AdMob Rewarded Ad (Clean user choice flow for Android WebView & Web)
+  // Trigger Rewarded Sponsor Ad (Clean user choice flow for Android WebView & Web)
   const triggerRewardedAd = (movie) => {
     const targetMovie = movie || previewMovie;
     if (!targetMovie) return;
