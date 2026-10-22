@@ -2079,6 +2079,7 @@ async function handleUploadFromUrl(request, env, ctx) {
 // ==========================================
 const DEFAULT_ADS_CONFIG = {
   adsEnabled: true,
+  adTriggerMode: "timeline", // "timeline" (movie timestamp) or "watchTime" (physical watch time)
   firstAdDelayMinutes: 15,
   adIntervalMinutes: 25,
   warningCountdownSeconds: 15,
@@ -2099,20 +2100,44 @@ const DEFAULT_ADS_CONFIG = {
 
 async function handleGetAdsConfig(request, env) {
   try {
-    const obj = await env.MY_BUCKET.get("system/ads_config.json");
-    if (!obj) {
-      return jsonResponse({
-        success: true,
-        data: DEFAULT_ADS_CONFIG,
-        source: "default"
-      }, 200, {}, request);
+    // 1. Try reading from Cloudflare D1 Database if env.DB is bound
+    if (env && env.DB) {
+      try {
+        const row = await env.DB.prepare(
+          "SELECT config_json FROM ads_config WHERE id = 'default'"
+        ).first();
+        if (row && row.config_json) {
+          const parsed = JSON.parse(row.config_json);
+          return jsonResponse({
+            success: true,
+            data: { ...DEFAULT_ADS_CONFIG, ...parsed },
+            source: "d1"
+          }, 200, {}, request);
+        }
+      } catch (d1Err) {
+        console.warn("[ADS_CONFIG_D1_WARN] D1 query failed, falling back to R2:", d1Err.message);
+      }
     }
-    const text = await obj.text();
-    const config = JSON.parse(text);
+
+    // 2. Fallback to Cloudflare R2 bucket
+    if (env && env.MY_BUCKET) {
+      const obj = await env.MY_BUCKET.get("system/ads_config.json");
+      if (obj) {
+        const text = await obj.text();
+        const config = JSON.parse(text);
+        return jsonResponse({
+          success: true,
+          data: { ...DEFAULT_ADS_CONFIG, ...config },
+          source: "r2"
+        }, 200, {}, request);
+      }
+    }
+
+    // 3. Fallback to built-in default configuration
     return jsonResponse({
       success: true,
-      data: { ...DEFAULT_ADS_CONFIG, ...config },
-      source: "r2"
+      data: DEFAULT_ADS_CONFIG,
+      source: "default"
     }, 200, {}, request);
   } catch (err) {
     return jsonResponse({
@@ -2135,14 +2160,51 @@ async function handleUpdateAdsConfig(request, env) {
       ...body,
       updatedAt: new Date().toISOString()
     };
-    await env.MY_BUCKET.put("system/ads_config.json", JSON.stringify(updated, null, 2), {
-      httpMetadata: {
-        contentType: "application/json"
+    const jsonStr = JSON.stringify(updated, null, 2);
+    let primaryStorage = "r2";
+
+    // 1. Save to Cloudflare D1 Database if configured
+    if (env && env.DB) {
+      try {
+        // Ensure table exists
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS ads_config (
+            id TEXT PRIMARY KEY,
+            config_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        `).run();
+
+        // Upsert configuration
+        await env.DB.prepare(`
+          INSERT INTO ads_config (id, config_json, updated_at)
+          VALUES ('default', ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            config_json = excluded.config_json,
+            updated_at = excluded.updated_at
+        `).bind(jsonStr, updated.updatedAt).run();
+
+        primaryStorage = "d1";
+      } catch (d1Err) {
+        console.error("[ADS_CONFIG_D1_ERROR] Failed saving to D1:", d1Err.message);
       }
-    });
+    }
+
+    // 2. Also dual-save to R2 bucket for backup & CDN distribution
+    if (env && env.MY_BUCKET) {
+      await env.MY_BUCKET.put("system/ads_config.json", jsonStr, {
+        httpMetadata: {
+          contentType: "application/json"
+        }
+      });
+    }
+
     return jsonResponse({
       success: true,
-      message: "Player ads configuration updated successfully",
+      message: primaryStorage === "d1"
+        ? "Player ads configuration updated and synced to Cloudflare D1 database & R2"
+        : "Player ads configuration updated successfully in R2",
+      storage: primaryStorage,
       data: updated
     }, 200, {}, request);
   } catch (err) {

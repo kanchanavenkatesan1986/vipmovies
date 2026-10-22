@@ -1617,76 +1617,144 @@
 .vip-player-ad-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(5, 7, 15, 0.88);
+  background: rgba(5, 7, 15, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 85;
-  padding: 20px;
+  padding: 16px;
   pointer-events: auto;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .vip-player-ad-card {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.99));
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 20px;
-  padding: 28px 24px;
+  padding: 24px 22px;
   max-width: 440px;
   width: 100%;
-  text-align: center;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(16, 185, 129, 0.15);
+  max-height: 94%;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(16, 185, 129, 0.15);
   position: relative;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.vip-player-ad-card::-webkit-scrollbar {
+  width: 4px;
+}
+.vip-player-ad-card::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+/* Top Row */
+.vip-ad-card-top-row {
+  width: 100%;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .vip-ad-compliance-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 4px 10px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   background: rgba(16, 185, 129, 0.16);
   color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.35);
-  margin-bottom: 16px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
+.vip-ad-close-corner-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+.vip-ad-close-corner-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+/* Card Body */
+.vip-ad-card-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.vip-ad-card-info-col {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vip-ad-header-flex {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+
 .vip-ad-icon-halo {
-  width: 58px;
-  height: 58px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: radial-gradient(circle at center, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.05) 70%);
   border: 1px solid rgba(16, 185, 129, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 20px;
   color: #10b981;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+  flex-shrink: 0;
 }
 
 .vip-ad-modal-title {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
   color: #fff;
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
   letter-spacing: -0.3px;
 }
 
 .vip-ad-modal-desc {
-  font-size: 13px;
+  font-size: 12.5px;
   color: #cbd5e1;
-  line-height: 1.5;
-  margin: 0 0 18px 0;
+  line-height: 1.45;
+  margin: 0 0 14px 0;
   max-width: 360px;
 }
 
@@ -1694,28 +1762,35 @@
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   width: 100%;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   text-align: left;
+  box-sizing: border-box;
 }
 
 .vip-ad-feature-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 11.5px;
   color: #e2e8f0;
+}
+
+.vip-ad-card-actions-col {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .vip-ad-modal-actions {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .vip-ad-btn-primary {
@@ -1724,7 +1799,7 @@
   color: #fff;
   border: none;
   border-radius: 12px;
-  padding: 14px 20px;
+  padding: 12px 18px;
   font-size: 14px;
   font-weight: 800;
   display: flex;
@@ -1734,6 +1809,7 @@
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+  box-sizing: border-box;
 }
 
 .vip-ad-btn-primary:hover:not(:disabled) {
@@ -1756,7 +1832,7 @@
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #94a3b8;
-  padding: 8px 16px;
+  padding: 7px 14px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
@@ -1771,13 +1847,298 @@
 }
 
 .vip-ad-modal-footer {
-  margin-top: 16px;
-  font-size: 11px;
+  margin-top: 12px;
+  font-size: 10.5px;
   color: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  text-align: center;
+}
+
+/* ==========================================================================
+   HORIZONTAL (90° ROTATED) & LANDSCAPE MOBILE OPTIMIZATIONS
+   ========================================================================== */
+.vip-advanced-player-container.vip-player-horizontal .vip-player-warning-pill,
+.vip-player-warning-pill.is-horizontal {
+  bottom: 64px !important;
+  right: 20px !important;
+  padding: 5px 12px 5px 6px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-player-ad-backdrop,
+.vip-player-ad-backdrop.is-horizontal {
+  padding: 10px 14px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-player-ad-card,
+.vip-player-ad-card.is-horizontal {
+  max-width: 580px !important;
+  padding: 12px 18px !important;
+  border-radius: 16px !important;
+  max-height: 90% !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-card-top-row,
+.vip-player-ad-card.is-horizontal .vip-ad-card-top-row {
+  margin-bottom: 6px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-compliance-badge,
+.vip-player-ad-card.is-horizontal .vip-ad-compliance-badge {
+  padding: 3px 8px !important;
+  font-size: 9.5px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-card-body,
+.vip-player-ad-card.is-horizontal .vip-ad-card-body {
+  display: grid !important;
+  grid-template-columns: 1.15fr 0.95fr !important;
+  gap: 14px !important;
+  align-items: center !important;
+  text-align: left !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-card-info-col,
+.vip-player-ad-card.is-horizontal .vip-ad-card-info-col {
+  align-items: flex-start !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-header-flex,
+.vip-player-ad-card.is-horizontal .vip-ad-header-flex {
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  text-align: left !important;
+  margin-bottom: 6px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-icon-halo,
+.vip-player-ad-card.is-horizontal .vip-ad-icon-halo {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  font-size: 15px !important;
+  margin-bottom: 0 !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-modal-title,
+.vip-player-ad-card.is-horizontal .vip-ad-modal-title {
+  font-size: 15px !important;
+  margin: 0 0 2px 0 !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-modal-desc,
+.vip-player-ad-card.is-horizontal .vip-ad-modal-desc {
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  margin: 0 !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-feature-box,
+.vip-player-ad-card.is-horizontal .vip-ad-feature-box {
+  padding: 6px 10px !important;
+  gap: 3px !important;
+  margin-bottom: 0 !important;
+  border-radius: 8px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-feature-item,
+.vip-player-ad-card.is-horizontal .vip-ad-feature-item {
+  font-size: 10.5px !important;
+  gap: 6px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-card-actions-col,
+.vip-player-ad-card.is-horizontal .vip-ad-card-actions-col {
+  gap: 6px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-modal-actions,
+.vip-player-ad-card.is-horizontal .vip-ad-modal-actions {
+  gap: 6px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-btn-primary,
+.vip-player-ad-card.is-horizontal .vip-ad-btn-primary {
+  padding: 10px 14px !important;
+  font-size: 12.5px !important;
+  border-radius: 10px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-btn-secondary,
+.vip-player-ad-card.is-horizontal .vip-ad-btn-secondary {
+  padding: 5px 10px !important;
+  font-size: 11px !important;
+}
+
+.vip-advanced-player-container.vip-player-horizontal .vip-ad-modal-footer,
+.vip-player-ad-card.is-horizontal .vip-ad-modal-footer {
+  margin-top: 4px !important;
+  font-size: 9.5px !important;
+}
+
+/* Landscape orientation for native mobile browser view */
+@media (orientation: landscape) and (max-height: 520px) {
+  .vip-player-ad-backdrop {
+    padding: 10px 14px !important;
+  }
+  .vip-player-ad-card {
+    max-width: 580px !important;
+    padding: 12px 18px !important;
+    border-radius: 16px !important;
+    max-height: 90% !important;
+  }
+  .vip-ad-card-top-row {
+    margin-bottom: 6px !important;
+  }
+  .vip-ad-compliance-badge {
+    padding: 3px 8px !important;
+    font-size: 9.5px !important;
+  }
+  .vip-ad-card-body {
+    display: grid !important;
+    grid-template-columns: 1.15fr 0.95fr !important;
+    gap: 14px !important;
+    align-items: center !important;
+    text-align: left !important;
+  }
+  .vip-ad-card-info-col {
+    align-items: flex-start !important;
+  }
+  .vip-ad-header-flex {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    text-align: left !important;
+    margin-bottom: 6px !important;
+  }
+  .vip-ad-icon-halo {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    font-size: 15px !important;
+    margin-bottom: 0 !important;
+  }
+  .vip-ad-modal-title {
+    font-size: 15px !important;
+    margin: 0 0 2px 0 !important;
+  }
+  .vip-ad-modal-desc {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+  }
+  .vip-ad-feature-box {
+    padding: 6px 10px !important;
+    gap: 3px !important;
+    margin-bottom: 0 !important;
+    border-radius: 8px !important;
+  }
+  .vip-ad-feature-item {
+    font-size: 10.5px !important;
+    gap: 6px !important;
+  }
+  .vip-ad-card-actions-col {
+    gap: 6px !important;
+  }
+  .vip-ad-modal-actions {
+    gap: 6px !important;
+  }
+  .vip-ad-btn-primary {
+    padding: 10px 14px !important;
+    font-size: 12.5px !important;
+    border-radius: 10px !important;
+  }
+  .vip-ad-btn-secondary {
+    padding: 5px 10px !important;
+    font-size: 11px !important;
+  }
+  .vip-ad-modal-footer {
+    margin-top: 4px !important;
+    font-size: 9.5px !important;
+  }
+}
+
+/* ==========================================================================
+   MOBILE PORTRAIT (INLINE / PAGE-MODE COMPACT AD BREAK OVERLAY)
+   ========================================================================== */
+@media (max-width: 600px), (max-height: 380px) {
+  .vip-player-warning-pill {
+    bottom: 58px;
+    right: 12px;
+    gap: 6px;
+    padding: 4px 10px 4px 6px;
+  }
+  .vip-pill-icon-wrap {
+    width: 22px;
+    height: 22px;
+  }
+  .vip-pill-timer {
+    font-size: 10px;
+  }
+  .vip-pill-text {
+    font-size: 11px;
+  }
+  .vip-pill-btn-action {
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+
+  /* Compact in-player card for small mobile view */
+  .vip-player-ad-card:not(.is-horizontal) {
+    padding: 12px 14px;
+    border-radius: 14px;
+    max-width: 95%;
+  }
+
+  .vip-player-ad-card:not(.is-horizontal) .vip-ad-card-top-row {
+    margin-bottom: 6px;
+  }
+
+  .vip-player-ad-card:not(.is-horizontal) .vip-ad-icon-halo {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+
+  .vip-player-ad-card:not(.is-horizontal) .vip-ad-modal-title {
+    font-size: 15px;
+    margin-bottom: 3px;
+  }
+
+  .vip-player-ad-card:not(.is-horizontal) .vip-ad-modal-desc {
+    font-size: 11px;
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+
+  .vip-player-ad-card:not(.is-horizontal) .vip-ad-feature-box {
+    padding: 5px 8px;
+    margin-bottom: 10px;
+    gap: 3px;
+  }
+
+  .vip-player-ad-card:not(.is-horizontal) .vip-ad-feature-item {
+    font-size: 10.5px;
+  }
+
+  .vip-player-ad-card:not(.is-horizontal) .vip-ad-btn-primary {
+    padding: 9px 12px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+
+  .vip-player-ad-card:not(.is-horizontal) .vip-ad-btn-secondary {
+    padding: 4px 8px;
+    font-size: 10.5px;
+  }
+
+  .vip-player-ad-card:not(.is-horizontal) .vip-ad-modal-footer {
+    display: none; /* Hide footer note on ultra-small mobile to prioritize button visibility */
+  }
 }
 
 /* Watch Ahead Button in Controls */

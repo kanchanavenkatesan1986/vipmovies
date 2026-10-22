@@ -7,6 +7,13 @@ compatibility_date = "2024-04-01"
 binding = "MY_BUCKET"
 bucket_name = "tvk-movies"
 
+# Cloudflare D1 Database Binding (Player Ads Config & Movies)
+[[d1_databases]]
+binding = "DB"
+database_name = "tvk-movies"
+database_id = "9acf968f-c714-4ca0-ad86-975c889cb58e"
+
 # Configuration Variables
 [vars]
 # UPLOAD_API_TOKEN is optional. Defaults to VIP_SECURE_TOKEN_2026 if not set
+

@@ -6,6 +6,7 @@
 
 export const DEFAULT_ADS_CONFIG = {
   adsEnabled: true,
+  adTriggerMode: 'timeline', // 'timeline' (movie position) or 'watchTime' (physical streaming time)
   firstAdDelayMinutes: 15,
   adIntervalMinutes: 25,
   warningCountdownSeconds: 15,
@@ -30,6 +31,7 @@ export const ADS_PRESETS = {
     description: "Maximum retention: first ad at 20m, repeats every 30m, capped at 3 ads per movie.",
     config: {
       adsEnabled: true,
+      adTriggerMode: 'timeline',
       firstAdDelayMinutes: 20,
       adIntervalMinutes: 30,
       warningCountdownSeconds: 15,
@@ -45,6 +47,7 @@ export const ADS_PRESETS = {
     description: "Great balance of revenue and user comfort: first ad at 15m, repeats every 25m, capped at 4 ads.",
     config: {
       adsEnabled: true,
+      adTriggerMode: 'timeline',
       firstAdDelayMinutes: 15,
       adIntervalMinutes: 25,
       warningCountdownSeconds: 15,
@@ -60,6 +63,7 @@ export const ADS_PRESETS = {
     description: "High ad frequency: first ad at 10m, repeats every 20m, capped at 6 ads.",
     config: {
       adsEnabled: true,
+      adTriggerMode: 'timeline',
       firstAdDelayMinutes: 10,
       adIntervalMinutes: 20,
       warningCountdownSeconds: 15,
@@ -130,7 +134,7 @@ export const adsConfigService = {
       if (res.ok) {
         const json = await res.json();
         if (json && json.success && json.data) {
-          cachedConfig = { ...DEFAULT_ADS_CONFIG, ...json.data };
+          cachedConfig = { ...DEFAULT_ADS_CONFIG, ...json.data, _source: json.source || 'server' };
           lastFetchTime = now;
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(cachedConfig));

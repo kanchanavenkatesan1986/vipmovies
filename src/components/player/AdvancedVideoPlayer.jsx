@@ -77,8 +77,33 @@ export default function AdvancedVideoPlayer({
     }
   });
 
+  const [clearedMilestones, setClearedMilestones] = useState(() => {
+    try {
+      const mid = String(movie?.id || movie?.movieId || '').trim();
+      const stored = sessionStorage.getItem(`vip_cleared_milestones_${mid}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const activeWatchSecondsRef = useRef(0);
+  const pendingResumeTimeRef = useRef(null);
+  const targetMilestoneRef = useRef(null);
   const hasAppliedInitialTimeRef = useRef(false);
+
+  // ─── 0b. TIMELINE POSITION AD MILESTONES ───
+  const adMilestones = useMemo(() => {
+    if (!adsConfig?.adsEnabled) return [];
+    const maxAds = adsConfig?.maxAdsPerMovie || 3;
+    const firstSec = (adsConfig?.firstAdDelayMinutes || 15) * 60;
+    const intervalSec = (adsConfig?.adIntervalMinutes || 25) * 60;
+    const list = [];
+    for (let i = 0; i < maxAds; i++) {
+      list.push(firstSec + (i * intervalSec));
+    }
+    return list;
+  }, [adsConfig]);
 
   // ─── 1. RESOLVE AVAILABLE VIDEO SOURCES ───
   const availableSources = useMemo(() => {
@@ -293,9 +318,34 @@ export default function AdvancedVideoPlayer({
   const seekTo = useCallback((time) => {
     if (!videoRef.current || isNaN(time)) return;
     const target = Math.max(0, Math.min(time, duration || 100000));
+    const isTimelineMode = (adsConfig?.adTriggerMode || 'timeline') === 'timeline';
+
+    // In Timeline Position Mode: check if skipping forward past an uncleared ad break
+    if (adsConfig?.adsEnabled && isTimelineMode && adsWatchedCount < (adsConfig?.maxAdsPerMovie || 3)) {
+      const unclearedCrossed = adMilestones.filter(
+        (m) => !clearedMilestones.includes(m) && target >= m
+      );
+
+      if (unclearedCrossed.length > 0) {
+        const triggeredMilestone = unclearedCrossed[0];
+        if (!videoRef.current.paused) {
+          videoRef.current.pause();
+        }
+        pendingResumeTimeRef.current = target;
+        targetMilestoneRef.current = triggeredMilestone;
+        setShowWarningPill(false);
+        setIsAdBreakModalOpen(true);
+        if (window.UIManager?.showToast) {
+          const mins = Math.floor(triggeredMilestone / 60);
+          window.UIManager.showToast(`Ad break required to unlock content beyond ${mins}:00`);
+        }
+        return;
+      }
+    }
+
     videoRef.current.currentTime = target;
     setCurrentTime(target);
-  }, [duration]);
+  }, [duration, adsConfig, adsWatchedCount, adMilestones, clearedMilestones]);
 
   const seekRelative = useCallback((deltaSeconds) => {
     if (!videoRef.current) return;
@@ -566,12 +616,38 @@ export default function AdvancedVideoPlayer({
         sessionStorage.setItem(`vip_session_ads_${mid}`, String(newCount));
       } catch {}
 
+      // Unlock timeline milestones reached or targeted
+      if (adMilestones.length > 0) {
+        const targetPos = initialTime > 0 ? initialTime : (pendingResumeTimeRef.current || videoRef.current?.currentTime || 0);
+        const toClear = adMilestones.filter(m => targetPos >= (m - 30) || (targetMilestoneRef.current && m === targetMilestoneRef.current));
+        if (toClear.length > 0) {
+          setClearedMilestones(prev => {
+            const set = new Set([...prev, ...toClear]);
+            const arr = Array.from(set);
+            try {
+              sessionStorage.setItem(`vip_cleared_milestones_${mid}`, JSON.stringify(arr));
+            } catch {}
+            return arr;
+          });
+        }
+      }
+
       activeWatchSecondsRef.current = 0;
       setShowWarningPill(false);
       setIsAdBreakModalOpen(false);
 
+      if (pendingResumeTimeRef.current !== null && videoRef.current) {
+        videoRef.current.currentTime = pendingResumeTimeRef.current;
+        setCurrentTime(pendingResumeTimeRef.current);
+        pendingResumeTimeRef.current = null;
+      }
+
       if (window.UIManager?.showToast) {
         window.UIManager.showToast(`🎉 Reward Granted! Enjoy ${adsConfig?.rewardDurationMinutes || 25} minutes ad-free streaming!`);
+      }
+
+      if (videoRef.current) {
+        videoRef.current.play().catch(() => {});
       }
 
       try {
@@ -580,15 +656,46 @@ export default function AdvancedVideoPlayer({
         window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search);
       } catch {}
     }
-  }, [rewardGranted, movie]);
+  }, [rewardGranted, movie, adMilestones, initialTime, adsConfig]);
 
-  // ─── 14. ACTIVE WATCH TIME TRACKING ENGINE ───
+  // ─── 14. AD BREAK TRIGGER ENGINE (TIMELINE POSITION & WATCH TIME) ───
   useEffect(() => {
     if (!adsConfig?.adsEnabled) return;
     if (adsWatchedCount >= (adsConfig?.maxAdsPerMovie || 3)) return;
 
+    const isTimelineMode = (adsConfig?.adTriggerMode || 'timeline') === 'timeline';
+
     const interval = setInterval(() => {
-      if (playerState === 'PLAYING' && !isAdBreakModalOpen && videoRef.current && !videoRef.current.paused) {
+      if (playerState !== 'PLAYING' || isAdBreakModalOpen || !videoRef.current || videoRef.current.paused) {
+        return;
+      }
+
+      if (isTimelineMode) {
+        // ── Timeline Position Mode: check movie's current playback timestamp ──
+        const curr = videoRef.current.currentTime || 0;
+        const nextMilestone = adMilestones.find((m) => !clearedMilestones.includes(m));
+
+        if (nextMilestone) {
+          const warnSecs = adsConfig?.warningCountdownSeconds || 15;
+          const diff = nextMilestone - curr;
+
+          if (diff <= warnSecs && diff > 0) {
+            setShowWarningPill(true);
+            setWarningSecondsLeft(Math.ceil(diff));
+          } else if (diff <= 0) {
+            setShowWarningPill(false);
+            if (!videoRef.current.paused) {
+              videoRef.current.pause();
+            }
+            targetMilestoneRef.current = nextMilestone;
+            pendingResumeTimeRef.current = nextMilestone;
+            setIsAdBreakModalOpen(true);
+          } else if (showWarningPill && diff > warnSecs) {
+            setShowWarningPill(false);
+          }
+        }
+      } else {
+        // ── Active Watch Time Mode: wall-clock streaming duration ──
         activeWatchSecondsRef.current += 1;
         const currentSecs = activeWatchSecondsRef.current;
 
@@ -615,16 +722,18 @@ export default function AdvancedVideoPlayer({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [playerState, adsConfig, adsWatchedCount, isAdBreakModalOpen, showWarningPill]);
+  }, [playerState, adsConfig, adsWatchedCount, isAdBreakModalOpen, showWarningPill, adMilestones, clearedMilestones]);
 
   // ─── 15. AD TRIGGER ACTION & RESUME WORKFLOW ───
   const handleWatchAd = useCallback(() => {
     if (!videoRef.current || !movie) return;
 
     const mid = String(movie.id || movie.movieId || '').trim();
-    const currentPos = Math.floor(videoRef.current.currentTime || currentTime || 0);
+    const resumePos = pendingResumeTimeRef.current !== null
+      ? pendingResumeTimeRef.current
+      : Math.floor(videoRef.current.currentTime || currentTime || 0);
 
-    const resumeUrl = `${window.location.origin}/player?reward=${encodeURIComponent(mid)}&t=${currentPos}&quality=${encodeURIComponent(currentQuality)}&reward_granted=true`;
+    const resumeUrl = `${window.location.origin}/player?reward=${encodeURIComponent(mid)}&t=${resumePos}&quality=${encodeURIComponent(currentQuality)}&reward_granted=true`;
 
     const isAndroid = /Android/i.test(navigator.userAgent) ||
                       window.Android !== undefined ||
@@ -633,7 +742,7 @@ export default function AdvancedVideoPlayer({
 
     if (isAndroid) {
       playerStorage.saveProgress(mid, {
-        currentTime: currentPos,
+        currentTime: resumePos,
         duration: duration,
         quality: currentQuality,
         playbackRate: playbackRate
@@ -649,9 +758,31 @@ export default function AdvancedVideoPlayer({
           sessionStorage.setItem(`vip_session_ads_${mid}`, String(nextCount));
         } catch {}
 
+        // Unlock milestone in timeline mode
+        if (adMilestones.length > 0) {
+          const targetPos = pendingResumeTimeRef.current !== null ? pendingResumeTimeRef.current : (videoRef.current?.currentTime || 0);
+          const toClear = adMilestones.filter(m => targetPos >= (m - 30) || (targetMilestoneRef.current && m === targetMilestoneRef.current));
+          if (toClear.length > 0) {
+            setClearedMilestones(prev => {
+              const set = new Set([...prev, ...toClear]);
+              const arr = Array.from(set);
+              try {
+                sessionStorage.setItem(`vip_cleared_milestones_${mid}`, JSON.stringify(arr));
+              } catch {}
+              return arr;
+            });
+          }
+        }
+
         activeWatchSecondsRef.current = 0;
         setIsAdBreakModalOpen(false);
         setShowWarningPill(false);
+
+        if (pendingResumeTimeRef.current !== null && videoRef.current) {
+          videoRef.current.currentTime = pendingResumeTimeRef.current;
+          setCurrentTime(pendingResumeTimeRef.current);
+          pendingResumeTimeRef.current = null;
+        }
 
         if (window.UIManager?.showToast) {
           window.UIManager.showToast(`🎉 +${adsConfig?.rewardDurationMinutes || 25} Ad-Free minutes unlocked!`);
@@ -662,7 +793,7 @@ export default function AdvancedVideoPlayer({
         }
       }, 1500);
     }
-  }, [movie, currentTime, currentQuality, duration, playbackRate, adsWatchedCount, adsConfig]);
+  }, [movie, currentTime, currentQuality, duration, playbackRate, adsWatchedCount, adsConfig, adMilestones]);
 
   const handleWatchAhead = useCallback(() => {
     if (videoRef.current && !videoRef.current.paused) {
@@ -751,9 +882,18 @@ export default function AdvancedVideoPlayer({
         movieId={movie?.id || movie?.movieId}
         currentTime={currentTime}
         currentQuality={currentQuality}
+        isHorizontal={isHorizontalMode}
         onWatchAd={handleWatchAd}
         onDismissWarning={() => setShowWarningPill(false)}
-        onKeepPaused={() => setIsAdBreakModalOpen(false)}
+        onKeepPaused={() => {
+          setIsAdBreakModalOpen(false);
+          // If in timeline mode and user canceled, keep position right before the milestone so video doesn't play forward
+          if ((adsConfig?.adTriggerMode || 'timeline') === 'timeline' && targetMilestoneRef.current && videoRef.current) {
+            const safePos = Math.max(0, targetMilestoneRef.current - 1);
+            videoRef.current.currentTime = safePos;
+            setCurrentTime(safePos);
+          }
+        }}
       />
 
       {/* ── CUSTOM CONTROLS OVERLAY ── */}

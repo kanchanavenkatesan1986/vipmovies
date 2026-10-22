@@ -9,7 +9,7 @@ export default function PlayerAdsPage({ navigateTo }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activePreset, setActivePreset] = useState('balanced');
-  const [previewTab, setPreviewTab] = useState('pill'); // 'pill' or 'modal'
+  const [storageSource, setStorageSource] = useState('r2'); // 'd1', 'r2', 'default'
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -21,6 +21,7 @@ export default function PlayerAdsPage({ navigateTo }) {
     try {
       const data = await adsConfigService.getAdsConfig(true);
       setConfig(data);
+      if (data._source) setStorageSource(data._source);
       detectPreset(data);
     } catch (err) {
       showToast('Failed to load ads config from server. Using local defaults.', 'warning');
@@ -83,9 +84,16 @@ export default function PlayerAdsPage({ navigateTo }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await adsConfigService.saveAdsConfig(config);
+      const res = await adsConfigService.saveAdsConfig(config);
       setHasChanges(false);
-      showToast('🎉 Player Ads settings saved & published to Cloudflare R2!', 'success');
+      const isD1 = res?.storage === 'd1';
+      if (isD1) setStorageSource('d1');
+      showToast(
+        isD1
+          ? '🎉 Player Ads settings saved & synced to Cloudflare D1 Database & R2!'
+          : '🎉 Player Ads settings saved & published to Cloudflare R2!',
+        'success'
+      );
     } catch (err) {
       showToast(err.message || 'Failed to save configuration', 'error');
     } finally {
@@ -128,8 +136,8 @@ export default function PlayerAdsPage({ navigateTo }) {
             <span className="policy-badge">
               <i className="fa-solid fa-shield-check"></i> 100% AdMob Compliant
             </span>
-            <span className="r2-badge">
-              <i className="fa-solid fa-cloud"></i> Synced to Cloudflare R2
+            <span className="r2-badge" style={{ background: storageSource === 'd1' ? 'rgba(16, 185, 129, 0.15)' : undefined, color: storageSource === 'd1' ? '#10b981' : undefined, borderColor: storageSource === 'd1' ? 'rgba(16, 185, 129, 0.3)' : undefined }}>
+              <i className={`fa-solid ${storageSource === 'd1' ? 'fa-database' : 'fa-cloud'}`}></i> {storageSource === 'd1' ? 'Cloudflare D1 Table Active' : 'Synced to Cloudflare R2'}
             </span>
           </div>
         </div>
@@ -193,6 +201,57 @@ export default function PlayerAdsPage({ navigateTo }) {
               <div className="card-panel-title">
                 <i className="fa-solid fa-clock" style={{ color: '#60a5fa' }}></i>
                 Playback Timing & Ad Intervals
+              </div>
+
+              {/* Trigger Enforcement Mode Selector */}
+              <div style={{ marginBottom: '18px', padding: '14px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--admin-border)' }}>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--admin-text)', display: 'block', marginBottom: '8px' }}>
+                  <i className="fa-solid fa-crosshairs" style={{ color: '#10b981', marginRight: '6px' }}></i>
+                  Ad Break Trigger Mode
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div
+                    onClick={() => handleFieldChange('adTriggerMode', 'timeline')}
+                    style={{
+                      padding: '10px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      border: (config.adTriggerMode || 'timeline') === 'timeline' ? '2px solid #10b981' : '1px solid var(--admin-border)',
+                      background: (config.adTriggerMode || 'timeline') === 'timeline' ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: (config.adTriggerMode || 'timeline') === 'timeline' ? '#10b981' : '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <i className="fa-solid fa-timeline"></i>
+                      Timeline Position Mode
+                      {(config.adTriggerMode || 'timeline') === 'timeline' && <i className="fa-solid fa-check" style={{ marginLeft: 'auto', fontSize: '12px' }}></i>}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
+                      Ads trigger at exact movie timestamps (e.g. 15m, 40m). Fast-forwarding past an ad milestone triggers the ad break.
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => handleFieldChange('adTriggerMode', 'watchTime')}
+                    style={{
+                      padding: '10px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      border: config.adTriggerMode === 'watchTime' ? '2px solid #3b82f6' : '1px solid var(--admin-border)',
+                      background: config.adTriggerMode === 'watchTime' ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: config.adTriggerMode === 'watchTime' ? '#3b82f6' : '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <i className="fa-solid fa-stopwatch"></i>
+                      Active Watch Time
+                      {config.adTriggerMode === 'watchTime' && <i className="fa-solid fa-check" style={{ marginLeft: 'auto', fontSize: '12px' }}></i>}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
+                      Ads trigger only after user has actively streamed for 15 minutes, regardless of scrubbing or skipping forward.
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="form-group-grid">
