@@ -1515,3 +1515,293 @@
   margin: 0 20px;
 }
 
+/* ==========================================
+   ADBREAK OVERLAY & WARNING PILL (ADMOB)
+   ========================================== */
+.vip-player-warning-pill {
+  position: absolute;
+  bottom: 84px;
+  right: 24px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  border-radius: 999px;
+  padding: 6px 14px 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 55;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(245, 158, 11, 0.25);
+  animation: vipWarningPulse 2s infinite ease-in-out;
+  pointer-events: auto;
+}
+
+@keyframes vipWarningPulse {
+  0%, 100% {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 12px rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7), 0 0 22px rgba(245, 158, 11, 0.5);
+    border-color: rgba(245, 158, 11, 0.9);
+  }
+}
+
+.vip-pill-icon-wrap {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+}
+
+.vip-pill-timer {
+  font-size: 11px;
+  font-weight: 800;
+  color: #000;
+}
+
+.vip-pill-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.vip-pill-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+}
+
+.vip-pill-btn-action {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.vip-pill-btn-action:hover {
+  background: #f59e0b;
+  color: #000;
+  border-color: #f59e0b;
+}
+
+.vip-pill-btn-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vip-pill-btn-close:hover {
+  color: #fff;
+}
+
+/* Break Modal */
+.vip-player-ad-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 7, 15, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 85;
+  padding: 20px;
+  pointer-events: auto;
+}
+
+.vip-player-ad-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 28px 24px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(16, 185, 129, 0.15);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vip-ad-compliance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.16);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vip-ad-icon-halo {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.05) 70%);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: #10b981;
+  margin-bottom: 14px;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+}
+
+.vip-ad-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.3px;
+}
+
+.vip-ad-modal-desc {
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.5;
+  margin: 0 0 18px 0;
+  max-width: 360px;
+}
+
+.vip-ad-feature-box {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  width: 100%;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.vip-ad-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.vip-ad-modal-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vip-ad-btn-primary {
+  width: 100%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+}
+
+.vip-ad-btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(16, 185, 129, 0.45);
+}
+
+.vip-ad-btn-primary:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.vip-ad-modal-subactions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.vip-ad-btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.vip-ad-btn-secondary:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.vip-ad-modal-footer {
+  margin-top: 16px;
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Watch Ahead Button in Controls */
+.vip-ctrl-btn.vip-watch-ahead-btn {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: auto;
+}
+
+.vip-ctrl-btn.vip-watch-ahead-btn:hover {
+  background: rgba(245, 158, 11, 0.28);
+  border-color: rgba(245, 158, 11, 0.7);
+  color: #fbbf24;
+  transform: translateY(-1px);
+}
+
+

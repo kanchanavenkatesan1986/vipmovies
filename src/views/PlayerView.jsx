@@ -3,7 +3,7 @@ import { useApp } from '../AppContext';
 import AdvancedVideoPlayer from '../components/player/AdvancedVideoPlayer';
 import './PlayerView.css';
 
-export default function PlayerView({ movieId, initialQuality = 'auto' }) {
+export default function PlayerView({ movieId, initialQuality = 'auto', initialTime = 0, rewardGranted = false }) {
   const { movies } = useApp();
 
   const movie = useMemo(() => {
@@ -75,6 +75,8 @@ export default function PlayerView({ movieId, initialQuality = 'auto' }) {
       <AdvancedVideoPlayer
         movie={movie}
         initialQuality={initialQuality}
+        initialTime={initialTime}
+        rewardGranted={rewardGranted}
         nextMovie={nextMovie}
         onPlayNextMovie={handlePlayNext}
         onBack={handleGoBack}

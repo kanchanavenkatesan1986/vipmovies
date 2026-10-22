@@ -155,6 +155,16 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
           <span>Slide Management</span>
         </div>
 
+        <div className="admin-nav-section">Monetization</div>
+
+        <div
+          className={`admin-nav-item ${isActive('admin/ads') ? 'active' : ''}`}
+          onClick={() => go('admin/ads')}
+        >
+          <i className="fa-solid fa-rectangle-ad" style={{ color: '#10b981' }}></i>
+          <span>Player Ads (AdMob)</span>
+        </div>
+
       </div>
 
       {/* Footer */}

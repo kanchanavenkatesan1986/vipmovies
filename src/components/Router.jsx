@@ -19,6 +19,7 @@ import MoviesPage from '../admin/pages/MoviesPage';
 import SlidesPage from '../admin/pages/SlidesPage';
 import UploadManagerPage from '../admin/pages/UploadManagerPage';
 import FileManagerPage from '../admin/pages/FileManagerPage';
+import PlayerAdsPage from '../admin/pages/PlayerAdsPage';
 import { authService } from '../admin/services/authService';
 import '../admin/styles/admin.css';
 
@@ -105,6 +106,10 @@ export default function Router() {
       return <FileManagerPage navigateTo={navigateTo} />;
     }
 
+    if (path === 'admin/ads' || path === 'admin/player-ads') {
+      return <PlayerAdsPage navigateTo={navigateTo} />;
+    }
+
     if (path.startsWith('admin/movies')) {
       const parts = path.split('/');
       const type = parts[2] || '';
@@ -123,7 +128,14 @@ export default function Router() {
       return <WatchView movieId={route.params.reward || route.params.id} type={route.params.type} year={route.params.year} />;
     case 'player':
     case 'play':
-      return <PlayerView movieId={route.params.reward || route.params.id} initialQuality={route.params.quality || 'auto'} />;
+      return (
+        <PlayerView
+          movieId={route.params.reward || route.params.id}
+          initialQuality={route.params.quality || 'auto'}
+          initialTime={route.params.t ? parseFloat(route.params.t) : 0}
+          rewardGranted={route.params.reward_granted === '1' || route.params.reward_granted === 'true'}
+        />
+      );
     case 'search':
       return <SearchView query={route.params.q} />;
     case 'years':

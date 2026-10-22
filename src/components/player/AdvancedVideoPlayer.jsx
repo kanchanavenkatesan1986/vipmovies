@@ -6,6 +6,8 @@ import PlayerStatsModal from './PlayerStatsModal';
 import ResumeDialog from './ResumeDialog';
 import UpNextOverlay from './UpNextOverlay';
 import PlayerErrorOverlay from './PlayerErrorOverlay';
+import PlayerAdBreakOverlay from './PlayerAdBreakOverlay';
+import { adsConfigService } from '../../admin/services/adsConfigService';
 import {
   getAspectRatioStyle,
   mediaSessionEngine,
@@ -18,6 +20,8 @@ import './player.css';
 export default function AdvancedVideoPlayer({
   movie,
   initialQuality = 'auto',
+  initialTime = 0,
+  rewardGranted = false,
   nextMovie = null,
   onPlayNextMovie,
   onBack,
@@ -58,6 +62,23 @@ export default function AdvancedVideoPlayer({
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [resumePrompt, setResumePrompt] = useState(null);
   const [showUpNext, setShowUpNext] = useState(false);
+
+  // ─── ADMOB REWARDED ADS IN-PLAYER ENGINE ───
+  const [adsConfig, setAdsConfig] = useState(() => adsConfigService.getStoredConfigSync());
+  const [showWarningPill, setShowWarningPill] = useState(false);
+  const [warningSecondsLeft, setWarningSecondsLeft] = useState(15);
+  const [isAdBreakModalOpen, setIsAdBreakModalOpen] = useState(false);
+  const [adsWatchedCount, setAdsWatchedCount] = useState(() => {
+    try {
+      const mid = String(movie?.id || movie?.movieId || '').trim();
+      return parseInt(sessionStorage.getItem(`vip_session_ads_${mid}`) || '0', 10);
+    } catch {
+      return 0;
+    }
+  });
+
+  const activeWatchSecondsRef = useRef(0);
+  const hasAppliedInitialTimeRef = useRef(false);
 
   // ─── 1. RESOLVE AVAILABLE VIDEO SOURCES ───
   const availableSources = useMemo(() => {
@@ -185,6 +206,13 @@ export default function AdvancedVideoPlayer({
     setPlayerState('PAUSED');
     setError(null);
 
+    // Apply initial resume timestamp if returning from ad completion or deep link
+    if (!hasAppliedInitialTimeRef.current && initialTime > 0) {
+      hasAppliedInitialTimeRef.current = true;
+      videoRef.current.currentTime = initialTime;
+      setCurrentTime(initialTime);
+    }
+
     if (autoPlay && !resumePrompt) {
       videoRef.current.play().then(() => {
         setPlayerState('PLAYING');
@@ -204,6 +232,18 @@ export default function AdvancedVideoPlayer({
     setPlayerState('PAUSED');
     setIsControlsVisible(true);
     if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
+
+    // Natural Pause Opportunity (If enabled and user has watched 15+ minutes)
+    if (
+      adsConfig?.pauseTriggerEnabled &&
+      adsConfig?.adsEnabled &&
+      adsWatchedCount < (adsConfig?.maxAdsPerMovie || 3) &&
+      activeWatchSecondsRef.current >= 15 * 60 &&
+      !isAdBreakModalOpen
+    ) {
+      setShowWarningPill(true);
+      setWarningSecondsLeft(adsConfig?.warningCountdownSeconds || 15);
+    }
   };
 
   const handleWaiting = () => {
@@ -499,6 +539,139 @@ export default function AdvancedVideoPlayer({
     };
   }, [playerState]);
 
+  // ─── 12. LIVE ADS CONFIG & EVENT LISTENERS ───
+  useEffect(() => {
+    let mounted = true;
+    adsConfigService.getAdsConfig().then((cfg) => {
+      if (mounted && cfg) setAdsConfig(cfg);
+    });
+
+    const handleConfigEvent = (e) => {
+      if (e.detail) setAdsConfig(e.detail);
+    };
+    window.addEventListener('vip_ads_config_updated', handleConfigEvent);
+    return () => {
+      mounted = false;
+      window.removeEventListener('vip_ads_config_updated', handleConfigEvent);
+    };
+  }, []);
+
+  // ─── 13. HANDLE REWARD GRANTED ON MOUNT OR UPDATE ───
+  useEffect(() => {
+    if (rewardGranted && movie) {
+      const mid = String(movie.id || movie.movieId || '').trim();
+      const newCount = adsWatchedCount + 1;
+      setAdsWatchedCount(newCount);
+      try {
+        sessionStorage.setItem(`vip_session_ads_${mid}`, String(newCount));
+      } catch {}
+
+      activeWatchSecondsRef.current = 0;
+      setShowWarningPill(false);
+      setIsAdBreakModalOpen(false);
+
+      if (window.UIManager?.showToast) {
+        window.UIManager.showToast(`🎉 Reward Granted! Enjoy ${adsConfig?.rewardDurationMinutes || 25} minutes ad-free streaming!`);
+      }
+
+      try {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('reward_granted');
+        window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search);
+      } catch {}
+    }
+  }, [rewardGranted, movie]);
+
+  // ─── 14. ACTIVE WATCH TIME TRACKING ENGINE ───
+  useEffect(() => {
+    if (!adsConfig?.adsEnabled) return;
+    if (adsWatchedCount >= (adsConfig?.maxAdsPerMovie || 3)) return;
+
+    const interval = setInterval(() => {
+      if (playerState === 'PLAYING' && !isAdBreakModalOpen && videoRef.current && !videoRef.current.paused) {
+        activeWatchSecondsRef.current += 1;
+        const currentSecs = activeWatchSecondsRef.current;
+
+        const isFirst = adsWatchedCount === 0;
+        const targetMins = isFirst ? (adsConfig?.firstAdDelayMinutes || 15) : (adsConfig?.adIntervalMinutes || 25);
+        const targetSecs = targetMins * 60;
+        const warnSecs = adsConfig?.warningCountdownSeconds || 15;
+
+        const remaining = targetSecs - currentSecs;
+
+        if (remaining <= warnSecs && remaining > 0) {
+          setShowWarningPill(true);
+          setWarningSecondsLeft(remaining);
+        } else if (remaining <= 0) {
+          setShowWarningPill(false);
+          if (videoRef.current && !videoRef.current.paused) {
+            videoRef.current.pause();
+          }
+          setIsAdBreakModalOpen(true);
+        } else if (showWarningPill && remaining > warnSecs) {
+          setShowWarningPill(false);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [playerState, adsConfig, adsWatchedCount, isAdBreakModalOpen, showWarningPill]);
+
+  // ─── 15. AD TRIGGER ACTION & RESUME WORKFLOW ───
+  const handleWatchAd = useCallback(() => {
+    if (!videoRef.current || !movie) return;
+
+    const mid = String(movie.id || movie.movieId || '').trim();
+    const currentPos = Math.floor(videoRef.current.currentTime || currentTime || 0);
+
+    const resumeUrl = `${window.location.origin}/player?reward=${encodeURIComponent(mid)}&t=${currentPos}&quality=${encodeURIComponent(currentQuality)}&reward_granted=true`;
+
+    const isAndroid = /Android/i.test(navigator.userAgent) ||
+                      window.Android !== undefined ||
+                      window.androidBridge !== undefined ||
+                      window.location.search.includes('source=app');
+
+    if (isAndroid) {
+      playerStorage.saveProgress(mid, {
+        currentTime: currentPos,
+        duration: duration,
+        quality: currentQuality,
+        playbackRate: playbackRate
+      });
+      // Android WebView shouldOverrideUrlLoading catches ?reward= and presents native AdMob Rewarded ad
+      window.location.href = `/watch?reward=${encodeURIComponent(resumeUrl)}`;
+    } else {
+      // Browser / Desktop grace simulation
+      setTimeout(() => {
+        const nextCount = adsWatchedCount + 1;
+        setAdsWatchedCount(nextCount);
+        try {
+          sessionStorage.setItem(`vip_session_ads_${mid}`, String(nextCount));
+        } catch {}
+
+        activeWatchSecondsRef.current = 0;
+        setIsAdBreakModalOpen(false);
+        setShowWarningPill(false);
+
+        if (window.UIManager?.showToast) {
+          window.UIManager.showToast(`🎉 +${adsConfig?.rewardDurationMinutes || 25} Ad-Free minutes unlocked!`);
+        }
+
+        if (videoRef.current) {
+          videoRef.current.play().catch(() => {});
+        }
+      }, 1500);
+    }
+  }, [movie, currentTime, currentQuality, duration, playbackRate, adsWatchedCount, adsConfig]);
+
+  const handleWatchAhead = useCallback(() => {
+    if (videoRef.current && !videoRef.current.paused) {
+      videoRef.current.pause();
+    }
+    setShowWarningPill(false);
+    setIsAdBreakModalOpen(true);
+  }, []);
+
   const aspectStyle = getAspectRatioStyle(aspectRatio);
 
   return (
@@ -569,6 +742,20 @@ export default function AdvancedVideoPlayer({
         </video>
       </PlayerGestureHandler>
 
+      {/* ── IN-PLAYER AD BREAK & WARNING OVERLAY (ADMOB) ── */}
+      <PlayerAdBreakOverlay
+        isOpen={isAdBreakModalOpen}
+        countdownSeconds={warningSecondsLeft}
+        showWarningPill={showWarningPill}
+        adsConfig={adsConfig}
+        movieId={movie?.id || movie?.movieId}
+        currentTime={currentTime}
+        currentQuality={currentQuality}
+        onWatchAd={handleWatchAd}
+        onDismissWarning={() => setShowWarningPill(false)}
+        onKeepPaused={() => setIsAdBreakModalOpen(false)}
+      />
+
       {/* ── CUSTOM CONTROLS OVERLAY ── */}
       <PlayerControls
         movie={movie}
@@ -601,6 +788,9 @@ export default function AdvancedVideoPlayer({
         onToggleHorizontal={toggleHorizontal}
         onTogglePip={togglePip}
         onBack={handleSmartBack}
+        showWatchAhead={adsConfig?.enableWatchAhead && adsConfig?.adsEnabled && adsWatchedCount < (adsConfig?.maxAdsPerMovie || 3)}
+        watchAheadLabel={adsConfig?.uiCopy?.watchAheadText || '⚡ +30m Ad-Free'}
+        onWatchAhead={handleWatchAhead}
       />
 
       {/* ── RESUME DIALOG ── */}

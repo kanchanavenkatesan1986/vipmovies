@@ -33,7 +33,10 @@ export default function PlayerControls({
   onToggleHorizontal,
   onTogglePip,
   onBack,
-  disabled = false
+  disabled = false,
+  showWatchAhead = false,
+  watchAheadLabel = '⚡ +30m Ad-Free',
+  onWatchAhead = null
 }) {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
 
@@ -79,6 +82,19 @@ export default function PlayerControls({
           <div className="vip-player-watermark vip-ctrl-desktop-only">
             <span className="gold">VIP</span> MOVIES
           </div>
+
+          {/* ⚡ WATCH AHEAD BUTTON (VOLUNTARY REWARDED AD) */}
+          {showWatchAhead && onWatchAhead && (
+            <button
+              type="button"
+              className="vip-ctrl-btn vip-watch-ahead-btn"
+              onClick={onWatchAhead}
+              title="Watch a short ad now to bank ad-free uninterrupted streaming"
+              aria-label="Watch Ahead"
+            >
+              <span>{watchAheadLabel}</span>
+            </button>
+          )}
 
           {/* ↻ HORIZONTAL / ↶ EXIT BUTTON */}
           <button

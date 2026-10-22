@@ -2073,6 +2073,86 @@ async function handleUploadFromUrl(request, env, ctx) {
 }
 
 // ==========================================
+
+// ==========================================
+// 4h. PLAYER ADS CONFIGURATION (ADMOB)
+// ==========================================
+const DEFAULT_ADS_CONFIG = {
+  adsEnabled: true,
+  firstAdDelayMinutes: 15,
+  adIntervalMinutes: 25,
+  warningCountdownSeconds: 15,
+  rewardDurationMinutes: 25,
+  maxAdsPerMovie: 3,
+  enableWatchAhead: true,
+  gracePeriodMinutes: 15,
+  pauseTriggerEnabled: true,
+  uiCopy: {
+    warningText: "Ad break coming in {sec}s...",
+    modalTitle: "Break Time",
+    modalDescription: "Watch a short sponsor message to unlock the next {min} minutes of uninterrupted playback.",
+    buttonText: "▶ Watch Ad to Continue",
+    watchAheadText: "⚡ +30m Ad-Free"
+  },
+  updatedAt: new Date().toISOString()
+};
+
+async function handleGetAdsConfig(request, env) {
+  try {
+    const obj = await env.MY_BUCKET.get("system/ads_config.json");
+    if (!obj) {
+      return jsonResponse({
+        success: true,
+        data: DEFAULT_ADS_CONFIG,
+        source: "default"
+      }, 200, {}, request);
+    }
+    const text = await obj.text();
+    const config = JSON.parse(text);
+    return jsonResponse({
+      success: true,
+      data: { ...DEFAULT_ADS_CONFIG, ...config },
+      source: "r2"
+    }, 200, {}, request);
+  } catch (err) {
+    return jsonResponse({
+      success: true,
+      data: DEFAULT_ADS_CONFIG,
+      source: "fallback",
+      error: err.message
+    }, 200, {}, request);
+  }
+}
+
+async function handleUpdateAdsConfig(request, env) {
+  try {
+    const body = await request.json();
+    if (!body || typeof body !== "object") {
+      return jsonResponse({ success: false, error: "Invalid JSON body" }, 400, {}, request);
+    }
+    const updated = {
+      ...DEFAULT_ADS_CONFIG,
+      ...body,
+      updatedAt: new Date().toISOString()
+    };
+    await env.MY_BUCKET.put("system/ads_config.json", JSON.stringify(updated, null, 2), {
+      httpMetadata: {
+        contentType: "application/json"
+      }
+    });
+    return jsonResponse({
+      success: true,
+      message: "Player ads configuration updated successfully",
+      data: updated
+    }, 200, {}, request);
+  } catch (err) {
+    return jsonResponse({
+      success: false,
+      error: err.message
+    }, 500, {}, request);
+  }
+}
+
 // 5. MAIN ROUTER / WORKER FETCH HANDLER
 // ==========================================
 export default {
@@ -2101,6 +2181,11 @@ export default {
     // 3. Public Health Route
     if (request.method === "GET" && path === "/health") {
       return handleHealth(request);
+    }
+
+    // 3b. Public Player Ads Config Route
+    if (request.method === "GET" && (path === "/ads-config" || path === "/get-ads-config")) {
+      return handleGetAdsConfig(request, env);
     }
 
     // 4. Media Streaming / Download Routes (GET)
@@ -2146,7 +2231,8 @@ export default {
       "/create-folder": handleCreateFolder,
       "/delete-folder": handleDeleteFolder,
       "/rename-folder": handleRenameFolder,
-      "/put-object": handlePutObject
+      "/put-object": handlePutObject,
+      "/update-ads-config": handleUpdateAdsConfig
     };
 
     if (request.method === "POST" && postRoutes[path]) {
