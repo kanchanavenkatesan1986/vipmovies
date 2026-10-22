@@ -460,12 +460,12 @@ input:checked + .slider-round:before {
   cursor: pointer;
 }
 
-/* Simulated Break Modal */
+/* Simulated Break Modal - Yellow Theme */
 .preview-modal-card {
   position: absolute;
   inset: 16px;
-  background: rgba(15, 23, 42, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(12, 17, 32, 0.72);
+  border: 1px solid rgba(245, 197, 24, 0.28);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
@@ -473,16 +473,16 @@ input:checked + .slider-round:before {
   align-items: center;
   text-align: center;
   padding: 16px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(245, 197, 24, 0.12);
   z-index: 20;
 }
 
 .preview-modal-badge {
-  background: rgba(16, 185, 129, 0.2);
-  border: 1px solid rgba(16, 185, 129, 0.4);
-  color: #10b981;
+  background: rgba(245, 197, 24, 0.14);
+  border: 1px solid rgba(245, 197, 24, 0.38);
+  color: #f5c518;
   font-size: 10px;
   font-weight: 700;
   padding: 4px 8px;
@@ -491,36 +491,39 @@ input:checked + .slider-round:before {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .preview-modal-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
   color: #fff;
-  margin: 0 0 6px 0;
+  margin: 0 0 5px 0;
+  letter-spacing: -0.3px;
 }
 
 .preview-modal-desc {
-  font-size: 11px;
-  color: #cbd5e1;
-  line-height: 1.4;
+  font-size: 10.5px;
+  color: #94a3b8;
+  line-height: 1.45;
   margin: 0 0 12px 0;
   max-width: 280px;
 }
 
 .preview-modal-action-btn {
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: #fff;
+  background: linear-gradient(135deg, #f5c518 0%, #e6b400 100%);
+  color: #0a0f1e;
   border: none;
   border-radius: 8px;
   padding: 8px 16px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   display: flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 14px rgba(245, 197, 24, 0.38);
 }
 
 /* Bottom Action Bar */

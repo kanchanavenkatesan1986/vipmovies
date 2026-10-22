@@ -1,15 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 /**
  * PlayerAdBreakOverlay
- * Professional In-Player Sponsor Break Overlay
- * 
- * Features:
- * - 15-second non-intrusive countdown pill before sponsor break
- * - Clean opt-in modal with reward disclosure
- * - Android WebView ?reward= navigation trigger
- * - Grace Pass fallback for offline / no-fill
- * - Auto-resume at exact timestamp
+ * Professional In-Player Sponsor Break Overlay — Yellow Theme
  */
 export default function PlayerAdBreakOverlay({
   isOpen = false,
@@ -25,25 +18,22 @@ export default function PlayerAdBreakOverlay({
   onKeepPaused
 }) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [fallbackGraceActive, setFallbackGraceActive] = useState(false);
 
   const uiCopy = adsConfig?.uiCopy || {};
-  const warningText = (uiCopy.warningText || 'Ad break coming in {sec}s...').replace('{sec}', countdownSeconds);
-  const modalTitle = uiCopy.modalTitle || 'Break Time';
-  const modalDesc = (uiCopy.modalDescription || 'Watch a short sponsor message to unlock the next {min} minutes of uninterrupted playback.')
+  const warningText = (uiCopy.warningText || 'Ad break in {sec}s').replace('{sec}', countdownSeconds);
+  const modalTitle = uiCopy.modalTitle || 'Short Break';
+  const modalDesc = (uiCopy.modalDescription || 'Watch a quick ad to unlock {min} min of free streaming.')
     .replace('{min}', adsConfig?.rewardDurationMinutes || 25);
-  const buttonText = uiCopy.buttonText || '▶ Watch Ad to Continue';
+  const buttonText = uiCopy.buttonText || 'Watch & Continue';
 
   const handleTriggerAd = () => {
     setIsProcessing(true);
-    if (onWatchAd) {
-      onWatchAd();
-    }
+    if (onWatchAd) onWatchAd();
   };
 
   return (
     <>
-      {/* ── 1. PRE-BREAK 15-SECOND NON-INTRUSIVE WARNING PILL ── */}
+      {/* ── WARNING PILL ── */}
       {showWarningPill && !isOpen && (
         <div className={`vip-player-warning-pill animate-slide-up ${isHorizontal ? 'is-horizontal' : ''}`}>
           <div className="vip-pill-icon-wrap">
@@ -64,7 +54,7 @@ export default function PlayerAdBreakOverlay({
                 type="button"
                 className="vip-pill-btn-close"
                 onClick={onDismissWarning}
-                title="Dismiss warning"
+                title="Dismiss"
                 aria-label="Dismiss warning"
               >
                 <i className="fa-solid fa-xmark"></i>
@@ -74,37 +64,46 @@ export default function PlayerAdBreakOverlay({
         </div>
       )}
 
-      {/* ── 2. POLICY COMPLIANT BREAK MODAL ── */}
+      {/* ── BREAK MODAL ── */}
       {isOpen && (
-        <div className={`vip-player-ad-backdrop animate-fade-in ${isHorizontal ? 'is-horizontal' : ''}`} onClick={(e) => e.stopPropagation()}>
-          <div className={`vip-player-ad-card animate-scale-up ${isHorizontal ? 'is-horizontal' : ''}`} onClick={(e) => e.stopPropagation()}>
-            
-            {/* Top Header Row with Clean Glass Tag and Close */}
+        <div
+          className={`vip-player-ad-backdrop animate-fade-in ${isHorizontal ? 'is-horizontal' : ''}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className={`vip-player-ad-card animate-scale-up ${isHorizontal ? 'is-horizontal' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+
+            {/* ── TOP ROW: Badge + Close ── */}
             <div className="vip-ad-card-top-row">
               <div className="vip-ad-glass-tag">
-                <i className="fa-solid fa-sparkles" style={{ color: '#10b981' }}></i>
-                <span>Sponsor Intermission</span>
+                <i className="fa-solid fa-star"></i>
+                <span>VIP Streaming</span>
               </div>
               {onKeepPaused && (
                 <button
                   type="button"
                   className="vip-ad-close-corner-btn"
                   onClick={onKeepPaused}
-                  title="Keep movie paused"
-                  aria-label="Close ad break"
+                  title="Close"
+                  aria-label="Close"
                 >
                   <i className="fa-solid fa-xmark"></i>
                 </button>
               )}
             </div>
 
-            {/* Responsive Body Layout (Stacks on desktop/portrait, 2-columns on horizontal/landscape) */}
+            {/* ── BODY ── */}
             <div className="vip-ad-card-body">
-              {/* Left Column: Info, Icon, Text, Features */}
+
+              {/* Left / Top column */}
               <div className="vip-ad-card-info-col">
+
+                {/* Icon + Title + Desc */}
                 <div className="vip-ad-header-flex">
                   <div className="vip-ad-icon-halo">
-                    <i className="fa-solid fa-circle-play"></i>
+                    <i className="fa-solid fa-clapperboard"></i>
                   </div>
                   <div className="vip-ad-header-text">
                     <h3 className="vip-ad-modal-title">{modalTitle}</h3>
@@ -112,21 +111,28 @@ export default function PlayerAdBreakOverlay({
                   </div>
                 </div>
 
+                {/* Feature chips */}
                 <div className="vip-ad-feature-box">
                   <div className="vip-ad-feature-item">
-                    <i className="fa-solid fa-rotate-right" style={{ color: '#10b981' }}></i>
-                    <span>Resumes automatically at this scene</span>
+                    <i className="fa-solid fa-circle-check vip-ad-feat-icon"></i>
+                    <span>Resumes at the same scene</span>
                   </div>
                   <div className="vip-ad-feature-item">
-                    <i className="fa-solid fa-unlock-keyhole" style={{ color: '#38bdf8' }}></i>
-                    <span>+{adsConfig?.rewardDurationMinutes || 25} minutes uninterrupted playback</span>
+                    <i className="fa-solid fa-bolt vip-ad-feat-icon"></i>
+                    <span>+{adsConfig?.rewardDurationMinutes || 25} min ad-free streaming</span>
+                  </div>
+                  <div className="vip-ad-feature-item">
+                    <i className="fa-solid fa-film vip-ad-feat-icon"></i>
+                    <span>Free 1080p HD quality</span>
                   </div>
                 </div>
               </div>
 
-              {/* Right Column: CTA Buttons & Clean Footer Notice */}
+              {/* Right / Bottom column */}
               <div className="vip-ad-card-actions-col">
                 <div className="vip-ad-modal-actions">
+
+                  {/* Primary CTA */}
                   <button
                     type="button"
                     className="vip-ad-btn-primary"
@@ -135,15 +141,18 @@ export default function PlayerAdBreakOverlay({
                   >
                     {isProcessing ? (
                       <>
-                        <i className="fa-solid fa-spinner fa-spin"></i> Unlocking Playback...
+                        <i className="fa-solid fa-spinner fa-spin"></i>
+                        Loading...
                       </>
                     ) : (
                       <>
-                        <i className="fa-solid fa-play"></i> {buttonText}
+                        <i className="fa-solid fa-play"></i>
+                        {buttonText}
                       </>
                     )}
                   </button>
 
+                  {/* Secondary */}
                   <div className="vip-ad-modal-subactions">
                     {onKeepPaused && (
                       <button
@@ -152,19 +161,20 @@ export default function PlayerAdBreakOverlay({
                         onClick={onKeepPaused}
                         disabled={isProcessing}
                       >
-                        Keep Movie Paused
+                        Pause for now
                       </button>
                     )}
                   </div>
                 </div>
 
+                {/* Footer note */}
                 <div className="vip-ad-modal-footer">
-                  <i className="fa-solid fa-film"></i>
-                  <span>Free High-Speed 1080p Cloud Streaming</span>
+                  <i className="fa-solid fa-shield-halved"></i>
+                  <span>Free streaming · Supported by sponsors</span>
                 </div>
               </div>
-            </div>
 
+            </div>
           </div>
         </div>
       )}
