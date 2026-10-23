@@ -221,8 +221,91 @@ const CONFIG = {
 };
 
 // ==========================================
-// 2. HELPER UTILITIES
+// 2. HELPER UTILITIES & IN-MEMORY METADATA CACHE
 // ==========================================
+
+// Global in-memory metadata cache for R2 objects (reduces Class B HeadObject calls)
+const WORKER_METADATA_CACHE = new Map();
+const WORKER_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
+const MAX_WORKER_CACHE_SIZE = 1000;
+
+function getCachedWorkerMetadata(key) {
+  const item = WORKER_METADATA_CACHE.get(key);
+  if (!item) return null;
+  if (Date.now() - item.cachedAt > WORKER_CACHE_TTL_MS) {
+    WORKER_METADATA_CACHE.delete(key);
+    return null;
+  }
+  return item;
+}
+
+function setCachedWorkerMetadata(key, meta) {
+  if (WORKER_METADATA_CACHE.size >= MAX_WORKER_CACHE_SIZE) {
+    const oldestKey = WORKER_METADATA_CACHE.keys().next().value;
+    WORKER_METADATA_CACHE.delete(oldestKey);
+  }
+  WORKER_METADATA_CACHE.set(key, { ...meta, cachedAt: Date.now() });
+}
+
+function invalidateWorkerMetadata(key) {
+  if (key) WORKER_METADATA_CACHE.delete(key);
+}
+
+function etagsMatch(clientHeader, serverEtag) {
+  if (!clientHeader || !serverEtag) return false;
+  const cleanServer = serverEtag.replace(/^W\//, "").replace(/"/g, "").trim();
+  const tokens = clientHeader.split(",").map(t => t.trim().replace(/^W\//, "").replace(/"/g, ""));
+  return tokens.includes("*") || tokens.includes(cleanServer);
+}
+
+function ifModifiedSinceMatches(clientDateStr, serverUploaded) {
+  if (!clientDateStr || !serverUploaded) return false;
+  try {
+    const clientDate = new Date(clientDateStr);
+    const serverDate = new Date(serverUploaded);
+    return !isNaN(clientDate.getTime()) && clientDate >= serverDate;
+  } catch {
+    return false;
+  }
+}
+
+function parseRangeHeader(rangeHeader) {
+  if (!rangeHeader) return null;
+  const parts = rangeHeader.trim().split("=");
+  if (parts.length !== 2 || parts[0] !== "bytes") return null;
+
+  const rangeSpec = parts[1].trim();
+  if (rangeSpec.includes(",")) return null;
+
+  const rangeMatch = rangeSpec.match(/^(\d*)-(\d*)$/);
+  if (!rangeMatch) return null;
+
+  const startStr = rangeMatch[1];
+  const endStr = rangeMatch[2];
+  if (!startStr && !endStr) return null;
+
+  if (!startStr) {
+    return { start: null, end: parseInt(endStr, 10), isSuffix: true };
+  }
+  return {
+    start: parseInt(startStr, 10),
+    end: endStr ? parseInt(endStr, 10) : null,
+    isSuffix: false
+  };
+}
+
+function resolveRange(parsedRange, size) {
+  if (parsedRange.isSuffix) {
+    let start = size - parsedRange.end;
+    if (start < 0) start = 0;
+    const end = size - 1;
+    return { start, end, length: end - start + 1, unsatisfied: start >= size };
+  }
+  const start = parsedRange.start;
+  let end = parsedRange.end;
+  if (end === null || end >= size) end = size - 1;
+  return { start, end, length: end - start + 1, unsatisfied: start >= size || start > end };
+}
 
 /**
  * Standard JSON response constructor
@@ -648,22 +731,29 @@ async function handleListObjects(request, env) {
       const filename = obj.key.split("/").pop() || obj.key;
       const extMatch = filename.match(/\.[0-9a-z]+$/i);
       const ext = extMatch ? extMatch[0].toLowerCase() : "";
+      const contentType = obj.httpMetadata?.contentType || resolveContentType(filename);
+      const etag = obj.httpEtag || obj.etag;
 
-      return {
+      const itemMeta = {
         key: obj.key,
         filename,
         size: obj.size,
         sizeFormatted: formatBytes(obj.size),
-        etag: obj.httpEtag || obj.etag,
+        etag,
         uploaded: obj.uploaded,
         httpMetadata: obj.httpMetadata || {},
         customMetadata: obj.customMetadata || {},
-        contentType: obj.httpMetadata?.contentType || resolveContentType(filename),
+        contentType,
         extension: ext,
         isVideo: [".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi", ".ts"].includes(ext),
         isImage: [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"].includes(ext),
         isKeepMarker: filename === ".keep"
       };
+
+      // Populate in-memory metadata cache from listing to eliminate future HeadObject calls
+      setCachedWorkerMetadata(obj.key, itemMeta);
+
+      return itemMeta;
     });
 
     const folders = (listed.delimitedPrefixes || []).map(p => {
@@ -713,6 +803,15 @@ async function handleObjectDetails(request, env) {
     return jsonResponse({ success: false, error: "Invalid object key", code: "INVALID_KEY" }, 400, {}, request);
   }
 
+  // Check in-memory metadata cache first (avoids Class B HeadObject)
+  const cached = getCachedWorkerMetadata(key);
+  if (cached) {
+    return jsonResponse({
+      success: true,
+      ...cached
+    }, 200, {}, request);
+  }
+
   try {
     const head = await env.MY_BUCKET.head(key);
     if (!head) {
@@ -722,21 +821,29 @@ async function handleObjectDetails(request, env) {
     const filename = key.split("/").pop() || key;
     const extMatch = filename.match(/\.[0-9a-z]+$/i);
     const ext = extMatch ? extMatch[0].toLowerCase() : "";
+    const contentType = head.httpMetadata?.contentType || resolveContentType(filename);
+    const etag = head.httpEtag || head.etag;
 
-    return jsonResponse({
-      success: true,
+    const details = {
       key: head.key,
       filename,
       size: head.size,
       sizeFormatted: formatBytes(head.size),
-      etag: head.httpEtag || head.etag,
+      etag,
       uploaded: head.uploaded,
       httpMetadata: head.httpMetadata || {},
       customMetadata: head.customMetadata || {},
-      contentType: head.httpMetadata?.contentType || resolveContentType(filename),
+      contentType,
       extension: ext,
       isVideo: [".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi", ".ts"].includes(ext),
       isImage: [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"].includes(ext)
+    };
+
+    setCachedWorkerMetadata(key, details);
+
+    return jsonResponse({
+      success: true,
+      ...details
     }, 200, {}, request);
   } catch (err) {
     console.error(`[OBJECT_DETAILS] Error getting head for ${key}:`, err);
@@ -763,6 +870,7 @@ async function handleDeleteObject(request, env) {
 
   try {
     await env.MY_BUCKET.delete(key);
+    invalidateWorkerMetadata(key);
     return jsonResponse({ success: true, key, message: "Object deleted successfully" }, 200, {}, request);
   } catch (err) {
     console.error(`[DELETE_OBJECT] Error deleting ${key}:`, err);
@@ -794,6 +902,7 @@ async function handleDeleteObjects(request, env) {
 
   try {
     await env.MY_BUCKET.delete(validKeys);
+    validKeys.forEach(k => invalidateWorkerMetadata(k));
     return jsonResponse({ success: true, deletedCount: validKeys.length, keys: validKeys }, 200, {}, request);
   } catch (err) {
     console.error("[DELETE_OBJECTS] Error bulk deleting objects:", err);
@@ -828,19 +937,21 @@ async function handleCopyObject(request, env) {
       return jsonResponse({ success: false, error: `Source object '${sourceKey}' not found`, code: "SOURCE_NOT_FOUND" }, 404, {}, request);
     }
 
-    // Check destination existence for conflict policy
-    const existingDest = await env.MY_BUCKET.head(destKey);
-    if (existingDest) {
-      if (conflictPolicy === "skip") {
-        return jsonResponse({ success: true, skipped: true, sourceKey, destKey, message: "Destination already exists, skipped" }, 200, {}, request);
-      } else if (conflictPolicy === "rename") {
-        const parts = destKey.split("/");
-        const filename = parts.pop();
-        const baseDir = parts.length > 0 ? parts.join("/") + "/" : "";
-        const dotIdx = filename.lastIndexOf(".");
-        const namePart = dotIdx !== -1 ? filename.substring(0, dotIdx) : filename;
-        const extPart = dotIdx !== -1 ? filename.substring(dotIdx) : "";
-        destKey = `${baseDir}${namePart}_copy_${Date.now()}${extPart}`;
+    // Check destination existence for conflict policy only if policy is not 'replace'
+    if (conflictPolicy !== "replace" && conflictPolicy !== "overwrite") {
+      const existingDest = await env.MY_BUCKET.head(destKey);
+      if (existingDest) {
+        if (conflictPolicy === "skip") {
+          return jsonResponse({ success: true, skipped: true, sourceKey, destKey, message: "Destination already exists, skipped" }, 200, {}, request);
+        } else if (conflictPolicy === "rename") {
+          const parts = destKey.split("/");
+          const filename = parts.pop();
+          const baseDir = parts.length > 0 ? parts.join("/") + "/" : "";
+          const dotIdx = filename.lastIndexOf(".");
+          const namePart = dotIdx !== -1 ? filename.substring(0, dotIdx) : filename;
+          const extPart = dotIdx !== -1 ? filename.substring(dotIdx) : "";
+          destKey = `${baseDir}${namePart}_copy_${Date.now()}${extPart}`;
+        }
       }
     }
 
@@ -849,6 +960,7 @@ async function handleCopyObject(request, env) {
       httpMetadata: sourceObj.httpMetadata,
       customMetadata: sourceObj.customMetadata
     });
+    invalidateWorkerMetadata(destKey);
 
     return jsonResponse({
       success: true,
@@ -963,6 +1075,8 @@ async function handleRenameObject(request, env) {
 
     // Delete old key
     await env.MY_BUCKET.delete(oldKey);
+    invalidateWorkerMetadata(oldKey);
+    invalidateWorkerMetadata(newKey);
 
     return jsonResponse({ success: true, oldKey, newKey, message: "Object renamed successfully" }, 200, {}, request);
   } catch (err) {
@@ -1001,18 +1115,20 @@ async function handleMoveObject(request, env) {
       return jsonResponse({ success: false, error: `Source object '${sourceKey}' not found`, code: "NOT_FOUND" }, 404, {}, request);
     }
 
-    const existingDest = await env.MY_BUCKET.head(destKey);
-    if (existingDest) {
-      if (conflictPolicy === "skip") {
-        return jsonResponse({ success: true, skipped: true, sourceKey, destKey, message: "Destination already exists, skipped" }, 200, {}, request);
-      } else if (conflictPolicy === "rename") {
-        const parts = destKey.split("/");
-        const filename = parts.pop();
-        const baseDir = parts.length > 0 ? parts.join("/") + "/" : "";
-        const dotIdx = filename.lastIndexOf(".");
-        const namePart = dotIdx !== -1 ? filename.substring(0, dotIdx) : filename;
-        const extPart = dotIdx !== -1 ? filename.substring(dotIdx) : "";
-        destKey = `${baseDir}${namePart}_moved_${Date.now()}${extPart}`;
+    if (conflictPolicy !== "replace" && conflictPolicy !== "overwrite") {
+      const existingDest = await env.MY_BUCKET.head(destKey);
+      if (existingDest) {
+        if (conflictPolicy === "skip") {
+          return jsonResponse({ success: true, skipped: true, sourceKey, destKey, message: "Destination already exists, skipped" }, 200, {}, request);
+        } else if (conflictPolicy === "rename") {
+          const parts = destKey.split("/");
+          const filename = parts.pop();
+          const baseDir = parts.length > 0 ? parts.join("/") + "/" : "";
+          const dotIdx = filename.lastIndexOf(".");
+          const namePart = dotIdx !== -1 ? filename.substring(0, dotIdx) : filename;
+          const extPart = dotIdx !== -1 ? filename.substring(dotIdx) : "";
+          destKey = `${baseDir}${namePart}_moved_${Date.now()}${extPart}`;
+        }
       }
     }
 
@@ -1022,6 +1138,8 @@ async function handleMoveObject(request, env) {
     });
 
     await env.MY_BUCKET.delete(sourceKey);
+    invalidateWorkerMetadata(sourceKey);
+    invalidateWorkerMetadata(destKey);
 
     return jsonResponse({ success: true, sourceKey, destKey, message: "Object moved successfully" }, 200, {}, request);
   } catch (err) {
@@ -1170,7 +1288,7 @@ async function handleRenameFolder(request, env) {
 async function handleStreamMedia(request, env) {
   const url = new URL(request.url);
   let key = url.searchParams.get("key");
-  const isDownload = url.pathname.includes("/download");
+  const isDownload = url.pathname.includes("/download") || url.searchParams.get("download") === "1" || url.searchParams.get("dl") === "1";
 
   if (!key) {
     return jsonResponse({ success: false, error: "Invalid or missing key query parameter", code: "INVALID_KEY" }, 400, {}, request);
@@ -1183,12 +1301,117 @@ async function handleStreamMedia(request, env) {
     return jsonResponse({ success: false, error: "Invalid object key", code: "INVALID_KEY" }, 400, {}, request);
   }
 
-  try {
-    const rangeHeader = request.headers.get("Range");
-    const getOptions = {};
+  const filename = key.split("/").pop() || key;
+  const ifNoneMatch = request.headers.get("If-None-Match");
+  const ifModifiedSince = request.headers.get("If-Modified-Since");
+  const rangeHeader = request.headers.get("Range");
+
+  // Check in-memory metadata cache for fast HEAD & 304 responses
+  const cachedMeta = getCachedWorkerMetadata(key);
+
+  if (cachedMeta && !rangeHeader) {
+    const etagMatch = ifNoneMatch && etagsMatch(ifNoneMatch, cachedMeta.etag);
+    const dateMatch = ifModifiedSince && ifModifiedSinceMatches(ifModifiedSince, cachedMeta.uploaded);
+    if (etagMatch || dateMatch) {
+      const h304 = new Headers(getCorsHeaders(request));
+      if (cachedMeta.etag) h304.set("ETag", cachedMeta.etag);
+      h304.set("Accept-Ranges", "bytes");
+      h304.set("Vary", "Range");
+      h304.set("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
+      if (cachedMeta.uploaded) h304.set("Last-Modified", new Date(cachedMeta.uploaded).toUTCString());
+      return new Response(null, { status: 304, headers: h304 });
+    }
+  }
+
+  // Handle HEAD request
+  if (request.method === "HEAD") {
+    let headObj = cachedMeta;
+    if (!headObj) {
+      headObj = await env.MY_BUCKET.head(key);
+      if (!headObj) {
+        return jsonResponse({ success: false, error: `Object '${key}' not found`, code: "NOT_FOUND" }, 404, {}, request);
+      }
+      const sEtag = headObj.httpEtag || headObj.etag;
+      headObj = {
+        size: headObj.size,
+        etag: sEtag,
+        uploaded: headObj.uploaded,
+        httpMetadata: headObj.httpMetadata || {},
+        contentType: headObj.httpMetadata?.contentType || resolveContentType(filename)
+      };
+      setCachedWorkerMetadata(key, headObj);
+    }
+
+    if (!rangeHeader && ((ifNoneMatch && etagsMatch(ifNoneMatch, headObj.etag)) ||
+        (ifModifiedSince && ifModifiedSinceMatches(ifModifiedSince, headObj.uploaded)))) {
+      const h304 = new Headers(getCorsHeaders(request));
+      if (headObj.etag) h304.set("ETag", headObj.etag);
+      h304.set("Accept-Ranges", "bytes");
+      h304.set("Vary", "Range");
+      h304.set("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
+      if (headObj.uploaded) h304.set("Last-Modified", new Date(headObj.uploaded).toUTCString());
+      return new Response(null, { status: 304, headers: h304 });
+    }
+
+    const headers = new Headers(getCorsHeaders(request));
+    headers.set("Content-Type", isDownload ? "application/octet-stream" : (headObj.contentType || resolveContentType(filename)));
+    headers.set("Accept-Ranges", "bytes");
+    headers.set("Vary", "Range");
+    if (headObj.etag) headers.set("ETag", headObj.etag);
+    if (headObj.uploaded) headers.set("Last-Modified", new Date(headObj.uploaded).toUTCString());
+    headers.set("Cache-Control", isDownload ? "public, max-age=86400" : "public, max-age=604800, stale-while-revalidate=86400");
+    if (isDownload) {
+      headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+    } else {
+      headers.set("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`);
+    }
 
     if (rangeHeader) {
-      getOptions.range = request.headers;
+      const parsedRange = parseRangeHeader(rangeHeader);
+      if (parsedRange) {
+        const resolved = resolveRange(parsedRange, headObj.size);
+        if (resolved.unsatisfied) {
+          headers.set("Content-Range", `bytes */${headObj.size}`);
+          return new Response(null, { status: 416, headers });
+        }
+        headers.set("Content-Range", `bytes ${resolved.start}-${resolved.end}/${headObj.size}`);
+        headers.set("Content-Length", resolved.length.toString());
+        return new Response(null, { status: 206, headers });
+      }
+    }
+
+    headers.set("Content-Length", headObj.size.toString());
+    return new Response(null, { status: 200, headers });
+  }
+
+  // Handle GET request
+  try {
+    const getOptions = {};
+    if (rangeHeader) {
+      const parsedRange = parseRangeHeader(rangeHeader);
+      if (parsedRange) {
+        if (parsedRange.isSuffix) {
+          getOptions.range = { suffix: parsedRange.end };
+        } else if (parsedRange.end !== null) {
+          getOptions.range = {
+            offset: parsedRange.start,
+            length: parsedRange.end - parsedRange.start + 1
+          };
+        } else {
+          // Open-ended range: Range: bytes=start-
+          // For streaming playback, bound the chunk to 20 MB to prevent multi-GB stream churn
+          if (!isDownload) {
+            getOptions.range = {
+              offset: parsedRange.start,
+              length: 20 * 1024 * 1024
+            };
+          } else {
+            getOptions.range = { offset: parsedRange.start };
+          }
+        }
+      } else {
+        getOptions.range = request.headers;
+      }
     }
 
     const object = await env.MY_BUCKET.get(key, getOptions);
@@ -1196,20 +1419,44 @@ async function handleStreamMedia(request, env) {
       return jsonResponse({ success: false, error: `Object '${key}' not found`, code: "NOT_FOUND" }, 404, {}, request);
     }
 
-    const filename = key.split("/").pop() || key;
     let contentType = object.httpMetadata?.contentType;
     if (!contentType || contentType === "application/octet-stream" || contentType.trim() === "") {
       contentType = resolveContentType(filename);
     }
 
+    const sEtag = object.httpEtag || object.etag;
+
+    // Cache metadata in memory
+    setCachedWorkerMetadata(key, {
+      size: object.size,
+      etag: sEtag,
+      uploaded: object.uploaded,
+      httpMetadata: object.httpMetadata || {},
+      contentType
+    });
+
+    // Check 304 conditional after getting object if no range
+    if (!rangeHeader && ((ifNoneMatch && etagsMatch(ifNoneMatch, sEtag)) ||
+        (ifModifiedSince && ifModifiedSinceMatches(ifModifiedSince, object.uploaded)))) {
+      if (object.body) await object.body.cancel();
+      const h304 = new Headers(getCorsHeaders(request));
+      if (sEtag) h304.set("ETag", sEtag);
+      h304.set("Accept-Ranges", "bytes");
+      h304.set("Vary", "Range");
+      h304.set("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
+      if (object.uploaded) h304.set("Last-Modified", object.uploaded.toUTCString());
+      return new Response(null, { status: 304, headers: h304 });
+    }
+
     const headers = new Headers();
     object.writeHttpMetadata(headers);
-    headers.set("Content-Type", contentType);
+    headers.set("Content-Type", isDownload ? "application/octet-stream" : contentType);
     headers.set("Accept-Ranges", "bytes");
-    headers.set("ETag", object.httpEtag || object.etag);
-    headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+    headers.set("Vary", "Range");
+    if (sEtag) headers.set("ETag", sEtag);
+    if (object.uploaded) headers.set("Last-Modified", object.uploaded.toUTCString());
+    headers.set("Cache-Control", isDownload ? "public, max-age=86400" : "public, max-age=604800, stale-while-revalidate=86400");
 
-    // Range & Content-Length specification required for HTML5 video player buffer seeking
     if (object.range) {
       const start = object.range.offset;
       const end = object.range.offset + object.range.length - 1;
@@ -1227,6 +1474,8 @@ async function handleStreamMedia(request, env) {
 
     if (isDownload) {
       headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+    } else {
+      headers.set("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`);
     }
 
     const status = object.range ? 206 : 200;
@@ -1287,20 +1536,23 @@ async function handleCreateUpload(request, env) {
   let finalKey = `${cleanCategory}/${cleanYear}/${cleanMovieFolder}/${cleanFilename}`;
   const duplicatePolicy = body?.duplicatePolicy || CONFIG.duplicatePolicy;
 
-  try {
-    const existingObject = await env.MY_BUCKET.head(finalKey);
-    if (existingObject) {
-      if (duplicatePolicy === "reject") {
-        return jsonResponse({ success: false, error: `Object '${finalKey}' already exists in R2`, code: "DUPLICATE_KEY", existingKey: finalKey }, 409, {}, request);
-      } else if (duplicatePolicy === "rename") {
-        const dotIdx = cleanFilename.lastIndexOf(".");
-        const namePart = dotIdx !== -1 ? cleanFilename.substring(0, dotIdx) : cleanFilename;
-        const extPart = dotIdx !== -1 ? cleanFilename.substring(dotIdx) : "";
-        finalKey = `${cleanCategory}/${cleanYear}/${cleanMovieFolder}/${namePart}_${Date.now()}${extPart}`;
+  // Only execute HeadObject duplicate check if policy is 'reject' or 'rename'
+  if (duplicatePolicy === "reject" || duplicatePolicy === "rename") {
+    try {
+      const existingObject = await env.MY_BUCKET.head(finalKey);
+      if (existingObject) {
+        if (duplicatePolicy === "reject") {
+          return jsonResponse({ success: false, error: `Object '${finalKey}' already exists in R2`, code: "DUPLICATE_KEY", existingKey: finalKey }, 409, {}, request);
+        } else if (duplicatePolicy === "rename") {
+          const dotIdx = cleanFilename.lastIndexOf(".");
+          const namePart = dotIdx !== -1 ? cleanFilename.substring(0, dotIdx) : cleanFilename;
+          const extPart = dotIdx !== -1 ? cleanFilename.substring(dotIdx) : "";
+          finalKey = `${cleanCategory}/${cleanYear}/${cleanMovieFolder}/${namePart}_${Date.now()}${extPart}`;
+        }
       }
+    } catch (err) {
+      console.warn(`[CREATE_UPLOAD] Head check warning for ${finalKey}:`, err);
     }
-  } catch (err) {
-    console.warn(`[CREATE_UPLOAD] Head check warning for ${finalKey}:`, err);
   }
 
   const finalContentType = resolveContentType(cleanFilename, userContentType);
@@ -1671,6 +1923,7 @@ async function handlePutObject(request, env) {
     await env.MY_BUCKET.put(key, content, {
       httpMetadata: { contentType: resolvedContentType }
     });
+    invalidateWorkerMetadata(key);
 
     return jsonResponse({
       success: true,
@@ -2250,8 +2503,8 @@ export default {
       return handleGetAdsConfig(request, env);
     }
 
-    // 4. Media Streaming / Download Routes (GET)
-    if (request.method === "GET" && (path === "/stream-media" || path === "/download")) {
+    // 4. Media Streaming / Download Routes (GET & HEAD)
+    if ((request.method === "GET" || request.method === "HEAD") && (path === "/stream-media" || path === "/download")) {
       if (!authenticate(request, env)) {
         return jsonResponse({ success: false, error: "Unauthorized", code: "UNAUTHORIZED" }, 401, {}, request);
       }

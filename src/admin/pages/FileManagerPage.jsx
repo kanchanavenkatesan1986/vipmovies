@@ -85,19 +85,29 @@ export default function FileManagerPage({ navigateTo }) {
     }
   }, []);
 
+  // 60-second in-memory freshness window to avoid repeated listObjects on folder navigation
+  const FOLDER_CACHE_TTL_MS = 60 * 1000;
+
   // ==========================================
-  // DATA FETCHING (with SWR Instant Navigation)
+  // DATA FETCHING (with Cached Navigation)
   // ==========================================
   const loadObjects = useCallback(async (prefix = currentPrefix, isNewPrefix = true, skipCache = false) => {
+    const cached = folderCacheRef.current.get(prefix);
+    const isFresh = cached && (Date.now() - (cached.timestamp || 0) < FOLDER_CACHE_TTL_MS);
+
     // 1. Instant Cache Hit: render from memory without spinner flicker
-    if (!skipCache && isNewPrefix && folderCacheRef.current.has(prefix)) {
-      const cached = folderCacheRef.current.get(prefix);
+    if (!skipCache && isNewPrefix && cached) {
       setFolders(cached.folders);
       setObjects(cached.objects);
       setCursor(cached.cursor);
       setHasMore(cached.hasMore);
       setSelectedKeys(new Set());
       setLoading(false);
+
+      // If the cached listing is fresh (< 60s), avoid firing a redundant network request
+      if (isFresh) {
+        return;
+      }
     } else {
       setLoading(true);
     }
@@ -112,12 +122,13 @@ export default function FileManagerPage({ navigateTo }) {
       const cleanFolders = data.folders || [];
       const cleanObjects = (data.objects || []).filter(o => !o.isKeepMarker);
 
-      // Cache the result in memory
+      // Cache the result in memory with freshness timestamp
       folderCacheRef.current.set(prefix, {
         folders: cleanFolders,
         objects: cleanObjects,
         cursor: data.cursor || null,
-        hasMore: data.hasMore || false
+        hasMore: data.hasMore || false,
+        timestamp: Date.now()
       });
 
       setFolders(cleanFolders);

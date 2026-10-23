@@ -105,21 +105,48 @@ class FileManagerApiClient {
     }, 45);
   }
 
+  // Bounded in-memory cache for getObjectDetails to eliminate duplicate network requests
+  detailsCache = new Map();
+
   /**
    * POST /object-details
    */
-  async getObjectDetails(key) {
-    return this.request('/object-details', {
+  async getObjectDetails(key, forceRefresh = false) {
+    if (!key) throw new Error('Key is required');
+    const now = Date.now();
+    const cached = this.detailsCache.get(key);
+
+    if (!forceRefresh && cached && (now - cached.cachedAt < 5 * 60 * 1000)) {
+      return cached.data;
+    }
+
+    const data = await this.request('/object-details', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key })
     }, 30);
+
+    if (this.detailsCache.size >= 500) {
+      const oldest = this.detailsCache.keys().next().value;
+      this.detailsCache.delete(oldest);
+    }
+    this.detailsCache.set(key, { data, cachedAt: now });
+    return data;
+  }
+
+  clearDetailsCache(key = null) {
+    if (key) {
+      this.detailsCache.delete(key);
+    } else {
+      this.detailsCache.clear();
+    }
   }
 
   /**
    * POST /delete-object
    */
   async deleteObject(key) {
+    this.clearDetailsCache(key);
     return this.request('/delete-object', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -131,6 +158,9 @@ class FileManagerApiClient {
    * POST /delete-objects (bulk)
    */
   async deleteObjects(keys) {
+    if (Array.isArray(keys)) {
+      keys.forEach(k => this.clearDetailsCache(k));
+    }
     return this.request('/delete-objects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -164,6 +194,8 @@ class FileManagerApiClient {
    * POST /rename-object
    */
   async renameObject(oldKey, newKey) {
+    this.clearDetailsCache(oldKey);
+    this.clearDetailsCache(newKey);
     return this.request('/rename-object', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -175,6 +207,8 @@ class FileManagerApiClient {
    * POST /move-object
    */
   async moveObject(sourceKey, destKey, conflictPolicy = 'skip') {
+    this.clearDetailsCache(sourceKey);
+    this.clearDetailsCache(destKey);
     return this.request('/move-object', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

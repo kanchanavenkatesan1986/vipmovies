@@ -19,19 +19,29 @@ export default function FileDetailsModal({
 
   useEffect(() => {
     if (isOpen && fileItem) {
-      setLoading(true);
-      fileManagerApi.getObjectDetails(fileItem.key)
-        .then(async (data) => {
-          setDetails(data);
-          const mUrl = await fileManagerApi.getMediaUrl(fileItem.key);
-          setMediaUrl(mUrl);
-        })
-        .catch(() => {
-          setDetails(fileItem);
-        })
-        .finally(() => setLoading(false));
+      // 1. Instantly use existing metadata from listing (0ms latency, zero Class B calls)
+      setDetails(fileItem);
+      const cleanKey = (fileItem.key || '').replace(/^\/+/, '');
+      fileManagerApi.getMediaUrl(cleanKey).then(setMediaUrl).catch(() => {});
+
+      // 2. Only fetch over the wire if vital metadata is absent
+      const hasCompleteMeta = fileItem.size !== undefined && fileItem.etag !== undefined;
+      if (!hasCompleteMeta) {
+        setLoading(true);
+        fileManagerApi.getObjectDetails(fileItem.key)
+          .then((data) => {
+            setDetails(data);
+          })
+          .catch(() => {
+            setDetails(fileItem);
+          })
+          .finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
     } else {
       setDetails(null);
+      setMediaUrl('');
     }
   }, [isOpen, fileItem]);
 
@@ -57,6 +67,20 @@ export default function FileDetailsModal({
     window.open(dUrl || displayUrl, '_blank');
   };
 
+  const handleRefreshDetails = async () => {
+    if (!fileItem?.key) return;
+    setLoading(true);
+    try {
+      const freshData = await fileManagerApi.getObjectDetails(fileItem.key, true);
+      setDetails(freshData);
+      showToast('Fresh metadata loaded from R2', 'success');
+    } catch (err) {
+      showToast('Failed to refresh metadata', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="admin-modal-overlay" onClick={onClose}>
       <div className="admin-modal-box md" onClick={(e) => e.stopPropagation()}>
@@ -65,9 +89,20 @@ export default function FileDetailsModal({
             <i className="fa-solid fa-circle-info" style={{ color: 'var(--admin-blue)' }}></i>
             Object Details
           </div>
-          <button type="button" className="admin-modal-close" onClick={onClose}>
-            <i className="fa-solid fa-xmark"></i>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              className="admin-btn text sm"
+              onClick={handleRefreshDetails}
+              title="Refresh fresh metadata from R2"
+              disabled={loading}
+            >
+              <i className={`fa-solid fa-arrows-rotate ${loading ? 'fa-spin' : ''}`}></i>
+            </button>
+            <button type="button" className="admin-modal-close" onClick={onClose}>
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
         </div>
 
         <div className="admin-modal-body">
