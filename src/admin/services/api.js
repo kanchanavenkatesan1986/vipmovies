@@ -1,11 +1,12 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api-movies.akatsuki-pvt-ltd.workers.dev';
 
-export async function request(endpoint, options = {}) {
+// Map for in-flight concurrent GET request deduplication
+const inFlightGets = new Map();
+
+async function executeRequest(endpoint, options, method) {
   let url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
 
-  const method = (options.method || 'GET').toUpperCase();
-
-  // For GET requests in admin: always append _t timestamp to bypass server/CDN caching safely without CORS preflight
+  // For GET requests in admin: append _t timestamp for bypass if needed
   if (method === 'GET') {
     const sep = url.includes('?') ? '&' : '?';
     url = `${url}${sep}_t=${Date.now()}`;
@@ -16,7 +17,6 @@ export async function request(endpoint, options = {}) {
     ...options.headers
   };
 
-  // Only set Content-Type if there is a body to send (POST / PUT)
   if (method !== 'GET' && method !== 'HEAD') {
     headers['Content-Type'] = 'application/json';
   }
@@ -27,7 +27,6 @@ export async function request(endpoint, options = {}) {
     headers
   };
 
-  // Timeout handling (15 seconds)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
   config.signal = controller.signal;
@@ -57,6 +56,24 @@ export async function request(endpoint, options = {}) {
     console.error(`API Error [${endpoint}]:`, error);
     throw error;
   }
+}
+
+export async function request(endpoint, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+
+  // Deduplicate concurrent GET requests
+  if (method === 'GET') {
+    const dedupeKey = `${endpoint}`;
+    if (inFlightGets.has(dedupeKey)) {
+      return inFlightGets.get(dedupeKey);
+    }
+    const promise = executeRequest(endpoint, options, method)
+      .finally(() => inFlightGets.delete(dedupeKey));
+    inFlightGets.set(dedupeKey, promise);
+    return promise;
+  }
+
+  return executeRequest(endpoint, options, method);
 }
 
 export const api = {

@@ -69,9 +69,9 @@ const triggerCatalogSync = (table, action, detail = {}) =>
   notifyCatalogChanged(table, action, detail);
 
 export const movieApi = {
-  // Fetch all movies for a given table (always live from API)
-  async getMovies(table, _forceRefresh = true) {
-    return await cacheManager.getTable(table, true);
+  // Fetch all movies for a given table (respects forceRefresh for memory caching)
+  async getMovies(table, force = false) {
+    return await cacheManager.getTable(table, force);
   },
 
   // Fetch a single movie

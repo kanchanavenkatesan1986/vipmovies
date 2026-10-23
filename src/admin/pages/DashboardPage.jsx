@@ -8,6 +8,8 @@ import { movieApi } from '../services/movieApi';
 import { slideApi } from '../services/slideApi';
 import { showToast } from '../components/common/ToastContainer';
 
+import { api } from '../services/api';
+
 export default function DashboardPage({ navigateTo }) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -25,11 +27,41 @@ export default function DashboardPage({ navigateTo }) {
   const fetchDashboardData = async (force = false) => {
     setLoading(true);
     try {
+      // 1. Fast path: lightweight stats endpoint
+      try {
+        const statsRes = await api.get('/api/stats');
+        if (statsRes && statsRes.success) {
+          setStats({
+            totalMovies: statsRes.totalMovies || 0,
+            tamilMovies: statsRes.tamilMovies || 0,
+            hollywoodMovies: statsRes.hollywoodMovies || 0,
+            totalSlides: statsRes.totalSlides || 0
+          });
+
+          // Fetch only current year tables (2026) for recent movies (instead of all 1,940 movies across 6 tables)
+          const [tamil2026, hollywood2026] = await Promise.all([
+            cacheManager.getTable('tamil_2026', force),
+            cacheManager.getTable('hollywood_2026', force)
+          ]);
+
+          const combined = [...tamil2026, ...hollywood2026].sort((a, b) => {
+            const dateA = a.created_at || '';
+            const dateB = b.created_at || '';
+            return dateB.localeCompare(dateA);
+          }).slice(0, 8);
+
+          setRecentMovies(combined);
+          return;
+        }
+      } catch (statsErr) {
+        console.warn('Fast stats fallback to table scan:', statsErr);
+      }
+
+      // 2. Safe Fallback: fetch all tables if stats endpoint is unavailable
       let tCount = 0;
       let hCount = 0;
       let allFetchedMovies = [];
 
-      // Fetch all 6 movie tables
       for (const table of VALID_TABLES) {
         if (table === 'slider') continue;
         try {
@@ -46,7 +78,6 @@ export default function DashboardPage({ navigateTo }) {
         }
       }
 
-      // Fetch slides table
       let sCount = 0;
       try {
         const slides = await cacheManager.getTable('slider', force);
@@ -62,7 +93,6 @@ export default function DashboardPage({ navigateTo }) {
         totalSlides: sCount
       });
 
-      // Sort recent movies by date / ID
       const sorted = [...allFetchedMovies].sort((a, b) => {
         const dateA = a.created_at || '';
         const dateB = b.created_at || '';

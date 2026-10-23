@@ -130,7 +130,7 @@ export const AppProvider = ({ children }) => {
 
         // Always fetch fresh slider data directly from API to ensure full sync with D1 database
         try {
-          const sliderRes = await fetch('https://api-movies.akatsuki-pvt-ltd.workers.dev/api/slider?t=' + Date.now(), { cache: 'no-store' });
+          const sliderRes = await fetch('https://api-movies.akatsuki-pvt-ltd.workers.dev/api/slider', { cache: 'default' });
           if (sliderRes.ok) {
             const sliderData = await sliderRes.json();
             const slidesList = Array.isArray(sliderData) ? sliderData : (sliderData.value || sliderData.data || []);

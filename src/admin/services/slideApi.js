@@ -38,9 +38,9 @@ const triggerSlideCatalogSync = (action, detail = {}) =>
   notifyCatalogChanged(SLIDER_TABLE, action, detail);
 
 export const slideApi = {
-  // Fetch all slider items (always live from API)
-  async getSlides(_forceRefresh = true) {
-    return await cacheManager.getTable(SLIDER_TABLE, true);
+  // Fetch all slider items (respects force for short memory cache)
+  async getSlides(force = false) {
+    return await cacheManager.getTable(SLIDER_TABLE, force);
   },
 
   /**

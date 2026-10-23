@@ -197,38 +197,55 @@ var DatabaseManager = (function() {
 
 // ─── API MANAGER ─────────────────────────────────────────────────────────────
 var ApiManager = (function() {
+    var _inFlight = new Map();
+
+    function deduplicatedFetch(key, fetchFn) {
+        if (_inFlight.has(key)) {
+            return _inFlight.get(key);
+        }
+        var promise = fetchFn().finally(function() {
+            _inFlight.delete(key);
+        });
+        _inFlight.set(key, promise);
+        return promise;
+    }
 
     function fetchVersion() {
-        return fetch(API_BASE + '/api/version?t=' + Date.now(), {
-            cache: 'no-cache'
-        })
-            .then(function(res) {
-                if (!res.ok) throw new Error('Version check failed: ' + res.status);
-                return res.json();
-            });
+        return deduplicatedFetch('version', function() {
+            return fetch(API_BASE + '/api/version?t=' + Date.now(), {
+                cache: 'default'
+            })
+                .then(function(res) {
+                    if (!res.ok) throw new Error('Version check failed: ' + res.status);
+                    return res.json();
+                });
+        });
     }
 
     function fetchApp() {
-        var controller = new AbortController();
-        var timeoutId  = setTimeout(function() { controller.abort(); }, 30000);
+        return deduplicatedFetch('app', function() {
+            var controller = new AbortController();
+            var timeoutId  = setTimeout(function() { controller.abort(); }, 30000);
 
-        return fetch(API_BASE + '/api/app?t=' + Date.now(), {
-            cache: 'no-store',
-            signal: controller.signal
-        }).then(function(res) {
-            clearTimeout(timeoutId);
-            if (!res.ok) throw new Error('App fetch failed: ' + res.status);
-            return res.json();
-        }).then(function(data) {
-            if (!data || !data.success || !Array.isArray(data.movies)) {
-                throw new Error('Invalid API payload');
-            }
-            return data;
+            return fetch(API_BASE + '/api/app?t=' + Date.now(), {
+                cache: 'default',
+                signal: controller.signal
+            }).then(function(res) {
+                clearTimeout(timeoutId);
+                if (!res.ok) throw new Error('App fetch failed: ' + res.status);
+                return res.json();
+            }).then(function(data) {
+                if (!data || !data.success || !Array.isArray(data.movies)) {
+                    throw new Error('Invalid API payload');
+                }
+                return data;
+            });
         });
     }
 
     return { fetchVersion, fetchApp };
 }());
+
 
 // ─── CACHE MANAGER ───────────────────────────────────────────────────────────
 var CacheManager = (function() {
