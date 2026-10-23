@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { sanitizeFilename, sanitizeMovieFolder } from '../../services/uploader/uploadUtils';
+import { sanitizeFilename, sanitizeMovieFolder } from '../../services/fileManager/fileManagerUtils';
 
 export default function RenameModal({
   isOpen,

@@ -17,8 +17,10 @@ import ContextMenu from '../components/fileManager/ContextMenu';
 import TextEditorModal from '../components/fileManager/TextEditorModal';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import KeyboardShortcutsModal from '../components/fileManager/KeyboardShortcutsModal';
+import BackgroundUploadDrawer from '../components/fileManager/BackgroundUploadDrawer';
 import { fileManagerApi } from '../services/fileManager/fileManagerApi';
 import { fileManagerStorage } from '../services/fileManager/fileManagerStorage';
+import { urlUploadManager } from '../services/fileManager/urlUploadManager';
 import { getFileCategory } from '../services/fileManager/fileManagerUtils';
 import { showToast } from '../components/common/ToastContainer';
 
@@ -148,6 +150,19 @@ export default function FileManagerPage({ navigateTo }) {
   useEffect(() => {
     loadObjects(currentPrefix, true);
   }, [currentPrefix, loadObjects]);
+
+  // Background Uploads Auto-Sync: When any background URL upload finishes, notify and reload if in same folder
+  useEffect(() => {
+    const unsub = urlUploadManager.onComplete(({ item }) => {
+      showToast(`File "${item.filename}" uploaded successfully from URL!`, 'success');
+      // If currently in the prefix where this upload completed, automatically refresh
+      if ((currentPrefix || '') === (item.prefix || '')) {
+        invalidateCache(currentPrefix);
+        loadObjects(currentPrefix, true, true);
+      }
+    });
+    return unsub;
+  }, [currentPrefix, invalidateCache, loadObjects]);
 
   // Handle prefix change with browser history URL update
   const handleNavigatePrefix = (newPrefix) => {
@@ -487,16 +502,7 @@ export default function FileManagerPage({ navigateTo }) {
     loadObjects(currentPrefix, true, true);
   };
 
-  // 5. Navigate to Uploader preset
-  const handleOpenUploadToCurrent = () => {
-    const parts = currentPrefix.replace(/\/+$/, '').split('/');
-    const category = parts[0] || 'tamil';
-    const year = parts[1] || '2026';
-    const folder = parts[2] || '';
-    navigateTo(`admin/uploads?category=${category}&year=${year}&folder=${folder}`);
-  };
-
-  // 6. Direct URL Upload Dialog
+  // 5. Direct URL Upload Dialog
   const handleOpenUploadUrl = (targetPrefix = currentPrefix) => {
     setUploadUrlPrefix(targetPrefix);
     setIsUploadUrlOpen(true);
@@ -643,7 +649,7 @@ export default function FileManagerPage({ navigateTo }) {
           currentPrefix={currentPrefix}
           loading={loading}
           onRefresh={() => loadObjects(currentPrefix, true)}
-          onOpenUpload={handleOpenUploadToCurrent}
+          onOpenUploadUrl={() => handleOpenUploadUrl(currentPrefix)}
         />
 
         {/* Path Bar & Breadcrumbs */}
@@ -663,7 +669,6 @@ export default function FileManagerPage({ navigateTo }) {
           onSortChange={handleSortChange}
           onOpenCreateFolder={() => setIsCreateFolderOpen(true)}
           onOpenUploadUrl={() => handleOpenUploadUrl(currentPrefix)}
-          onOpenUploadToCurrent={handleOpenUploadToCurrent}
           onToggleFilterDrawer={() => setIsFilterDrawerOpen(true)}
           hasActiveFilters={filters.types.size > 0 || filters.extensions.size > 0 || filters.sizeThreshold !== 'all' || filters.onlyPinned}
           selectedCount={selectedKeys.size}
@@ -704,7 +709,6 @@ export default function FileManagerPage({ navigateTo }) {
               onDownload={handleDownloadItem}
               onOpenUploadUrl={() => handleOpenUploadUrl(currentPrefix)}
               onOpenCreateFolder={() => setIsCreateFolderOpen(true)}
-              onOpenUploadToCurrent={handleOpenUploadToCurrent}
             />
           ) : (
             <FileListView
@@ -725,7 +729,6 @@ export default function FileManagerPage({ navigateTo }) {
               onDownload={handleDownloadItem}
               onOpenUploadUrl={() => handleOpenUploadUrl(currentPrefix)}
               onOpenCreateFolder={() => setIsCreateFolderOpen(true)}
-              onOpenUploadToCurrent={handleOpenUploadToCurrent}
             />
           )}
 
@@ -907,6 +910,11 @@ export default function FileManagerPage({ navigateTo }) {
         <KeyboardShortcutsModal
           isOpen={isShortcutsOpen}
           onClose={() => setIsShortcutsOpen(false)}
+        />
+
+        {/* Floating Background URL Upload Manager Drawer */}
+        <BackgroundUploadDrawer
+          onOpenUploadModal={() => handleOpenUploadUrl(currentPrefix)}
         />
       </div>
     </AdminLayout>

@@ -1,8 +1,10 @@
 /**
  * Cloudflare R2 File Manager API Client
  */
-import { DEFAULT_UPLOAD_CONFIG } from '../uploader/uploadConfig';
-import { uploadStorage } from '../uploader/uploadStorage';
+const DEFAULT_R2_CONFIG = {
+  apiBase: import.meta.env.VITE_UPLOAD_API_BASE || 'https://api-uploder.akatsuki-pvt-ltd.workers.dev',
+  mediaBaseUrl: import.meta.env.VITE_MEDIA_BASE_URL || 'https://api-download.akatsuki-pvt-ltd.workers.dev'
+};
 
 class FileManagerApiClient {
   constructor() {
@@ -11,9 +13,21 @@ class FileManagerApiClient {
 
   async getConfig() {
     if (!this.cachedConfig) {
-      this.cachedConfig = await uploadStorage.getSettings();
+      try {
+        const local = localStorage.getItem('vip_upload_settings');
+        const cfg = local ? { ...DEFAULT_R2_CONFIG, ...JSON.parse(local) } : DEFAULT_R2_CONFIG;
+        if (cfg.apiBase && cfg.apiBase.includes('api-uploud')) {
+          cfg.apiBase = DEFAULT_R2_CONFIG.apiBase;
+        }
+        if (!cfg.mediaBaseUrl || cfg.mediaBaseUrl.includes('media.vipmovies.in')) {
+          cfg.mediaBaseUrl = DEFAULT_R2_CONFIG.mediaBaseUrl;
+        }
+        this.cachedConfig = cfg;
+      } catch {
+        this.cachedConfig = DEFAULT_R2_CONFIG;
+      }
     }
-    return this.cachedConfig || DEFAULT_UPLOAD_CONFIG;
+    return this.cachedConfig || DEFAULT_R2_CONFIG;
   }
 
   clearConfigCache() {
@@ -30,9 +44,9 @@ class FileManagerApiClient {
 
   async getBaseUrl() {
     const config = await this.getConfig();
-    let base = (config.apiBase || DEFAULT_UPLOAD_CONFIG.apiBase).replace(/\/+$/, '');
+    let base = (config.apiBase || DEFAULT_R2_CONFIG.apiBase).replace(/\/+$/, '');
     if (base.includes('api-uploud')) {
-      base = DEFAULT_UPLOAD_CONFIG.apiBase;
+      base = DEFAULT_R2_CONFIG.apiBase;
     }
     return base;
   }

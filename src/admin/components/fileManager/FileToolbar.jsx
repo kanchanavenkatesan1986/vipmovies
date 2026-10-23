@@ -10,7 +10,6 @@ export default function FileToolbar({
   onSortChange,
   onOpenCreateFolder,
   onOpenUploadUrl,
-  onOpenUploadToCurrent,
   onToggleFilterDrawer,
   hasActiveFilters = false,
   selectedCount = 0,
@@ -110,23 +109,12 @@ export default function FileToolbar({
 
           <button
             type="button"
-            className="admin-btn secondary"
+            className="admin-btn primary"
             onClick={onOpenUploadUrl}
             title="Directly upload/import a file from a web URL into this folder"
-            style={{ borderColor: 'rgba(59, 130, 246, 0.45)', background: 'rgba(59, 130, 246, 0.12)', color: '#93c5fd' }}
           >
-            <i className="fa-solid fa-link" style={{ color: '#60a5fa' }}></i>
+            <i className="fa-solid fa-cloud-arrow-down"></i>
             <span>Upload URL</span>
-          </button>
-
-          <button
-            type="button"
-            className="admin-btn primary"
-            onClick={onOpenUploadToCurrent}
-            title="Upload local files to this folder"
-          >
-            <i className="fa-solid fa-cloud-arrow-up"></i>
-            <span>Upload Here</span>
           </button>
 
           {onShowShortcuts && (

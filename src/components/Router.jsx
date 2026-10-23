@@ -17,7 +17,6 @@ import LoginPage from '../admin/pages/LoginPage';
 import DashboardPage from '../admin/pages/DashboardPage';
 import MoviesPage from '../admin/pages/MoviesPage';
 import SlidesPage from '../admin/pages/SlidesPage';
-import UploadManagerPage from '../admin/pages/UploadManagerPage';
 import FileManagerPage from '../admin/pages/FileManagerPage';
 import PlayerAdsPage from '../admin/pages/PlayerAdsPage';
 import { authService } from '../admin/services/authService';
@@ -99,7 +98,7 @@ export default function Router() {
     }
 
     if (path === 'admin/uploads' || path === 'admin/upload') {
-      return <UploadManagerPage navigateTo={navigateTo} />;
+      return <FileManagerPage navigateTo={navigateTo} />;
     }
 
     if (path === 'admin/file-manager' || path === 'admin/files') {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { sanitizeMovieFolder } from '../../services/uploader/uploadUtils';
+import { sanitizeMovieFolder } from '../../services/fileManager/fileManagerUtils';
 
 export default function FolderCreateModal({
   isOpen,

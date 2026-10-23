@@ -6,7 +6,7 @@ export default function FileManagerHeader({
   currentPrefix = '',
   loading = false,
   onRefresh,
-  onOpenUpload
+  onOpenUploadUrl
 }) {
   return (
     <div className="fm-header-card">
@@ -35,14 +35,16 @@ export default function FileManagerHeader({
             <span>Refresh</span>
           </button>
 
-          <button
-            type="button"
-            className="admin-btn primary"
-            onClick={onOpenUpload}
-          >
-            <i className="fa-solid fa-cloud-arrow-up"></i>
-            <span>Upload Movies</span>
-          </button>
+          {onOpenUploadUrl && (
+            <button
+              type="button"
+              className="admin-btn primary"
+              onClick={onOpenUploadUrl}
+            >
+              <i className="fa-solid fa-cloud-arrow-down"></i>
+              <span>Upload from URL</span>
+            </button>
+          )}
         </div>
       </div>
 
