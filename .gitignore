@@ -26,3 +26,10 @@ dist-ssr
 
 # Scratch / Temp testing
 scratch/
+
+# Local backups (keep on disk, not in git)
+_backups/
+
+# Wrangler local cache
+.wrangler/
+*/.wrangler/
