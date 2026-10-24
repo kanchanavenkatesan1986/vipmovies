@@ -9,6 +9,7 @@ export default function App() {
   const { isLoading, error } = useApp();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState('home');
+  const [downloadToast, setDownloadToast] = useState(null);
 
   // Track active page path for bottom-nav styling
   useEffect(() => {
@@ -62,6 +63,30 @@ export default function App() {
     closeDrawer();
   };
 
+  const openDownloadManager = (e) => {
+    closeDrawer();
+
+    // 1. Direct Android WebView JS Bridge
+    if (window.AndroidBridge && typeof window.AndroidBridge.openDownloadManager === 'function') {
+      if (e && e.preventDefault) e.preventDefault();
+      window.AndroidBridge.openDownloadManager();
+      return;
+    }
+
+    // 2. Custom Scheme: Intercepted by UrlRouter.java in Android WebView
+    try {
+      window.location.href = 'app://downloads';
+    } catch (err) {
+      console.warn('Custom scheme trigger:', err);
+    }
+
+    // 3. User feedback for browser preview / non-webview environments
+    if (!window.AndroidBridge) {
+      setDownloadToast('Opening Native Download Manager (app://downloads)...');
+      setTimeout(() => setDownloadToast(null), 3200);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
@@ -109,6 +134,21 @@ export default function App() {
         <div className="nav-menu">
           <a onClick={() => navigateTo('home')} className={`nav-link ${currentPath === 'home' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
             <i className="fa-solid fa-house"></i> Home
+          </a>
+          <a 
+            href="app://downloads" 
+            onClick={openDownloadManager} 
+            className="nav-link nav-download-link" 
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="nav-download-icon-box">
+              <i className="fa-solid fa-arrow-down-to-bracket nav-download-icon"></i>
+            </div>
+            <span className="nav-download-text">Downloads</span>
+            <span className="nav-download-badge">Offline</span>
+          </a>
+          <a onClick={() => navigateTo('filter')} className={`nav-link ${currentPath === 'filter' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
+            <i className="fa-solid fa-sliders"></i> Filter
           </a>
           <a onClick={() => navigateTo('favorites')} className={`nav-link ${currentPath === 'favorites' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
             <i className="fa-solid fa-heart"></i> Favorites
@@ -166,15 +206,31 @@ export default function App() {
           <i className="fa-solid fa-calendar-days"></i>
           <span>Years</span>
         </a>
-        <a href="/filter" onClick={(e) => switchNav(e, 'filter')} className={`bottom-nav-item ${currentPath === 'filter' ? 'active' : ''}`}>
-          <i className="fa-solid fa-sliders"></i>
-          <span>Filter</span>
+        <a 
+          href="app://downloads" 
+          onClick={openDownloadManager} 
+          className="bottom-nav-item bottom-nav-download"
+          title="Downloads"
+        >
+          <div className="bottom-download-wrapper">
+            <i className="fa-solid fa-arrow-down-to-bracket bottom-download-icon"></i>
+            <span className="bottom-download-pulse"></span>
+          </div>
+          <span>Downloads</span>
         </a>
         <a href="/history" onClick={(e) => switchNav(e, 'history')} className={`bottom-nav-item ${currentPath === 'history' ? 'active' : ''}`}>
           <i className="fa-solid fa-clock-rotate-left"></i>
           <span>History</span>
         </a>
       </div>
+
+      {/* Native Download Trigger Toast */}
+      {downloadToast && (
+        <div className="native-download-toast">
+          <i className="fa-solid fa-circle-check"></i>
+          <span>{downloadToast}</span>
+        </div>
+      )}
     </div>
   );
 }

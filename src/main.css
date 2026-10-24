@@ -232,6 +232,208 @@ body {
     text-align: center;
 }
 
+/* ================= NATIVE DOWNLOAD MANAGER DYNAMIC STYLES & ANIMATION ================= */
+.nav-download-link {
+    background: linear-gradient(135deg, rgba(245, 197, 24, 0.12) 0%, rgba(255, 171, 0, 0.04) 100%) !important;
+    border: 1px solid rgba(245, 197, 24, 0.35) !important;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(245, 197, 24, 0.08);
+}
+
+.nav-download-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+    animation: dlShimmerSweep 3.5s infinite;
+}
+
+.nav-download-icon-box {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(245, 197, 24, 0.18);
+    color: var(--accent);
+    position: relative;
+    flex-shrink: 0;
+}
+
+.nav-download-icon {
+    font-size: 16px !important;
+    color: var(--accent) !important;
+    animation: dlIconDropBounce 2.2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+
+.nav-download-text {
+    flex: 1;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.nav-download-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(245, 197, 24, 0.25) 0%, rgba(255, 107, 0, 0.2) 100%);
+    color: #ffd043;
+    border: 1px solid rgba(245, 197, 24, 0.45);
+    box-shadow: 0 0 10px rgba(245, 197, 24, 0.2);
+    animation: dlBadgeGlow 2.5s ease-in-out infinite alternate;
+}
+
+/* Bottom Nav Download Item */
+.bottom-nav-download {
+    position: relative;
+}
+
+.bottom-download-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 24px;
+}
+
+.bottom-download-icon {
+    font-size: 18px !important;
+    color: #f5c518 !important;
+    animation: dlIconDropBounce 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+    filter: drop-shadow(0 0 6px rgba(245, 197, 24, 0.6));
+    transition: var(--transition);
+}
+
+.bottom-download-pulse {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(245, 197, 24, 0.45) 0%, transparent 70%);
+    animation: dlHaloPulse 2s ease-out infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.bottom-nav-download:hover .bottom-download-icon,
+.bottom-nav-download:active .bottom-download-icon {
+    transform: scale(1.18);
+    color: #ffea79 !important;
+    filter: drop-shadow(0 0 12px rgba(245, 197, 24, 0.9));
+}
+
+.bottom-nav-download span {
+    font-size: 10px;
+    font-weight: 600;
+    color: #f5c518;
+    text-shadow: 0 0 8px rgba(245, 197, 24, 0.3);
+}
+
+/* Dynamic Keyframes for Download Animations */
+@keyframes dlIconDropBounce {
+    0%, 100% {
+        transform: translateY(0) scale(1);
+    }
+    30% {
+        transform: translateY(-4px) scale(0.96);
+    }
+    55% {
+        transform: translateY(3px) scale(1.08);
+    }
+    70% {
+        transform: translateY(-1.5px) scale(1.02);
+    }
+    85% {
+        transform: translateY(1px) scale(1.01);
+    }
+}
+
+@keyframes dlHaloPulse {
+    0% {
+        transform: scale(0.6);
+        opacity: 0.85;
+    }
+    50% {
+        transform: scale(1.4);
+        opacity: 0.3;
+    }
+    100% {
+        transform: scale(1.85);
+        opacity: 0;
+    }
+}
+
+@keyframes dlBadgeGlow {
+    0% {
+        box-shadow: 0 0 6px rgba(245, 197, 24, 0.2);
+        border-color: rgba(245, 197, 24, 0.35);
+    }
+    100% {
+        box-shadow: 0 0 14px rgba(245, 197, 24, 0.6);
+        border-color: rgba(245, 197, 24, 0.75);
+    }
+}
+
+@keyframes dlShimmerSweep {
+    0% {
+        left: -100%;
+    }
+    40%, 100% {
+        left: 200%;
+    }
+}
+
+/* Native Download Toast Notification */
+.native-download-toast {
+    position: fixed;
+    bottom: 76px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(18, 18, 26, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(245, 197, 24, 0.45);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(245, 197, 24, 0.3);
+    color: #ffffff;
+    padding: 12px 22px;
+    border-radius: 50px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 10001;
+    animation: dlToastIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.native-download-toast i {
+    color: #f5c518;
+    font-size: 16px;
+    animation: dlIconDropBounce 1.5s infinite;
+}
+
+@keyframes dlToastIn {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 20px) scale(0.92);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+    }
+}
+
 /* ================= SLIDER CONTAINER (PREMIUM CINEMATIC DESIGN) ================= */
 #slider {
     margin: 0 auto 32px auto;
