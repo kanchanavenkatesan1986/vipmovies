@@ -252,21 +252,10 @@ body {
     animation: dlShimmerSweep 3.5s infinite;
 }
 
-.nav-download-icon-box {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    background: rgba(245, 197, 24, 0.18);
-    color: var(--accent);
-    position: relative;
-    flex-shrink: 0;
-}
-
 .nav-download-icon {
-    font-size: 16px !important;
+    font-size: 18px !important;
+    width: 24px;
+    text-align: center;
     color: var(--accent) !important;
     animation: dlIconDropBounce 2.2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
 }
@@ -277,32 +266,9 @@ body {
     color: #ffffff;
 }
 
-.nav-download-badge {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    padding: 3px 8px;
-    border-radius: 20px;
-    background: linear-gradient(135deg, rgba(245, 197, 24, 0.25) 0%, rgba(255, 107, 0, 0.2) 100%);
-    color: #ffd043;
-    border: 1px solid rgba(245, 197, 24, 0.45);
-    box-shadow: 0 0 10px rgba(245, 197, 24, 0.2);
-    animation: dlBadgeGlow 2.5s ease-in-out infinite alternate;
-}
-
 /* Bottom Nav Download Item */
 .bottom-nav-download {
     position: relative;
-}
-
-.bottom-download-wrapper {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 24px;
 }
 
 .bottom-download-icon {
@@ -311,17 +277,6 @@ body {
     animation: dlIconDropBounce 2s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
     filter: drop-shadow(0 0 6px rgba(245, 197, 24, 0.6));
     transition: var(--transition);
-}
-
-.bottom-download-pulse {
-    position: absolute;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(245, 197, 24, 0.45) 0%, transparent 70%);
-    animation: dlHaloPulse 2s ease-out infinite;
-    pointer-events: none;
-    z-index: 0;
 }
 
 .bottom-nav-download:hover .bottom-download-icon,

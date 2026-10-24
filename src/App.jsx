@@ -66,6 +66,12 @@ export default function App() {
   const openDownloadManager = (e) => {
     closeDrawer();
 
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(40);
+      } catch (err) {}
+    }
+
     // 1. Direct Android WebView JS Bridge
     if (window.AndroidBridge && typeof window.AndroidBridge.openDownloadManager === 'function') {
       if (e && e.preventDefault) e.preventDefault();
@@ -141,11 +147,8 @@ export default function App() {
             className="nav-link nav-download-link" 
             style={{ cursor: 'pointer' }}
           >
-            <div className="nav-download-icon-box">
-              <i className="fa-solid fa-arrow-down-to-bracket nav-download-icon"></i>
-            </div>
+            <i className="fa-solid fa-download nav-download-icon"></i>
             <span className="nav-download-text">Downloads</span>
-            <span className="nav-download-badge">Offline</span>
           </a>
           <a onClick={() => navigateTo('filter')} className={`nav-link ${currentPath === 'filter' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
             <i className="fa-solid fa-sliders"></i> Filter
@@ -212,10 +215,7 @@ export default function App() {
           className="bottom-nav-item bottom-nav-download"
           title="Downloads"
         >
-          <div className="bottom-download-wrapper">
-            <i className="fa-solid fa-arrow-down-to-bracket bottom-download-icon"></i>
-            <span className="bottom-download-pulse"></span>
-          </div>
+          <i className="fa-solid fa-download bottom-download-icon"></i>
           <span>Downloads</span>
         </a>
         <a href="/history" onClick={(e) => switchNav(e, 'history')} className={`bottom-nav-item ${currentPath === 'history' ? 'active' : ''}`}>
