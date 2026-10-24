@@ -124,40 +124,6 @@ function EpisodeRow({ ep, series, onPlay }) {
           >
             EP {ep.episodeNumber}
           </span>
-
-          {/* Play Icon Hover Overlay */}
-          {hasClickUrl && (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(0, 0, 0, 0.35)',
-                opacity: 0.9,
-                transition: 'opacity 0.2s ease'
-              }}
-            >
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'rgba(229, 9, 20, 0.85)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#fff',
-                  fontSize: '12px',
-                  paddingLeft: '2px',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.6)'
-                }}
-              >
-                <i className="fa-solid fa-play"></i>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Title & Metadata Badges */}
