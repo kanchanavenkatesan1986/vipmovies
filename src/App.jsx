@@ -150,9 +150,6 @@ export default function App() {
             <i className="fa-solid fa-download nav-download-icon"></i>
             <span className="nav-download-text">Downloads</span>
           </a>
-          <a onClick={() => navigateTo('filter')} className={`nav-link ${currentPath === 'filter' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
-            <i className="fa-solid fa-sliders"></i> Filter
-          </a>
           <a onClick={() => navigateTo('favorites')} className={`nav-link ${currentPath === 'favorites' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
             <i className="fa-solid fa-heart"></i> Favorites
           </a>
@@ -209,6 +206,10 @@ export default function App() {
           <i className="fa-solid fa-calendar-days"></i>
           <span>Years</span>
         </a>
+        <a href="/history" onClick={(e) => switchNav(e, 'history')} className={`bottom-nav-item ${currentPath === 'history' ? 'active' : ''}`}>
+          <i className="fa-solid fa-clock-rotate-left"></i>
+          <span>History</span>
+        </a>
         <a 
           href="app://downloads" 
           onClick={openDownloadManager} 
@@ -217,10 +218,6 @@ export default function App() {
         >
           <i className="fa-solid fa-download bottom-download-icon"></i>
           <span>Downloads</span>
-        </a>
-        <a href="/history" onClick={(e) => switchNav(e, 'history')} className={`bottom-nav-item ${currentPath === 'history' ? 'active' : ''}`}>
-          <i className="fa-solid fa-clock-rotate-left"></i>
-          <span>History</span>
         </a>
       </div>
 

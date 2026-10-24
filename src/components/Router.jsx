@@ -5,7 +5,6 @@ import PlayerView from '../views/PlayerView';
 import SearchView from '../views/SearchView';
 import YearsView from '../views/YearsView';
 import ListView from '../views/ListView';
-import FilterView from '../views/FilterView';
 import FavoritesView from '../views/FavoritesView';
 import HistoryView from '../views/HistoryView';
 import SettingsView from '../views/SettingsView';
@@ -142,7 +141,7 @@ export default function Router() {
     case 'list':
       return <ListView type={route.params.type} year={route.params.year} />;
     case 'filter':
-      return <FilterView />;
+      return <SearchView />;
     case 'favorites':
       return <FavoritesView />;
     case 'history':
