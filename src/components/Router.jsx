@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import HomeView from '../views/HomeView';
 import WatchView from '../views/WatchView';
+import WatchMovieView from '../views/WatchMovieView';
+import WatchSeriesView from '../views/WatchSeriesView';
 import PlayerView from '../views/PlayerView';
 import SearchView from '../views/SearchView';
 import YearsView from '../views/YearsView';
@@ -40,6 +42,16 @@ function parseLocation() {
       params.id = searchStr;
       params.reward = searchStr;
     }
+  }
+
+  // Safety protection: Unpack nested URL if passed in ?reward= (e.g. from external ad or bridge redirect)
+  if (params.reward && (params.reward.startsWith('http://') || params.reward.startsWith('https://') || params.reward.startsWith('/'))) {
+    try {
+      const fullUrl = params.reward.startsWith('http') ? new URL(params.reward) : new URL(params.reward, window.location.origin);
+      let nestedPath = fullUrl.pathname.replace(/^\//, '') || 'home';
+      const nestedParams = Object.fromEntries(fullUrl.searchParams.entries());
+      return { path: nestedPath, params: nestedParams };
+    } catch (e) {}
   }
 
   return { path, params };
@@ -119,16 +131,22 @@ export default function Router() {
   }
 
   // Public Web App Views Switch
-  switch (route.path) {
+  switch (path) {
     case 'home':
       return <HomeView />;
     case 'watch':
-      return <WatchView movieId={route.params.reward || route.params.id} type={route.params.type} year={route.params.year} />;
+    case 'watch-movie':
+    case 'watch-movie.html':
+      return <WatchMovieView movieId={route.params.reward || route.params.id} type={route.params.type} year={route.params.year} />;
+    case 'watch-series':
+    case 'watch-series.html':
+      return <WatchSeriesView seriesId={route.params.reward || route.params.id} />;
     case 'player':
     case 'play':
       return (
         <PlayerView
           movieId={route.params.reward || route.params.id}
+          episodeId={route.params.ep || route.params.episodeId}
           initialQuality={route.params.quality || 'auto'}
           initialTime={route.params.t ? parseFloat(route.params.t) : 0}
           rewardGranted={route.params.reward_granted === '1' || route.params.reward_granted === 'true'}

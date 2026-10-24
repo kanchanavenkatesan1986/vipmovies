@@ -92,17 +92,52 @@ export default function MovieDetailsModal({ isOpen, movie, onEdit, onClose }) {
             </div>
           )}
 
-          {/* Video Quality Links */}
-          <div style={{ background: 'rgba(139, 92, 246, 0.08)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(139, 92, 246, 0.25)' }}>
-            <strong style={{ fontSize: '12px', color: 'var(--admin-purple)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
-              <i className="fa-solid fa-link"></i> Video Sources:
-            </strong>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
-              <div><strong>360p (SD):</strong> {movie.p360 ? <a href={movie.p360} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p360}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
-              <div><strong>720p (HD):</strong> {movie.p720 ? <a href={movie.p720} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p720}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
-              <div><strong>1080p (Full HD):</strong> {movie.p1080 ? <a href={movie.p1080} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p1080}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
-            </div>
-          </div>
+          {/* Video Quality Links or Series Episodes */}
+          {(() => {
+            const isSeries = (movie.contentType === 'series') || (Array.isArray(movie.episodes) && movie.episodes.length > 0);
+            const episodes = Array.isArray(movie.episodes) ? movie.episodes : [];
+
+            if (isSeries) {
+              return (
+                <div style={{ background: 'rgba(229, 9, 20, 0.08)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(229, 9, 20, 0.25)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <strong style={{ fontSize: '13px', color: 'var(--accent)', textTransform: 'uppercase' }}>
+                      <i className="fa-solid fa-list-ol"></i> Series Episodes ({episodes.length}):
+                    </strong>
+                  </div>
+                  {episodes.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: 'var(--admin-text-dim)' }}>No episodes recorded yet.</div>
+                  ) : (
+                    <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {episodes.map((ep, i) => (
+                        <div key={ep.episodeId || i} style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#fff', fontWeight: 600 }}>
+                            S{ep.seasonNumber || 1}E{ep.episodeNumber || i+1}: {ep.title}
+                          </span>
+                          <span style={{ color: ep.clickurl ? '#4ade80' : '#f87171', fontSize: '11px' }}>
+                            {ep.clickurl ? 'Ready to Stream' : 'No URL'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ background: 'rgba(139, 92, 246, 0.08)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(139, 92, 246, 0.25)' }}>
+                <strong style={{ fontSize: '12px', color: 'var(--admin-purple)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                  <i className="fa-solid fa-link"></i> Video Sources:
+                </strong>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                  <div><strong>360p (SD):</strong> {movie.p360 ? <a href={movie.p360} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p360}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
+                  <div><strong>720p (HD):</strong> {movie.p720 ? <a href={movie.p720} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p720}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
+                  <div><strong>1080p (Full HD):</strong> {movie.p1080 ? <a href={movie.p1080} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p1080}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Footer */}
@@ -111,7 +146,7 @@ export default function MovieDetailsModal({ isOpen, movie, onEdit, onClose }) {
             Close
           </button>
           <button className="admin-btn primary" onClick={() => { onClose(); onEdit(movie); }}>
-            <i className="fa-solid fa-pen-to-square"></i> Edit Movie
+            <i className="fa-solid fa-pen-to-square"></i> Edit {movie.contentType === 'series' ? 'Series' : 'Movie'}
           </button>
         </div>
 

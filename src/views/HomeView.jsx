@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../AppContext';
 
 export default function HomeView() {
-  const { movies, slider, openMoviePreview } = useApp();
+  const { movies, slider, openMoviePreview, getWatchUrl } = useApp();
   const [slideIndex, setSlideIndex] = useState(0);
 
   // Helper to extract numeric ID suffix (e.g. tamil-2026-1 => 1)
@@ -68,7 +68,7 @@ export default function HomeView() {
       quality,
       image: imageUrl,
       matchedMovie,
-      url: item.url || (matchedMovie ? `/watch?reward=${matchedMovie.id}` : '#')
+      url: item.url || (matchedMovie ? (getWatchUrl ? getWatchUrl(matchedMovie) : `/watch?reward=${matchedMovie.id}`) : '#')
     };
   };
 
@@ -329,7 +329,7 @@ export default function HomeView() {
       </div>
       <div className="movie-scroll" id="tamilMovies">
         {tamilMovies.map((movie) => (
-          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }} className="movie-card-link">
+          <a key={movie.id} href={getWatchUrl ? getWatchUrl(movie) : `/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }} className="movie-card-link">
             <div className="movie-card">
               <div className="movie-card-img-wrapper">
                 <img 
@@ -370,7 +370,7 @@ export default function HomeView() {
       </div>
       <div className="movie-scroll" id="hollywoodMovies">
         {hollywoodMovies.map((movie) => (
-          <a key={movie.id} href={`/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }} className="movie-card-link">
+          <a key={movie.id} href={getWatchUrl ? getWatchUrl(movie) : `/watch?reward=${movie.id}`} onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }} className="movie-card-link">
             <div className="movie-card">
               <div className="movie-card-img-wrapper">
                 <img 

@@ -12,7 +12,7 @@ function getImageUrl(movie) {
 }
 
 export default function FavoritesView() {
-  const { favorites, removeFromFavorites, clearAllFavorites, openMoviePreview } = useApp();
+  const { favorites, removeFromFavorites, clearAllFavorites, openMoviePreview, getWatchUrl } = useApp();
 
   const hasFavorites = favorites && favorites.length > 0;
 
@@ -51,7 +51,7 @@ export default function FavoritesView() {
             return (
               <div key={fav.movieId} className="fav-card-wrapper">
                 <a
-                  href={`/watch?reward=${fav.movieId}`}
+                  href={getWatchUrl ? getWatchUrl(movie) : `/watch?reward=${fav.movieId}`}
                   onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }}
                   className="list-card-link"
                   style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}

@@ -62,7 +62,8 @@ export default function SlideFormModal({
 
   const handleSelectMovieFromCatalog = (movie) => {
     setLinkedMovie(movie);
-    const destinationUrl = movie.targetUrl || `https://vip-movies.pages.dev/watch?reward=${movie.id}`;
+    const isSeries = movie.contentType === 'series' || (Array.isArray(movie.episodes) && movie.episodes.length > 0);
+    const destinationUrl = movie.targetUrl || (isSeries ? `https://vip-movies.pages.dev/watch-series.html?id=${movie.id}` : `https://vip-movies.pages.dev/watch-movie.html?id=${movie.id}`);
     setFormData(prev => ({
       ...prev,
       title: movie.title || prev.title,

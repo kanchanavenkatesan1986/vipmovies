@@ -17,8 +17,9 @@ export default function MovieUnlockModal() {
   if (!previewMovie) return null;
 
   const isComingSoon = previewMovie.status && previewMovie.status.toLowerCase() === 'coming soon';
+  const isSeries = previewMovie.contentType === 'series' || (Array.isArray(previewMovie.episodes) && previewMovie.episodes.length > 0);
   const movieType = (previewMovie.type || '').toLowerCase();
-  const normalizedType = movieType ? movieType.charAt(0).toUpperCase() + movieType.slice(1) : 'Movie';
+  const normalizedType = isSeries ? 'Series' : (movieType ? movieType.charAt(0).toUpperCase() + movieType.slice(1) : 'Movie');
   const posterUrl = getMovieImageUrl(previewMovie);
 
   return (
@@ -28,8 +29,8 @@ export default function MovieUnlockModal() {
         {/* Top Header bar with Close Button */}
         <div className="glass-modal-header">
           <div className="glass-modal-title-group">
-            <span className="glass-badge-type">
-              <i className="fa-solid fa-clapperboard" style={{ marginRight: '5px', fontSize: '9px' }}></i>
+            <span className="glass-badge-type" style={isSeries ? { background: 'rgba(229,9,20,0.2)', color: 'var(--accent)', border: '1px solid rgba(229,9,20,0.3)' } : {}}>
+              <i className={`fa-solid ${isSeries ? 'fa-tv' : 'fa-clapperboard'}`} style={{ marginRight: '5px', fontSize: '9px' }}></i>
               {normalizedType}
             </span>
             <span className="glass-badge-year">

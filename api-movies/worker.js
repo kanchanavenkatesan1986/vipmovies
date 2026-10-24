@@ -124,6 +124,30 @@ async function validateColumns(env, tableName, body) {
   }
 }
 
+function formatRecord(row, tableName) {
+  if (!row) return row;
+  if (tableName === "slider") return row;
+  const isTamil = tableName && tableName.startsWith("tamil");
+  if (!row.type) {
+    row.type = isTamil ? "tamil" : "hollywood";
+  }
+  // Safe episodes parsing
+  if (typeof row.episodes === "string") {
+    try {
+      row.episodes = JSON.parse(row.episodes);
+    } catch {
+      row.episodes = [];
+    }
+  } else if (!Array.isArray(row.episodes)) {
+    row.episodes = [];
+  }
+  // Safe contentType fallback
+  if (!row.contentType) {
+    row.contentType = (Array.isArray(row.episodes) && row.episodes.length > 0) ? "series" : "movie";
+  }
+  return row;
+}
+
 // ─── 3. CANONICAL CACHE KEY & CLOUDFLARE EDGE CACHE ──────────────────────────
 
 /**
@@ -447,9 +471,7 @@ async function handleAppRequest(request, env, ctx) {
     } else {
       const isTamil = table.startsWith("tamil");
       const processedMovies = results.map((row) => {
-        if (!row.type) {
-          row.type = isTamil ? "tamil" : "hollywood";
-        }
+        formatRecord(row, table);
         const time = parseTimestamp(row.updated_at || row.created_at || row.release || row.updated);
         if (time > latestMovieTime) latestMovieTime = time;
         return row;
@@ -673,9 +695,10 @@ async function handleTableRoute(request, env, ctx, tableName, id, preParsedBody 
       if (!data) {
         return jsonResponse({ success: false, message: "Record not found" }, 404);
       }
+      data = formatRecord(data, tableName);
     } else {
       const { results } = await env.DB.prepare(`SELECT * FROM \`${tableName}\``).all();
-      data = results || [];
+      data = (results || []).map((r) => formatRecord(r, tableName));
     }
 
     const bodyText = JSON.stringify(data);
@@ -730,10 +753,24 @@ async function handleTableRoute(request, env, ctx, tableName, id, preParsedBody 
       return jsonResponse({ success: false, message: validation.message }, 400);
     }
 
-    const keys = Object.keys(body);
+    const sanitizedBody = { ...body };
+    if (tableName !== "slider") {
+      if (sanitizedBody.contentType === undefined) {
+        sanitizedBody.contentType = (Array.isArray(sanitizedBody.episodes) && sanitizedBody.episodes.length > 0) ? "series" : "movie";
+      }
+      if (sanitizedBody.episodes !== undefined) {
+        if (typeof sanitizedBody.episodes === "object" && sanitizedBody.episodes !== null) {
+          sanitizedBody.episodes = JSON.stringify(sanitizedBody.episodes);
+        } else if (typeof sanitizedBody.episodes !== "string") {
+          sanitizedBody.episodes = "[]";
+        }
+      }
+    }
+
+    const keys = Object.keys(sanitizedBody);
     const columns = keys.map((k) => `\`${k}\``).join(", ");
     const placeholders = keys.map(() => "?").join(", ");
-    const values = keys.map((k) => body[k]);
+    const values = keys.map((k) => sanitizedBody[k]);
     const sql = `INSERT INTO \`${tableName}\` (${columns}) VALUES (${placeholders})`;
 
     await env.DB.prepare(sql).bind(...values).run();
@@ -741,7 +778,7 @@ async function handleTableRoute(request, env, ctx, tableName, id, preParsedBody 
     // Invalidate edge caches immediately
     ctx.waitUntil(purgeCache(env, request.url, tableName, body.id || null));
 
-    return jsonResponse(body || { success: true, message: "Record inserted successfully" }, 201);
+    return jsonResponse(formatRecord({ ...body }, tableName) || { success: true, message: "Record inserted successfully" }, 201);
   }
 
   // ── PUT ──
@@ -762,13 +799,24 @@ async function handleTableRoute(request, env, ctx, tableName, id, preParsedBody 
       return jsonResponse({ success: false, message: validation.message }, 400);
     }
 
-    const keys = Object.keys(body).filter((k) => k !== "id");
+    const sanitizedBody = { ...body };
+    if (tableName !== "slider") {
+      if (sanitizedBody.episodes !== undefined) {
+        if (typeof sanitizedBody.episodes === "object" && sanitizedBody.episodes !== null) {
+          sanitizedBody.episodes = JSON.stringify(sanitizedBody.episodes);
+        } else if (typeof sanitizedBody.episodes !== "string") {
+          sanitizedBody.episodes = "[]";
+        }
+      }
+    }
+
+    const keys = Object.keys(sanitizedBody).filter((k) => k !== "id");
     if (keys.length === 0) {
       return jsonResponse({ success: false, message: "No fields to update" }, 400);
     }
 
     const setClause = keys.map((k) => `\`${k}\` = ?`).join(", ");
-    const values = keys.map((k) => body[k]);
+    const values = keys.map((k) => sanitizedBody[k]);
     values.push(parsedId);
 
     const updateSql = `UPDATE \`${tableName}\` SET ${setClause} WHERE \`id\` = ?`;
@@ -781,7 +829,8 @@ async function handleTableRoute(request, env, ctx, tableName, id, preParsedBody 
     // Invalidate edge caches immediately
     ctx.waitUntil(purgeCache(env, request.url, tableName, parsedId));
 
-    return jsonResponse({ success: true, message: "Record updated successfully", id: parsedId, ...body });
+    const updatedData = formatRecord({ id: parsedId, ...body }, tableName);
+    return jsonResponse({ success: true, message: "Record updated successfully", ...updatedData });
   }
 
   // ── DELETE ──
@@ -825,16 +874,12 @@ async function handleMoviesRoute(request, env, ctx, id) {
       if (!found) {
         return jsonResponse({ success: false, message: "Movie not found" }, 404);
       }
-      responseData = found.movie;
+      responseData = found.movie ? formatRecord(found.movie, found.table) : null;
     } else {
       const promises = MOVIE_TABLES.map(async (table) => {
         try {
           const { results } = await env.DB.prepare(`SELECT * FROM \`${table}\``).all();
-          const isTamil = table.startsWith("tamil");
-          return (results || []).map((row) => {
-            if (!row.type) row.type = isTamil ? "tamil" : "hollywood";
-            return row;
-          });
+          return (results || []).map((row) => formatRecord(row, table));
         } catch (e) {
           console.error(`Error loading table ${table} for movies endpoint:`, e);
           return [];

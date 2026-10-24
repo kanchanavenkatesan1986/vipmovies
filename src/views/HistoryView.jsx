@@ -25,7 +25,7 @@ function timeAgo(ts) {
 }
 
 export default function HistoryView() {
-  const { history, clearAllHistory, openMoviePreview } = useApp();
+  const { history, clearAllHistory, openMoviePreview, getWatchUrl } = useApp();
 
   const hasHistory = history && history.length > 0;
 
@@ -64,7 +64,7 @@ export default function HistoryView() {
             return (
               <a
                 key={hist.movieId}
-                href={`/watch?reward=${hist.movieId}`}
+                href={getWatchUrl ? getWatchUrl(movie) : `/watch?reward=${hist.movieId}`}
                 onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }}
                 className="list-card-link"
                 style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}

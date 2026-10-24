@@ -19,7 +19,9 @@ const MOVIE_COLUMNS = [
   'p1080',
   'created_at',
   'type',
-  'status'
+  'status',
+  'contentType',
+  'episodes'
 ];
 
 export function sanitizeMoviePayload(data) {
@@ -28,6 +30,20 @@ export function sanitizeMoviePayload(data) {
   for (const col of MOVIE_COLUMNS) {
     if (data[col] !== undefined) {
       sanitized[col] = data[col];
+    }
+  }
+  // Default contentType
+  if (!sanitized.contentType) {
+    sanitized.contentType = (Array.isArray(sanitized.episodes) && sanitized.episodes.length > 0) ? 'series' : 'movie';
+  }
+  // Default episodes array
+  if (sanitized.episodes === undefined) {
+    sanitized.episodes = sanitized.contentType === 'series' ? [] : [];
+  } else if (typeof sanitized.episodes === 'string') {
+    try {
+      sanitized.episodes = JSON.parse(sanitized.episodes);
+    } catch {
+      sanitized.episodes = [];
     }
   }
   return sanitized;

@@ -387,7 +387,22 @@ export const AppProvider = ({ children }) => {
     }
 
     // Full window location navigation so Android WebView shouldOverrideUrlLoading triggers the native rewarded ad
-    window.location.href = `/watch?reward=${encodeURIComponent(strId)}`;
+    const targetMovie = movies.find(m => String(m.id || m.movieId).trim() === strId);
+    const isSeries = targetMovie && (targetMovie.contentType === 'series' || (Array.isArray(targetMovie.episodes) && targetMovie.episodes.length > 0));
+    window.location.href = isSeries
+      ? `/watch-series.html?id=${encodeURIComponent(strId)}`
+      : `/watch-movie.html?id=${encodeURIComponent(strId)}`;
+  };
+
+  // Helper to determine watch URL (series vs movie)
+  const getWatchUrl = (movie) => {
+    if (!movie) return '/home';
+    const id = typeof movie === 'object' ? (movie.id || movie.movieId) : movie;
+    const target = typeof movie === 'object' ? movie : movies.find(m => String(m.id || m.movieId).trim() === String(id).trim());
+    const isSeries = target && (target.contentType === 'series' || (Array.isArray(target.episodes) && target.episodes.length > 0));
+    return isSeries
+      ? `/watch-series.html?id=${encodeURIComponent(id)}`
+      : `/watch-movie.html?id=${encodeURIComponent(id)}`;
   };
 
   // Trigger Rewarded Sponsor Ad (Clean user choice flow for Android WebView & Web)
@@ -417,6 +432,7 @@ export const AppProvider = ({ children }) => {
       closeMoviePreview,
       isMovieUnlocked,
       unlockMovie,
+      getWatchUrl,
       triggerRewardedAd,
       toggleFavorite,
       clearAllFavorites,

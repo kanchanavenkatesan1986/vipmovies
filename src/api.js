@@ -256,6 +256,7 @@ var CacheManager = (function() {
     var _byType     = new Map();
     var _byCategory = new Map();
     var _byStatus   = new Map();
+    var _byContentType = new Map();
     var _ready = false;
 
     function normalizeMovie(m) {
@@ -267,6 +268,23 @@ var CacheManager = (function() {
         else if (m['720p']) m.p720   = m['720p'];
         if (m.p1080)      m['1080p'] = m.p1080;
         else if (m['1080p']) m.p1080 = m['1080p'];
+
+        // Normalize episodes
+        if (typeof m.episodes === 'string') {
+            try {
+                m.episodes = JSON.parse(m.episodes);
+            } catch (e) {
+                m.episodes = [];
+            }
+        } else if (!Array.isArray(m.episodes)) {
+            m.episodes = [];
+        }
+
+        // Normalize contentType
+        if (!m.contentType) {
+            m.contentType = (Array.isArray(m.episodes) && m.episodes.length > 0) ? 'series' : 'movie';
+        }
+
         return m;
     }
 
@@ -283,6 +301,7 @@ var CacheManager = (function() {
         _byType.clear();
         _byCategory.clear();
         _byStatus.clear();
+        _byContentType.clear();
 
         _movies.forEach(function(m) {
             normalizeMovie(m);
@@ -303,6 +322,10 @@ var CacheManager = (function() {
 
             var status = String(m.status || '').toLowerCase().trim();
             if (status) { if (!_byStatus.has(status)) _byStatus.set(status, []); _byStatus.get(status).push(m); }
+
+            var cType = String(m.contentType || 'movie').toLowerCase().trim();
+            if (!_byContentType.has(cType)) _byContentType.set(cType, []);
+            _byContentType.get(cType).push(m);
         });
 
         _ready = true;
@@ -311,20 +334,21 @@ var CacheManager = (function() {
     function clear() {
         _movies = []; _slider = [];
         _byId.clear(); _byYear.clear();
-        _byType.clear(); _byCategory.clear(); _byStatus.clear();
+        _byType.clear(); _byCategory.clear(); _byStatus.clear(); _byContentType.clear();
         _ready = false;
     }
 
     return {
         populate, clear,
-        isReady:      function() { return _ready; },
-        getMovies:    function() { return _movies; },
-        getSlider:    function() { return _slider; },
-        byId:         function(id) { return _byId.get(String(id)) || _byId.get(Number(id)) || null; },
-        byYear:       function(y)  { return _byYear.get(String(y).trim()) || []; },
-        byType:       function(t)  { return _byType.get(t.toLowerCase().trim()) || []; },
-        byCategory:   function(c)  { return _byCategory.get(c.toLowerCase().trim()) || []; },
-        byStatus:     function(s)  { return _byStatus.get(s.toLowerCase().trim()) || []; },
+        isReady:       function() { return _ready; },
+        getMovies:     function() { return _movies; },
+        getSlider:     function() { return _slider; },
+        byId:          function(id) { return _byId.get(String(id)) || _byId.get(Number(id)) || null; },
+        byYear:        function(y)  { return _byYear.get(String(y).trim()) || []; },
+        byType:        function(t)  { return _byType.get(t.toLowerCase().trim()) || []; },
+        byCategory:    function(c)  { return _byCategory.get(c.toLowerCase().trim()) || []; },
+        byStatus:      function(s)  { return _byStatus.get(s.toLowerCase().trim()) || []; },
+        byContentType: function(c)  { return _byContentType.get(c.toLowerCase().trim()) || []; },
     };
 }());
 

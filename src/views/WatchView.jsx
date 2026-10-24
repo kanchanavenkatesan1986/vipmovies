@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../AppContext';
+import { fetchExactVideoSize, getDownloadUrl } from '../utils/mediaUtils';
 
 function getMovieImageUrl(movie) {
   if (!movie) return '';
@@ -53,6 +54,15 @@ export default function WatchView({ movieId }) {
   const { movies, favorites, toggleFavorite, recordHistory, isMovieUnlocked } = useApp();
   const movie = movies.find(m => String(m.id || m.movieId).trim() === String(movieId || '').trim());
 
+  // Automatic routing: if record is actually a series, redirect to watch-series.html
+  useEffect(() => {
+    if (movie && (movie.contentType === 'series' || (Array.isArray(movie.episodes) && movie.episodes.length > 0))) {
+      const id = movie.id || movie.movieId;
+      window.history.replaceState(null, '', `/watch-series.html?id=${encodeURIComponent(id)}`);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  }, [movie]);
+
   useEffect(() => {
     if (movie && isMovieUnlocked(movie.id)) {
       recordHistory(movie);
@@ -96,8 +106,19 @@ export default function WatchView({ movieId }) {
 
   const navigateToPlayer = (quality = 'auto') => {
     const id = movie.id || movie.movieId;
-    window.history.pushState(null, '', `/player?reward=${encodeURIComponent(id)}&quality=${encodeURIComponent(quality)}`);
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    const playerUrl = `/player?reward=${encodeURIComponent(id)}&quality=${encodeURIComponent(quality)}`;
+    const isAndroid = typeof window !== 'undefined' && (
+      window.Android !== undefined ||
+      window.androidBridge !== undefined ||
+      window.location.search.includes('source=app') ||
+      (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.includes('wv'))
+    );
+    if (isAndroid) {
+      window.location.href = playerUrl;
+    } else {
+      window.history.pushState(null, '', playerUrl);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
   };
 
   // Direct download links
@@ -109,11 +130,32 @@ export default function WatchView({ movieId }) {
   const has720 = Boolean(p720Link && p720Link !== '#' && p720Link.trim() !== '');
   const has1080 = Boolean(p1080Link && p1080Link !== '#' && p1080Link.trim() !== '');
 
-  const size460 = has460 ? getQualityFileSize(p460Link, movie.duration, '460p') : '';
-  const size720 = has720 ? getQualityFileSize(p720Link, movie.duration, '720p') : '';
-  const size1080 = has1080 ? getQualityFileSize(p1080Link, movie.duration, '1080p') : '';
+  const [exactSizes, setExactSizes] = useState({});
 
-  const directDownloadLink = has1080 ? p1080Link : has720 ? p720Link : has460 ? p460Link : '#';
+  useEffect(() => {
+    let isMounted = true;
+    [
+      { key: '460', link: p460Link },
+      { key: '720', link: p720Link },
+      { key: '1080', link: p1080Link }
+    ].forEach(({ key, link }) => {
+      if (link && link.startsWith('http')) {
+        fetchExactVideoSize(link).then(sz => {
+          if (isMounted && sz) {
+            setExactSizes(prev => ({ ...prev, [key]: sz }));
+          }
+        });
+      }
+    });
+    return () => { isMounted = false; };
+  }, [p460Link, p720Link, p1080Link]);
+
+  const size460 = exactSizes['460'] || (has460 ? getQualityFileSize(p460Link, movie.duration, '460p') : '');
+  const size720 = exactSizes['720'] || (has720 ? getQualityFileSize(p720Link, movie.duration, '720p') : '');
+  const size1080 = exactSizes['1080'] || (has1080 ? getQualityFileSize(p1080Link, movie.duration, '1080p') : '');
+
+  const rawDownloadLink = has1080 ? p1080Link : has720 ? p720Link : has460 ? p460Link : '#';
+  const directDownloadLink = getDownloadUrl(rawDownloadLink);
 
   return (
     <>
@@ -244,7 +286,7 @@ export default function WatchView({ movieId }) {
                     </button>
                     <a
                       className="quality-btn-down p460"
-                      href={p460Link}
+                      href={getDownloadUrl(p460Link)}
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Download 460p"
@@ -285,7 +327,7 @@ export default function WatchView({ movieId }) {
                     </button>
                     <a
                       className="quality-btn-down p720"
-                      href={p720Link}
+                      href={getDownloadUrl(p720Link)}
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Download 720p"
@@ -326,7 +368,7 @@ export default function WatchView({ movieId }) {
                     </button>
                     <a
                       className="quality-btn-down p1080"
-                      href={p1080Link}
+                      href={getDownloadUrl(p1080Link)}
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Download 1080p"

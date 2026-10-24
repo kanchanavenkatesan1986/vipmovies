@@ -736,87 +736,105 @@ export default function AdvancedVideoPlayer({
   }, [playerState, adsConfig, adsWatchedCount, isAdBreakModalOpen, showWarningPill, adMilestones, clearedMilestones]);
 
   // ─── 15. AD TRIGGER ACTION & RESUME WORKFLOW ───
+  const resumePlaybackAfterAd = useCallback(() => {
+    if (!movie) return;
+    const mid = String(movie.id || movie.movieId || '').trim();
+    const nextCount = (adsWatchedCountRef.current || 0) + 1;
+    setAdsWatchedCount(nextCount);
+    adsWatchedCountRef.current = nextCount;
+    try {
+      sessionStorage.setItem(`vip_session_ads_${mid}`, String(nextCount));
+    } catch {}
+
+    // Unlock milestone in timeline mode
+    if (adMilestones.length > 0) {
+      const targetPos = pendingResumeTimeRef.current !== null ? pendingResumeTimeRef.current : (videoRef.current?.currentTime || 0);
+      const nextMilestoneToClear = targetMilestoneRef.current || adMilestones.find((m) => !clearedMilestonesRef.current.includes(m));
+      const toClear = adMilestones.filter(
+        (m) =>
+          (nextMilestoneToClear && m === nextMilestoneToClear) ||
+          targetPos >= (m - 30) ||
+          m <= targetPos
+      );
+
+      if (toClear.length > 0) {
+        setClearedMilestones((prev) => {
+          const set = new Set([...prev, ...toClear]);
+          const arr = Array.from(set);
+          clearedMilestonesRef.current = arr;
+          try {
+            sessionStorage.setItem(`vip_cleared_milestones_${mid}`, JSON.stringify(arr));
+          } catch {}
+          return arr;
+        });
+      }
+    }
+
+    activeWatchSecondsRef.current = 0;
+    setIsAdBreakModalOpen(false);
+    setShowWarningPill(false);
+
+    const resumeTime = pendingResumeTimeRef.current;
+    pendingResumeTimeRef.current = null;
+    targetMilestoneRef.current = null;
+
+    if (resumeTime !== null && videoRef.current) {
+      videoRef.current.currentTime = resumeTime;
+      setCurrentTime(resumeTime);
+    }
+
+    if (window.UIManager?.showToast) {
+      window.UIManager.showToast(`🎉 +${adsConfig?.rewardDurationMinutes || 25} Ad-Free minutes unlocked!`);
+    }
+
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [movie, adsConfig, adMilestones]);
+
   const handleWatchAd = useCallback(() => {
     if (!videoRef.current || !movie) return;
 
-    const mid = String(movie.id || movie.movieId || '').trim();
-    const resumePos = pendingResumeTimeRef.current !== null
-      ? pendingResumeTimeRef.current
-      : Math.floor(videoRef.current.currentTime || currentTime || 0);
+    // Check if real Android WebView bridge exists (with showRewardedAd)
+    const hasBridge = (
+      (window.AndroidBridge && typeof window.AndroidBridge.showRewardedAd === 'function') ||
+      (window.Android && typeof window.Android.showRewardedAd === 'function')
+    );
 
-    const resumeUrl = `${window.location.origin}/player?reward=${encodeURIComponent(mid)}&t=${resumePos}&quality=${encodeURIComponent(currentQuality)}&reward_granted=true`;
-
-    const isAndroid = /Android/i.test(navigator.userAgent) ||
-                      window.Android !== undefined ||
-                      window.androidBridge !== undefined ||
-                      window.location.search.includes('source=app');
-
-    if (isAndroid) {
-      playerStorage.saveProgress(mid, {
-        currentTime: resumePos,
-        duration: duration,
-        quality: currentQuality,
-        playbackRate: playbackRate
-      });
-      // Android WebView shouldOverrideUrlLoading catches ?reward= and triggers the native rewarded ad
-      window.location.href = `/watch?reward=${encodeURIComponent(resumeUrl)}`;
-    } else {
-      // Browser / Desktop grace simulation
-      setTimeout(() => {
-        const nextCount = (adsWatchedCountRef.current || 0) + 1;
-        setAdsWatchedCount(nextCount);
-        adsWatchedCountRef.current = nextCount;
-        try {
-          sessionStorage.setItem(`vip_session_ads_${mid}`, String(nextCount));
-        } catch {}
-
-        // Unlock milestone in timeline mode
-        if (adMilestones.length > 0) {
-          const targetPos = pendingResumeTimeRef.current !== null ? pendingResumeTimeRef.current : (videoRef.current?.currentTime || 0);
-          const nextMilestoneToClear = targetMilestoneRef.current || adMilestones.find((m) => !clearedMilestonesRef.current.includes(m));
-          const toClear = adMilestones.filter(
-            (m) =>
-              (nextMilestoneToClear && m === nextMilestoneToClear) ||
-              targetPos >= (m - 30) ||
-              m <= targetPos
-          );
-
-          if (toClear.length > 0) {
-            setClearedMilestones((prev) => {
-              const set = new Set([...prev, ...toClear]);
-              const arr = Array.from(set);
-              clearedMilestonesRef.current = arr;
-              try {
-                sessionStorage.setItem(`vip_cleared_milestones_${mid}`, JSON.stringify(arr));
-              } catch {}
-              return arr;
-            });
-          }
+    if (hasBridge) {
+      try {
+        if (window.AndroidBridge?.showRewardedAd) {
+          window.AndroidBridge.showRewardedAd();
+        } else if (window.Android?.showRewardedAd) {
+          window.Android.showRewardedAd();
         }
-
-        activeWatchSecondsRef.current = 0;
-        setIsAdBreakModalOpen(false);
-        setShowWarningPill(false);
-
-        const resumeTime = pendingResumeTimeRef.current;
-        pendingResumeTimeRef.current = null;
-        targetMilestoneRef.current = null;
-
-        if (resumeTime !== null && videoRef.current) {
-          videoRef.current.currentTime = resumeTime;
-          setCurrentTime(resumeTime);
-        }
-
-        if (window.UIManager?.showToast) {
-          window.UIManager.showToast(`🎉 +${adsConfig?.rewardDurationMinutes || 25} Ad-Free minutes unlocked!`);
-        }
-
-        if (videoRef.current) {
-          videoRef.current.play().catch(() => {});
-        }
-      }, 1500);
+        return;
+      } catch (e) {
+        console.warn('Android bridge ad call failed, falling back to in-player resume:', e);
+      }
     }
-  }, [movie, currentTime, currentQuality, duration, playbackRate, adsWatchedCount, adsConfig, adMilestones, clearedMilestones]);
+
+    // In web player (desktop / mobile browser): brief 1s sponsor grace & resume playback seamlessly!
+    setTimeout(() => {
+      resumePlaybackAfterAd();
+    }, 1000);
+  }, [movie, resumePlaybackAfterAd]);
+
+  // Global listener for Android WebView native rewarded ad callback
+  useEffect(() => {
+    window.onRewardedAdCompleted = () => {
+      resumePlaybackAfterAd();
+    };
+    window.onVipAdCompleted = () => {
+      resumePlaybackAfterAd();
+    };
+    return () => {
+      try {
+        delete window.onRewardedAdCompleted;
+        delete window.onVipAdCompleted;
+      } catch {}
+    };
+  }, [resumePlaybackAfterAd]);
 
   const handleWatchAhead = useCallback(() => {
     if (videoRef.current && !videoRef.current.paused) {

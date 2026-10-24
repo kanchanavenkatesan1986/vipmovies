@@ -32,14 +32,27 @@ export function validateMovieData(data) {
     }
   };
 
-  if (data.p360 && !isValidUrl(data.p360)) {
-    errors.p360 = 'Invalid URL format for 360p link.';
-  }
-  if (data.p720 && !isValidUrl(data.p720)) {
-    errors.p720 = 'Invalid URL format for 720p link.';
-  }
-  if (data.p1080 && !isValidUrl(data.p1080)) {
-    errors.p1080 = 'Invalid URL format for 1080p link.';
+  const isSeries = data.contentType === 'series';
+
+  if (!isSeries) {
+    if (data.p360 && !isValidUrl(data.p360)) {
+      errors.p360 = 'Invalid URL format for 360p link.';
+    }
+    if (data.p720 && !isValidUrl(data.p720)) {
+      errors.p720 = 'Invalid URL format for 720p link.';
+    }
+    if (data.p1080 && !isValidUrl(data.p1080)) {
+      errors.p1080 = 'Invalid URL format for 1080p link.';
+    }
+  } else {
+    // For series, episodes can be checked
+    if (Array.isArray(data.episodes)) {
+      data.episodes.forEach((ep, idx) => {
+        if (ep.clickurl && !isValidUrl(ep.clickurl)) {
+          errors.episodes = `Invalid URL format in Episode #${ep.episodeNumber || idx + 1}`;
+        }
+      });
+    }
   }
 
   return {

@@ -14,7 +14,7 @@ function getImageUrl(movie) {
 }
 
 export default function ListView({ type = '', year = '' }) {
-  const { movies, openMoviePreview } = useApp();
+  const { movies, openMoviePreview, getWatchUrl } = useApp();
   const [page, setPage] = useState(1);
 
   const normType = type.toLowerCase().trim();
@@ -142,7 +142,7 @@ export default function ListView({ type = '', year = '' }) {
             return (
               <a 
                 key={movie.id} 
-                href={`/watch?reward=${movie.id}`} 
+                href={getWatchUrl ? getWatchUrl(movie) : `/watch?reward=${movie.id}`} 
                 onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }}
                 className="list-card-link"
               >

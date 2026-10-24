@@ -16,6 +16,7 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
 
   // Filters
   const [searchText, setSearchText] = useState('');
+  const [selectedContentType, setSelectedContentType] = useState(''); // '' | 'movie' | 'series'
   const [selectedType, setSelectedType] = useState(initialType || '');
   const [selectedYear, setSelectedYear] = useState(initialYear || '');
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -166,6 +167,13 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
       );
     }
 
+    if (selectedContentType) {
+      result = result.filter(m => {
+        const cType = (m.contentType || (Array.isArray(m.episodes) && m.episodes.length > 0 ? 'series' : 'movie')).toLowerCase();
+        return cType === selectedContentType.toLowerCase();
+      });
+    }
+
     if (selectedStatus) {
       const normStat = selectedStatus.toLowerCase();
       result = result.filter(m => (m.status || '').toLowerCase() === normStat);
@@ -198,7 +206,7 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
       const dateB = b.created_at || '';
       return dateB.localeCompare(dateA);
     });
-  }, [allMovies, searchText, selectedStatus, selectedCategory, selectedLanguage]);
+  }, [allMovies, searchText, selectedContentType, selectedStatus, selectedCategory, selectedLanguage]);
 
   // Pagination calculation
   const totalRecords = filteredMovies.length;
@@ -226,6 +234,7 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
   // Reset Filters
   const handleResetFilters = () => {
     setSearchText('');
+    setSelectedContentType('');
     setSelectedType('');
     setSelectedYear('');
     setSelectedStatus('');
@@ -245,13 +254,15 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
     if (!sliderCandidate) return;
     const movie = sliderCandidate;
     setIsSliderConfirmOpen(false);
-    setSliderCandidate(null);
-
     try {
+      const isSeries = movie.contentType === 'series' || (Array.isArray(movie.episodes) && movie.episodes.length > 0);
+      const destinationUrl = isSeries
+        ? `https://vip-movies.pages.dev/watch-series.html?id=${movie.id}`
+        : `https://vip-movies.pages.dev/watch-movie.html?id=${movie.id}`;
       const slidePayload = {
         title: movie.title || '',
         image: movie.image || '',
-        url: `https://vip-movies.pages.dev/watch?reward=${movie.id}`,
+        url: destinationUrl,
         status: 'active'
       };
       await slideApi.createSlide(slidePayload);
@@ -483,6 +494,17 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
 
         <select
           className="admin-select"
+          value={selectedContentType}
+          onChange={(e) => { setSelectedContentType(e.target.value); setCurrentPage(1); }}
+          style={{ borderColor: selectedContentType ? 'var(--admin-accent)' : undefined, fontWeight: selectedContentType ? 700 : 400 }}
+        >
+          <option value="">All Formats</option>
+          <option value="movie">Movies Only</option>
+          <option value="series">Series Only</option>
+        </select>
+
+        <select
+          className="admin-select"
           value={selectedType}
           onChange={(e) => { setSelectedType(e.target.value); setCurrentPage(1); }}
         >
@@ -649,8 +671,45 @@ export default function MoviesPage({ navigateTo, initialType = '', initialYear =
                     <td style={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'var(--admin-accent)' }}>
                       {movie.id}
                     </td>
-                    <td style={{ fontWeight: 700, color: '#fff', maxWidth: '220px' }}>
-                      {movie.title}
+                    <td style={{ fontWeight: 700, color: '#fff', maxWidth: '240px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span>{movie.title}</span>
+                        {(() => {
+                          const isSeries = (movie.contentType === 'series') || (Array.isArray(movie.episodes) && movie.episodes.length > 0);
+                          const epCount = Array.isArray(movie.episodes) ? movie.episodes.length : 0;
+                          return isSeries ? (
+                            <span style={{
+                              background: 'rgba(229, 9, 20, 0.15)',
+                              color: 'var(--accent)',
+                              border: '1px solid rgba(229, 9, 20, 0.3)',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <i className="fa-solid fa-tv"></i> SERIES {epCount > 0 ? `(${epCount})` : ''}
+                            </span>
+                          ) : (
+                            <span style={{
+                              background: 'rgba(59, 130, 246, 0.12)',
+                              color: '#60a5fa',
+                              border: '1px solid rgba(59, 130, 246, 0.25)',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <i className="fa-solid fa-film"></i> MOVIE
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td style={{ color: 'var(--admin-text-muted)' }}>{movie.release || '-'}</td>
                     <td>{movie.language || 'Tamil'}</td>

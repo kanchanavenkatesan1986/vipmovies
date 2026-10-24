@@ -23,10 +23,11 @@ const QUICK_TAGS = [
   { label: 'Hollywood', type: 'lang', value: 'hollywood', icon: 'fa-clapperboard' },
   { label: '2026 Movies', type: 'year', value: '2026', icon: 'fa-calendar-days' },
   { label: '2025 Movies', type: 'year', value: '2025', icon: 'fa-calendar-check' },
+  { label: 'Series', type: 'contentType', value: 'series', icon: 'fa-tv' },
 ];
 
 export default function SearchView({ query = '' }) {
-  const { movies, openMoviePreview } = useApp();
+  const { movies, openMoviePreview, getWatchUrl } = useApp();
   const [searchText, setSearchText] = useState(query);
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedLang, setSelectedLang] = useState('');
@@ -234,7 +235,7 @@ export default function SearchView({ query = '' }) {
               return (
                 <a
                   key={movie.id}
-                  href={`/watch?reward=${movie.id}`}
+                  href={getWatchUrl ? getWatchUrl(movie) : `/watch?reward=${movie.id}`}
                   onClick={(e) => { e.preventDefault(); openMoviePreview(movie); }}
                   className="list-card-link"
                   style={isComingSoon ? { opacity: '0.45', filter: 'grayscale(60%)' } : {}}

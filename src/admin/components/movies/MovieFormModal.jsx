@@ -3,6 +3,7 @@ import { getMovieTable, dbToDisplayType, displayToDbType } from '../../utils/tab
 import { generateNextMovieId } from '../../utils/idGenerator';
 import { validateMovieData } from '../../utils/validation';
 import { movieApi } from '../../services/movieApi';
+import EpisodeManager from './EpisodeManager';
 
 export default function MovieFormModal({
   isOpen,
@@ -33,17 +34,35 @@ export default function MovieFormModal({
     p1080: '',
     created_at: new Date().toISOString().split('T')[0],
     type: targetType || 'tamil',
-    status: 'active'
+    status: 'active',
+    contentType: 'movie',
+    episodes: []
   });
 
   const [errors, setErrors] = useState({});
   const [targetTable, setTargetTable] = useState('tamil_2026');
+  const [contentTypeWarning, setContentTypeWarning] = useState(false);
 
   // Initialize form state
   useEffect(() => {
     if (isEdit && initialData) {
       const dbType = displayToDbType(initialData.type || targetType);
       const yr = String(initialData.year || targetYear);
+      let parsedEpisodes = [];
+      if (Array.isArray(initialData.episodes)) {
+        parsedEpisodes = initialData.episodes;
+      } else if (typeof initialData.episodes === 'string') {
+        try {
+          parsedEpisodes = JSON.parse(initialData.episodes);
+        } catch {
+          parsedEpisodes = [];
+        }
+      }
+
+      const inferredContentType = initialData.contentType
+        ? initialData.contentType.toLowerCase()
+        : (parsedEpisodes.length > 0 ? 'series' : 'movie');
+
       setFormData({
         id: initialData.id || '',
         title: initialData.title || '',
@@ -61,7 +80,9 @@ export default function MovieFormModal({
         p1080: initialData.p1080 || initialData['1080p'] || '',
         created_at: initialData.created_at || new Date().toISOString().split('T')[0],
         type: dbType,
-        status: (initialData.status || 'active').toLowerCase()
+        status: (initialData.status || 'active').toLowerCase(),
+        contentType: inferredContentType,
+        episodes: parsedEpisodes
       });
       setTargetTable(initialData._sourceTable || getMovieTable(dbType, yr));
     } else {
@@ -89,10 +110,13 @@ export default function MovieFormModal({
         p1080: '',
         created_at: new Date().toISOString().split('T')[0],
         type: dbType,
-        status: 'active'
+        status: 'active',
+        contentType: 'movie',
+        episodes: []
       });
     }
     setErrors({});
+    setContentTypeWarning(false);
   }, [isOpen, mode, initialData, targetType, targetYear]);
 
   // Handle Type or Year changes in Create mode
@@ -105,6 +129,20 @@ export default function MovieFormModal({
       year: newYear,
       id: `${newType}-${newYear}-00001`
     }));
+  };
+
+  // Handle Content Type change with warning if episodes exist
+  const handleContentTypeChange = (newType) => {
+    if (formData.contentType === 'series' && newType === 'movie' && formData.episodes && formData.episodes.length > 0) {
+      setContentTypeWarning(true);
+      return;
+    }
+    handleChange('contentType', newType);
+  };
+
+  const confirmSwitchToMovie = () => {
+    handleChange('contentType', 'movie');
+    setContentTypeWarning(false);
   };
 
   const handleChange = (field, value) => {
@@ -131,16 +169,18 @@ export default function MovieFormModal({
     ? (formData.image.startsWith('http') ? formData.image : `/src/images/${formData.type}/${formData.year}/${formData.image}`)
     : '';
 
+  const isSeries = formData.contentType === 'series';
+
   return (
     <div className="admin-modal-backdrop" onClick={onCancel}>
-      <div className="admin-modal" style={{ maxWidth: '760px' }} onClick={(e) => e.stopPropagation()}>
+      <div className="admin-modal" style={{ maxWidth: '820px', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}
         <div className="admin-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <i className={`fa-solid ${isEdit ? 'fa-pen-to-square' : 'fa-circle-plus'}`} style={{ color: 'var(--admin-accent)', fontSize: '18px' }}></i>
+            <i className={`fa-solid ${isSeries ? 'fa-tv' : isEdit ? 'fa-pen-to-square' : 'fa-circle-plus'}`} style={{ color: 'var(--admin-accent)', fontSize: '18px' }}></i>
             <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#fff' }}>
-              {isEdit ? `Edit Movie (${formData.id})` : 'Add New Movie'}
+              {isEdit ? `Edit ${isSeries ? 'Series' : 'Movie'} (${formData.id})` : `Add New ${isSeries ? 'Series' : 'Movie'}`}
             </h3>
           </div>
           <button className="admin-btn" style={{ padding: '4px 8px' }} onClick={onCancel}>
@@ -148,17 +188,76 @@ export default function MovieFormModal({
           </button>
         </div>
 
+        {/* Content Type Switch Warning Modal */}
+        {contentTypeWarning && (
+          <div style={{
+            background: 'rgba(239,68,68,0.15)',
+            borderBottom: '1px solid #ef4444',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            fontSize: '12px'
+          }}>
+            <div style={{ color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <i className="fa-solid fa-triangle-exclamation" style={{ color: '#f87171', fontSize: '16px' }}></i>
+              <span>
+                <strong>Warning:</strong> This record has <strong>{formData.episodes?.length || 0} episode(s)</strong>.
+                Switching to Movie will keep episode data in memory, but if saved as a movie, streaming will rely on movie quality URLs.
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              <button
+                type="button"
+                className="admin-btn"
+                style={{ padding: '4px 10px', fontSize: '11px' }}
+                onClick={() => setContentTypeWarning(false)}
+              >
+                Keep Series
+              </button>
+              <button
+                type="button"
+                className="admin-btn"
+                style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 10px', fontSize: '11px' }}
+                onClick={confirmSwitchToMovie}
+              >
+                Switch to Movie
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Form Body */}
-        <form id="movieForm" onSubmit={handleSubmit} className="admin-modal-body">
+        <form id="movieForm" onSubmit={handleSubmit} className="admin-modal-body" style={{ overflowY: 'auto' }}>
 
           {/* DATABASE TARGET & ID SECTION */}
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--admin-border)', padding: '14px 16px', borderRadius: '12px' }}>
             <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--admin-accent)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-              <i className="fa-solid fa-database"></i> Target D1 Database & Generated ID
+              <i className="fa-solid fa-database"></i> Content Type, D1 Target & Generated ID
             </div>
             <div className="admin-form-grid">
+              
+              {/* Content Type Selector */}
               <div className="admin-form-group">
-                <label>Movie Type</label>
+                <label>Content Type *</label>
+                <select
+                  className="admin-select"
+                  value={formData.contentType || 'movie'}
+                  onChange={(e) => handleContentTypeChange(e.target.value)}
+                  style={{
+                    borderColor: isSeries ? 'var(--admin-accent)' : undefined,
+                    fontWeight: 700,
+                    color: isSeries ? 'var(--admin-accent)' : '#fff'
+                  }}
+                >
+                  <option value="movie">Movie</option>
+                  <option value="series">Series</option>
+                </select>
+              </div>
+
+              <div className="admin-form-group">
+                <label>Collection Type</label>
                 {isEdit ? (
                   <input className="admin-input" value={dbToDisplayType(formData.type)} disabled readOnly />
                 ) : (
@@ -196,13 +295,14 @@ export default function MovieFormModal({
               </div>
 
               <div className="admin-form-group">
-                <label>Movie ID {!isEdit && <span style={{ color: 'var(--admin-gold)', fontSize: '11px' }}>(Position #1)</span>}</label>
+                <label>{isSeries ? 'Series' : 'Movie'} ID {!isEdit && <span style={{ color: 'var(--admin-gold)', fontSize: '11px' }}>(Position #1)</span>}</label>
                 <input className="admin-input" value={formData.id} disabled readOnly style={{ color: 'var(--admin-accent)', fontWeight: 'bold' }} />
               </div>
             </div>
+
             {!isEdit && (
               <div style={{ fontSize: '11px', color: 'var(--admin-gold)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <i className="fa-solid fa-arrow-down-wide-short"></i> New movie will be inserted as ID 1 (Row 1). All existing movies will automatically shift +1 (1 → 2, 2 → 3...).
+                <i className="fa-solid fa-arrow-down-wide-short"></i> New record will be inserted as ID 1 (Row 1). All existing records in {targetTable} will automatically shift +1 (1 → 2, 2 → 3...).
               </div>
             )}
             {isEdit && (
@@ -214,11 +314,11 @@ export default function MovieFormModal({
 
           {/* BASIC INFORMATION */}
           <div className="admin-form-group full">
-            <label>Movie Title *</label>
+            <label>{isSeries ? 'Series Title *' : 'Movie Title *'}</label>
             <input
               type="text"
               className="admin-input"
-              placeholder="e.g. Minions and Monsters (2026)"
+              placeholder={isSeries ? "e.g. Stranger Things (2026)" : "e.g. Minions and Monsters (2026)"}
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
             />
@@ -269,11 +369,11 @@ export default function MovieFormModal({
             </div>
 
             <div className="admin-form-group">
-              <label>Duration</label>
+              <label>Duration {isSeries && <span style={{ fontSize: '11px', color: 'var(--admin-text-dim)' }}>(Avg/Optional)</span>}</label>
               <input
                 type="text"
                 className="admin-input"
-                placeholder="e.g. 02:15:35 min"
+                placeholder={isSeries ? "e.g. 45 min / ep" : "e.g. 02:15:35 min"}
                 value={formData.duration}
                 onChange={(e) => handleChange('duration', e.target.value)}
               />
@@ -305,11 +405,11 @@ export default function MovieFormModal({
 
           {/* MEDIA & IMAGE PREVIEW */}
           <div className="admin-form-group full">
-            <label>Image Filename or Full URL *</label>
+            <label>{isSeries ? 'Series Poster Image Filename or Full URL *' : 'Movie Poster Image Filename or Full URL *'}</label>
             <input
               type="text"
               className="admin-input"
-              placeholder="e.g. Movie Poster.webp OR https://..."
+              placeholder="e.g. Poster.webp OR https://..."
               value={formData.image}
               onChange={(e) => handleChange('image', e.target.value)}
             />
@@ -349,48 +449,58 @@ export default function MovieFormModal({
             ></textarea>
           </div>
 
-          {/* STREAMING VIDEO SOURCES */}
-          <div style={{ borderTop: '1px solid var(--admin-border)', pt: '12px', marginTop: '4px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--admin-purple)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-              <i className="fa-solid fa-play"></i> Streaming & Download Video Sources (URLs)
-            </div>
-            
-            <div className="admin-form-group full" style={{ marginBottom: '10px' }}>
-              <label>360p (SD) Download URL</label>
-              <input
-                type="text"
-                className="admin-input"
-                placeholder="https://..."
-                value={formData.p360}
-                onChange={(e) => handleChange('p360', e.target.value)}
-              />
-              {errors.p360 && <span className="error-text">{errors.p360}</span>}
-            </div>
+          {/* CONDITIONAL SECTION: EPISODES FOR SERIES vs VIDEO SOURCES FOR MOVIE */}
+          {isSeries ? (
+            <EpisodeManager
+              episodes={formData.episodes || []}
+              onChange={(newEpisodes) => handleChange('episodes', newEpisodes)}
+              movieTitle={formData.title}
+              movieImage={formData.image}
+            />
+          ) : (
+            /* STREAMING VIDEO SOURCES FOR MOVIE */
+            <div style={{ borderTop: '1px solid var(--admin-border)', paddingTop: '12px', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--admin-purple)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+                <i className="fa-solid fa-play"></i> Streaming & Download Video Sources (URLs)
+              </div>
+              
+              <div className="admin-form-group full" style={{ marginBottom: '10px' }}>
+                <label>360p (SD) Download URL</label>
+                <input
+                  type="text"
+                  className="admin-input"
+                  placeholder="https://..."
+                  value={formData.p360}
+                  onChange={(e) => handleChange('p360', e.target.value)}
+                />
+                {errors.p360 && <span className="error-text">{errors.p360}</span>}
+              </div>
 
-            <div className="admin-form-group full" style={{ marginBottom: '10px' }}>
-              <label>720p (HD) Download URL</label>
-              <input
-                type="text"
-                className="admin-input"
-                placeholder="https://..."
-                value={formData.p720}
-                onChange={(e) => handleChange('p720', e.target.value)}
-              />
-              {errors.p720 && <span className="error-text">{errors.p720}</span>}
-            </div>
+              <div className="admin-form-group full" style={{ marginBottom: '10px' }}>
+                <label>720p (HD) Download URL</label>
+                <input
+                  type="text"
+                  className="admin-input"
+                  placeholder="https://..."
+                  value={formData.p720}
+                  onChange={(e) => handleChange('p720', e.target.value)}
+                />
+                {errors.p720 && <span className="error-text">{errors.p720}</span>}
+              </div>
 
-            <div className="admin-form-group full">
-              <label>1080p (Full HD) Download URL</label>
-              <input
-                type="text"
-                className="admin-input"
-                placeholder="https://..."
-                value={formData.p1080}
-                onChange={(e) => handleChange('p1080', e.target.value)}
-              />
-              {errors.p1080 && <span className="error-text">{errors.p1080}</span>}
+              <div className="admin-form-group full">
+                <label>1080p (Full HD) Download URL</label>
+                <input
+                  type="text"
+                  className="admin-input"
+                  placeholder="https://..."
+                  value={formData.p1080}
+                  onChange={(e) => handleChange('p1080', e.target.value)}
+                />
+                {errors.p1080 && <span className="error-text">{errors.p1080}</span>}
+              </div>
             </div>
-          </div>
+          )}
 
         </form>
 
@@ -400,7 +510,7 @@ export default function MovieFormModal({
             Cancel
           </button>
           <button className="admin-btn primary" type="submit" form="movieForm" disabled={loading}>
-            {loading ? <><i className="fa-solid fa-spinner fa-spin"></i> Saving...</> : isEdit ? 'Save Changes' : 'Create Movie'}
+            {loading ? <><i className="fa-solid fa-spinner fa-spin"></i> Saving...</> : isEdit ? 'Save Changes' : (isSeries ? 'Create Series' : 'Create Movie')}
           </button>
         </div>
 
