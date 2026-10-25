@@ -38,7 +38,7 @@ export default function PlayerAdBreakOverlay({
   const modalTitle = uiCopy.modalTitle || 'Short Break';
   const modalDesc = (uiCopy.modalDescription || 'Watch a quick ad to unlock {min} min of free streaming.')
     .replace('{min}', adsConfig?.rewardDurationMinutes || 25);
-  const buttonText = uiCopy.buttonText || 'Watch & Continue';
+  const buttonText = uiCopy.buttonText || 'Watch Ad to Continue';
 
   const handleTriggerAd = () => {
     if (isProcessing) return;

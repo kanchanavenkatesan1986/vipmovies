@@ -650,6 +650,9 @@ export default function AdvancedVideoPlayer({
         videoRef.current.currentTime = pendingResumeTimeRef.current;
         setCurrentTime(pendingResumeTimeRef.current);
         pendingResumeTimeRef.current = null;
+      } else if (initialTime > 0 && videoRef.current) {
+        videoRef.current.currentTime = initialTime;
+        setCurrentTime(initialTime);
       }
 
       if (window.UIManager?.showToast) {
@@ -660,13 +663,20 @@ export default function AdvancedVideoPlayer({
         videoRef.current.play().catch(() => {});
       }
 
+      // Revert address bar to clean normal player URL (removes reward_granted & nested reward params)
       try {
-        const cleanUrl = new URL(window.location.href);
-        cleanUrl.searchParams.delete('reward_granted');
-        window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search);
-      } catch {}
+        const isSeries = Boolean(movie.seriesId || movie.isSeriesEpisode || (movie.id && String(movie.id).includes('_')));
+        const baseId = movie.seriesId || (movie.id && String(movie.id).includes('_') ? String(movie.id).split('_')[0] : (movie.id || movie.movieId));
+        const epId = movie.episodeId || (movie.id && String(movie.id).includes('_') ? String(movie.id).split('_')[1] : '');
+        const epParam = isSeries && epId ? `&ep=${encodeURIComponent(epId)}` : '';
+        const qParam = currentQuality && currentQuality !== 'auto' ? `&quality=${encodeURIComponent(currentQuality)}` : '';
+        const normalPlayerUrl = `/player?id=${encodeURIComponent(baseId)}${epParam}${qParam}`;
+        window.history.replaceState(null, '', normalPlayerUrl);
+      } catch (e) {
+        console.warn('URL clean replace error:', e);
+      }
     }
-  }, [rewardGranted, movie, adMilestones, initialTime, adsConfig]);
+  }, [rewardGranted, movie, adMilestones, initialTime, adsConfig, currentQuality]);
 
   // ─── 14. AD BREAK TRIGGER ENGINE (TIMELINE POSITION & WATCH TIME) ───
   useEffect(() => {
@@ -725,6 +735,7 @@ export default function AdvancedVideoPlayer({
           if (videoRef.current && !videoRef.current.paused) {
             videoRef.current.pause();
           }
+          pendingResumeTimeRef.current = Math.floor(videoRef.current?.currentTime || currentTime || 0);
           setIsAdBreakModalOpen(true);
         } else if (showWarningPill && remaining > warnSecs) {
           setShowWarningPill(false);
@@ -790,35 +801,73 @@ export default function AdvancedVideoPlayer({
     if (videoRef.current) {
       videoRef.current.play().catch(() => {});
     }
-  }, [movie, adsConfig, adMilestones]);
+
+    // Revert address bar to clean normal player URL
+    try {
+      const isSeries = Boolean(movie.seriesId || movie.isSeriesEpisode || (movie.id && String(movie.id).includes('_')));
+      const baseId = movie.seriesId || (movie.id && String(movie.id).includes('_') ? String(movie.id).split('_')[0] : (movie.id || movie.movieId));
+      const epId = movie.episodeId || (movie.id && String(movie.id).includes('_') ? String(movie.id).split('_')[1] : '');
+      const epParam = isSeries && epId ? `&ep=${encodeURIComponent(epId)}` : '';
+      const qParam = currentQuality && currentQuality !== 'auto' ? `&quality=${encodeURIComponent(currentQuality)}` : '';
+      const normalPlayerUrl = `/player?id=${encodeURIComponent(baseId)}${epParam}${qParam}`;
+      window.history.replaceState(null, '', normalPlayerUrl);
+    } catch (e) {}
+  }, [movie, adsConfig, adMilestones, currentQuality]);
 
   const handleWatchAd = useCallback(() => {
     if (!videoRef.current || !movie) return;
 
-    // Check if real Android WebView bridge exists (with showRewardedAd)
-    const hasBridge = (
-      (window.AndroidBridge && typeof window.AndroidBridge.showRewardedAd === 'function') ||
-      (window.Android && typeof window.Android.showRewardedAd === 'function')
+    // Determine current playback position for resuming
+    const resumePos = pendingResumeTimeRef.current !== null
+      ? pendingResumeTimeRef.current
+      : Math.floor(videoRef.current.currentTime || currentTime || 0);
+
+    // Identify series vs movie parameters
+    const isSeries = Boolean(movie.seriesId || movie.isSeriesEpisode || (movie.id && String(movie.id).includes('_')));
+    const rawMid = movie.seriesId || (movie.id && String(movie.id).includes('_') ? String(movie.id).split('_')[0] : (movie.id || movie.movieId || ''));
+    const mid = String(rawMid).trim();
+    const rawEp = movie.episodeId || (movie.id && String(movie.id).includes('_') ? String(movie.id).split('_')[1] : '');
+    const epId = String(rawEp).trim();
+    const epParam = isSeries && epId ? `&ep=${encodeURIComponent(epId)}` : '';
+
+    // Save playback progress to playerStorage so position is never lost
+    try {
+      playerStorage.saveProgress(mid, {
+        currentTime: resumePos,
+        duration: duration,
+        quality: currentQuality,
+        playbackRate: playbackRate
+      });
+    } catch (e) {}
+
+    // Construct the clean resume URL that will be loaded after ad completion
+    const resumeUrl = `${window.location.origin}/player?reward=${encodeURIComponent(mid)}${epParam}&t=${resumePos}&quality=${encodeURIComponent(currentQuality)}&reward_granted=true`;
+
+    // Construct the trigger URL that native Android WebView intercepts via ?reward=
+    const triggerUrl = `/watch?reward=${encodeURIComponent(resumeUrl)}`;
+
+    const isAndroid = typeof window !== 'undefined' && (
+      /Android/i.test(navigator.userAgent) ||
+      window.Android !== undefined ||
+      window.AndroidBridge !== undefined ||
+      window.androidBridge !== undefined ||
+      window.location.search.includes('source=app') ||
+      (typeof navigator !== 'undefined' && navigator.userAgent && (
+        navigator.userAgent.includes('wv') ||
+        navigator.userAgent.includes('Version/')
+      ))
     );
 
-    if (hasBridge) {
-      try {
-        if (window.AndroidBridge?.showRewardedAd) {
-          window.AndroidBridge.showRewardedAd();
-        } else if (window.Android?.showRewardedAd) {
-          window.Android.showRewardedAd();
-        }
-        return;
-      } catch (e) {
-        console.warn('Android bridge ad call failed, falling back to in-player resume:', e);
-      }
+    if (isAndroid) {
+      // Full window navigation so Android WebView shouldOverrideUrlLoading catches ?reward= and displays native rewarded ad
+      window.location.href = triggerUrl;
+    } else {
+      // Web browser (Desktop / dev testing fallback): brief sponsor grace simulation & seamless resume
+      setTimeout(() => {
+        resumePlaybackAfterAd();
+      }, 1000);
     }
-
-    // In web player (desktop / mobile browser): brief 1s sponsor grace & resume playback seamlessly!
-    setTimeout(() => {
-      resumePlaybackAfterAd();
-    }, 1000);
-  }, [movie, resumePlaybackAfterAd]);
+  }, [movie, currentTime, currentQuality, duration, playbackRate, resumePlaybackAfterAd]);
 
   // Global listener for Android WebView native rewarded ad callback
   useEffect(() => {

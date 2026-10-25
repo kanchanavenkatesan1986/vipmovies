@@ -400,13 +400,10 @@ export const AppProvider = ({ children }) => {
   /**
    * triggerRewardedAd — Card-click ad unlock flow
    *
-   * ANDROID WEBVIEW: Navigates to a special ad-bridge URL that Android
-   * intercepts via shouldOverrideUrlLoading to show the native rewarded ad.
-   * After the ad, Android calls window.onVipCardAdCompleted(id) which
-   * unlocks and navigates to the watch page.
-   *
-   * WEB BROWSER: Simulates a brief sponsor delay (1.5s), then unlocks
-   * the movie and navigates to the watch/series page directly.
+   * Triggers native Rewarded Ad via URL query (?reward=) which Android WebView
+   * intercepts in shouldOverrideUrlLoading.
+   * After the ad finishes, Android loads the URL and the user reaches the
+   * watch movie or series page with the title unlocked!
    */
   const triggerRewardedAd = (movie) => {
     const targetMovie = movie || previewMovie;
@@ -418,61 +415,51 @@ export const AppProvider = ({ children }) => {
 
     const isSeries = targetMovie.contentType === 'series' ||
       (Array.isArray(targetMovie.episodes) && targetMovie.episodes.length > 0);
-    const watchUrl = isSeries
-      ? `/watch-series.html?id=${encodeURIComponent(id)}`
-      : `/watch-movie.html?id=${encodeURIComponent(id)}`;
 
-    // ── Register global callback for Android WebView to call after ad completes ──
+    // Target URL uses ?reward= so Android WebView shouldOverrideUrlLoading catches it
+    const rewardUrl = isSeries
+      ? `/watch-series.html?reward=${encodeURIComponent(id)}`
+      : `/watch?reward=${encodeURIComponent(id)}`;
+
+    // Persist unlock synchronously
+    unlockMovie(id);
+
+    // Register global callback as backup for bridges that call window.onVipCardAdCompleted
     window.onVipCardAdCompleted = (completedId) => {
       const resolvedId = completedId || id;
       unlockMovie(resolvedId);
       if (window.UIManager?.showToast) {
         window.UIManager.showToast('🎉 Unlocked! Enjoy watching');
       }
-      // Navigate to watch page
-      window.location.href = isSeries
-        ? `/watch-series.html?id=${encodeURIComponent(resolvedId)}`
-        : `/watch-movie.html?id=${encodeURIComponent(resolvedId)}`;
+      window.location.href = rewardUrl;
       try { delete window.onVipCardAdCompleted; } catch {}
     };
 
-    // ── Check if Android WebView bridge is available ──
-    const hasBridge = (
-      (window.AndroidBridge && typeof window.AndroidBridge.showRewardedAd === 'function') ||
-      (window.Android && typeof window.Android.showRewardedAd === 'function') ||
-      (window.Android && typeof window.Android.showCardAd === 'function')
+    const isAndroid = typeof window !== 'undefined' && (
+      /Android/i.test(navigator.userAgent) ||
+      window.Android !== undefined ||
+      window.AndroidBridge !== undefined ||
+      window.androidBridge !== undefined ||
+      window.location.search.includes('source=app') ||
+      (typeof navigator !== 'undefined' && navigator.userAgent && (
+        navigator.userAgent.includes('wv') ||
+        navigator.userAgent.includes('Version/')
+      ))
     );
 
-    if (hasBridge) {
-      // Trigger native rewarded ad via Android bridge — Android calls window.onVipCardAdCompleted on completion
-      try {
-        if (window.AndroidBridge?.showCardAd) {
-          window.AndroidBridge.showCardAd(id, watchUrl);
-        } else if (window.Android?.showCardAd) {
-          window.Android.showCardAd(id, watchUrl);
-        } else if (window.AndroidBridge?.showRewardedAd) {
-          window.AndroidBridge.showRewardedAd(id, watchUrl);
-        } else if (window.Android?.showRewardedAd) {
-          window.Android.showRewardedAd(id, watchUrl);
+    if (isAndroid) {
+      // Android WebView intercepts ?reward= and displays native AdMob Rewarded ad
+      window.location.href = rewardUrl;
+    } else {
+      // Desktop / Web Browser fallback: brief sponsor moment then navigate to watch page
+      setTimeout(() => {
+        if (window.UIManager?.showToast) {
+          window.UIManager.showToast('🎉 Unlocked! Enjoy watching');
         }
-        // Android will call window.onVipCardAdCompleted() when done — do NOT navigate here
-        return;
-      } catch (e) {
-        console.warn('Android bridge card ad call failed, falling back to web flow:', e);
-      }
+        window.location.href = rewardUrl;
+        try { delete window.onVipCardAdCompleted; } catch {}
+      }, 600);
     }
-
-    // ── Web Browser Fallback: brief simulated sponsor moment then navigate ──
-    setTimeout(() => {
-      unlockMovie(id);
-      if (window.UIManager?.showToast) {
-        window.UIManager.showToast('🎉 Unlocked! Enjoy watching');
-      }
-      // SPA navigation
-      window.history.pushState(null, '', watchUrl);
-      window.dispatchEvent(new PopStateEvent('popstate'));
-      try { delete window.onVipCardAdCompleted; } catch {}
-    }, 800);
   };
 
   return (

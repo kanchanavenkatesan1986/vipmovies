@@ -84,7 +84,7 @@ export default function MovieUnlockModal() {
             </div>
             <div className="glass-policy-text">
               <strong><i className="fa-solid fa-sparkles" style={{ color: '#10b981', marginRight: '5px' }}></i> Sponsor Access</strong>
-              <span>Watch a short sponsor message to unlock full movie streaming &amp; downloads.</span>
+              <span>Watch a short sponsor message to unlock full {isSeries ? 'series episodes' : 'movie'} streaming &amp; downloads.</span>
             </div>
           </div>
 
@@ -103,7 +103,7 @@ export default function MovieUnlockModal() {
                 {isAdLoading ? (
                   <><i className="fa-solid fa-spinner fa-spin"></i> Preparing Ad...</>
                 ) : (
-                  <><i className="fa-solid fa-play"></i> Watch Ad to Unlock Movie</>
+                  <><i className="fa-solid fa-play"></i> Watch Ad to Unlock {isSeries ? 'Series' : 'Movie'}</>
                 )}
               </button>
             )}
