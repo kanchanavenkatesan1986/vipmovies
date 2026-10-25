@@ -145,7 +145,7 @@ export default function Router() {
     case 'play':
       return (
         <PlayerView
-          movieId={route.params.reward || route.params.id}
+          movieId={route.params.id || route.params.reward}
           episodeId={route.params.ep || route.params.episodeId}
           initialQuality={route.params.quality || 'auto'}
           initialTime={route.params.t ? parseFloat(route.params.t) : 0}

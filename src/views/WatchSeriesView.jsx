@@ -365,7 +365,8 @@ export default function WatchSeriesView({ seriesId }) {
   const handlePlayEpisode = (episode, quality = 'auto') => {
     const sId = series.id || series.movieId;
     const epId = episode?.episodeId;
-    const playerUrl = `/player?reward=${encodeURIComponent(sId)}&ep=${encodeURIComponent(epId)}&quality=${encodeURIComponent(quality)}`;
+    // Use ?id= (NOT ?reward=) so episode play does NOT re-trigger ad flow
+    const playerUrl = `/player?id=${encodeURIComponent(sId)}&ep=${encodeURIComponent(epId)}&quality=${encodeURIComponent(quality)}`;
 
     const isAndroid = typeof window !== 'undefined' && (
       window.Android !== undefined ||

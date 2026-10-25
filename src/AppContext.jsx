@@ -312,21 +312,24 @@ export const AppProvider = ({ children }) => {
     }
   }, [unlockedMovies]);
 
-  // Automatically unlock movie if URL contains ?reward= or ?id= (for Android WebView & direct links)
+  // Automatically unlock movie if URL contains ?reward= (for Android WebView ad-return callback redirects)
+  // NOTE: We do NOT unlock on ?id= since that param is for normal player navigation
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const rewardId = params.get('reward') || params.get('id');
-      if (rewardId) {
+      const rewardId = params.get('reward');
+      if (rewardId && !rewardId.startsWith('http') && !rewardId.startsWith('/')) {
         const idStr = String(rewardId).trim();
-        setUnlockedMovies((prev) => {
-          if (prev.some(item => String(item).trim() === idStr)) return prev;
-          const updated = [...prev, idStr];
-          try {
-            localStorage.setItem('vip_unlocked_movies', JSON.stringify(updated));
-          } catch (e) {}
-          return updated;
-        });
+        if (idStr) {
+          setUnlockedMovies((prev) => {
+            if (prev.some(item => String(item).trim() === idStr)) return prev;
+            const updated = [...prev, idStr];
+            try {
+              localStorage.setItem('vip_unlocked_movies', JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+          });
+        }
       }
     } catch (e) {
       console.error('URL unlock parse error:', e);
@@ -356,13 +359,13 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const unlockMovie = (target) => {
-    if (!target) return;
-    const rawId = typeof target === 'object' ? (target.id || target.movieId) : target;
+  // Persist unlock to localStorage and state (called after ad is completed/confirmed)
+  const unlockMovie = (rawTarget) => {
+    if (!rawTarget) return;
+    const rawId = typeof rawTarget === 'object' ? (rawTarget.id || rawTarget.movieId) : rawTarget;
     const strId = String(rawId || '').trim();
     if (!strId) return;
 
-    // Synchronously persist unlock in localStorage
     try {
       const saved = localStorage.getItem('vip_unlocked_movies');
       const currentList = saved ? JSON.parse(saved) : [];
@@ -381,17 +384,6 @@ export const AppProvider = ({ children }) => {
 
     setPreviewMovie(null);
     setIsAdLoading(false);
-
-    if (window.UIManager?.showToast) {
-      window.UIManager.showToast('🎉 Movie Unlocked! Enjoy watching');
-    }
-
-    // Full window location navigation so Android WebView shouldOverrideUrlLoading triggers the native rewarded ad
-    const targetMovie = movies.find(m => String(m.id || m.movieId).trim() === strId);
-    const isSeries = targetMovie && (targetMovie.contentType === 'series' || (Array.isArray(targetMovie.episodes) && targetMovie.episodes.length > 0));
-    window.location.href = isSeries
-      ? `/watch-series.html?id=${encodeURIComponent(strId)}`
-      : `/watch-movie.html?id=${encodeURIComponent(strId)}`;
   };
 
   // Helper to determine watch URL (series vs movie)
@@ -405,14 +397,82 @@ export const AppProvider = ({ children }) => {
       : `/watch-movie.html?id=${encodeURIComponent(id)}`;
   };
 
-  // Trigger Rewarded Sponsor Ad (Clean user choice flow for Android WebView & Web)
+  /**
+   * triggerRewardedAd — Card-click ad unlock flow
+   *
+   * ANDROID WEBVIEW: Navigates to a special ad-bridge URL that Android
+   * intercepts via shouldOverrideUrlLoading to show the native rewarded ad.
+   * After the ad, Android calls window.onVipCardAdCompleted(id) which
+   * unlocks and navigates to the watch page.
+   *
+   * WEB BROWSER: Simulates a brief sponsor delay (1.5s), then unlocks
+   * the movie and navigates to the watch/series page directly.
+   */
   const triggerRewardedAd = (movie) => {
     const targetMovie = movie || previewMovie;
     if (!targetMovie) return;
     const id = String(targetMovie.id || targetMovie.movieId || '').trim();
     if (!id) return;
 
-    unlockMovie(id);
+    setIsAdLoading(true);
+
+    const isSeries = targetMovie.contentType === 'series' ||
+      (Array.isArray(targetMovie.episodes) && targetMovie.episodes.length > 0);
+    const watchUrl = isSeries
+      ? `/watch-series.html?id=${encodeURIComponent(id)}`
+      : `/watch-movie.html?id=${encodeURIComponent(id)}`;
+
+    // ── Register global callback for Android WebView to call after ad completes ──
+    window.onVipCardAdCompleted = (completedId) => {
+      const resolvedId = completedId || id;
+      unlockMovie(resolvedId);
+      if (window.UIManager?.showToast) {
+        window.UIManager.showToast('🎉 Unlocked! Enjoy watching');
+      }
+      // Navigate to watch page
+      window.location.href = isSeries
+        ? `/watch-series.html?id=${encodeURIComponent(resolvedId)}`
+        : `/watch-movie.html?id=${encodeURIComponent(resolvedId)}`;
+      try { delete window.onVipCardAdCompleted; } catch {}
+    };
+
+    // ── Check if Android WebView bridge is available ──
+    const hasBridge = (
+      (window.AndroidBridge && typeof window.AndroidBridge.showRewardedAd === 'function') ||
+      (window.Android && typeof window.Android.showRewardedAd === 'function') ||
+      (window.Android && typeof window.Android.showCardAd === 'function')
+    );
+
+    if (hasBridge) {
+      // Trigger native rewarded ad via Android bridge — Android calls window.onVipCardAdCompleted on completion
+      try {
+        if (window.AndroidBridge?.showCardAd) {
+          window.AndroidBridge.showCardAd(id, watchUrl);
+        } else if (window.Android?.showCardAd) {
+          window.Android.showCardAd(id, watchUrl);
+        } else if (window.AndroidBridge?.showRewardedAd) {
+          window.AndroidBridge.showRewardedAd(id, watchUrl);
+        } else if (window.Android?.showRewardedAd) {
+          window.Android.showRewardedAd(id, watchUrl);
+        }
+        // Android will call window.onVipCardAdCompleted() when done — do NOT navigate here
+        return;
+      } catch (e) {
+        console.warn('Android bridge card ad call failed, falling back to web flow:', e);
+      }
+    }
+
+    // ── Web Browser Fallback: brief simulated sponsor moment then navigate ──
+    setTimeout(() => {
+      unlockMovie(id);
+      if (window.UIManager?.showToast) {
+        window.UIManager.showToast('🎉 Unlocked! Enjoy watching');
+      }
+      // SPA navigation
+      window.history.pushState(null, '', watchUrl);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      try { delete window.onVipCardAdCompleted; } catch {}
+    }, 800);
   };
 
   return (

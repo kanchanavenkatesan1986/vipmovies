@@ -106,7 +106,8 @@ export default function WatchView({ movieId }) {
 
   const navigateToPlayer = (quality = 'auto') => {
     const id = movie.id || movie.movieId;
-    const playerUrl = `/player?reward=${encodeURIComponent(id)}&quality=${encodeURIComponent(quality)}`;
+    // Use ?id= (NOT ?reward=) so this navigation does NOT re-trigger any ad flow
+    const playerUrl = `/player?id=${encodeURIComponent(id)}&quality=${encodeURIComponent(quality)}`;
     const isAndroid = typeof window !== 'undefined' && (
       window.Android !== undefined ||
       window.androidBridge !== undefined ||

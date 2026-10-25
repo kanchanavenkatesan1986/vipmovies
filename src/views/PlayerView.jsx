@@ -138,18 +138,20 @@ export default function PlayerView({ movieId, episodeId, initialQuality = 'auto'
   const handlePlayNext = useCallback(() => {
     if (isSeries && nextEpisode && baseRecord) {
       const sId = baseRecord.id || baseRecord.movieId;
+      // Use ?id= — next episode navigation never re-triggers ad
       window.history.pushState(
         null, '',
-        `/player?reward=${encodeURIComponent(sId)}&ep=${encodeURIComponent(nextEpisode.episodeId)}&quality=${encodeURIComponent(initialQuality || 'auto')}`
+        `/player?id=${encodeURIComponent(sId)}&ep=${encodeURIComponent(nextEpisode.episodeId)}&quality=${encodeURIComponent(initialQuality || 'auto')}`
       );
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;
     }
     if (!nextMovie) return;
     const nextId = nextMovie.id || nextMovie.movieId;
+    // Use ?id= — related movie navigation never re-triggers ad
     window.history.pushState(
       null, '',
-      `/player?reward=${encodeURIComponent(nextId)}&quality=${encodeURIComponent(initialQuality || 'auto')}`
+      `/player?id=${encodeURIComponent(nextId)}&quality=${encodeURIComponent(initialQuality || 'auto')}`
     );
     window.dispatchEvent(new PopStateEvent('popstate'));
   }, [isSeries, nextEpisode, baseRecord, nextMovie, initialQuality]);
