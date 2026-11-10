@@ -1,0 +1,17 @@
+{
+  "name": "vip-stream-uploader",
+  "version": "1.0.0",
+  "description": "Automated isaiDub to Cloudflare R2 Stream Pipeline with Live Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "playwright": "^1.43.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "ws": "^8.17.0"
+  }
+}
+

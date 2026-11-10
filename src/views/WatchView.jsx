@@ -140,7 +140,7 @@ export default function WatchView({ movieId }) {
       { key: '720', link: p720Link },
       { key: '1080', link: p1080Link }
     ].forEach(({ key, link }) => {
-      if (link && link.startsWith('http')) {
+      if (link && link.trim() && link.trim() !== '#') {
         fetchExactVideoSize(link).then(sz => {
           if (isMounted && sz) {
             setExactSizes(prev => ({ ...prev, [key]: sz }));

@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIP Movies Stream & Catalog Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'Fira Code', monospace; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #060911; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    .glass-card { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+    @keyframes pulse-fast {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+    .pulse-indicator { animation: pulse-fast 1.5s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-[#060911] text-slate-100 min-h-screen">
+  <div class="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+    
+    <!-- Top Bar -->
+    <header class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+      <div class="flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-sky-500 flex items-center justify-center shadow-lg shadow-rose-500/25 font-black text-2xl">
+          ⚡
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl sm:text-2xl font-black bg-gradient-to-r from-amber-400 via-rose-300 to-sky-400 bg-clip-text text-transparent">
+              VIP Movies Auto-Extract & Uploader
+            </h1>
+            <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-purple-950 text-purple-300 border border-purple-800/60">
+              Clean 0 • Dual-Site • Path-Only
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">
+            isaidub.green & moviezda.me Engine • Clean Movie Names • Local Poster Download • File Path Storage • D1 Clean & Replace All
+          </p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <span id="connectionBadge" class="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/70 border border-emerald-800/60 text-emerald-400 text-xs font-semibold rounded-full shadow">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Daemon Connected
+        </span>
+        <span id="statusBadge" class="px-3.5 py-1 bg-slate-900/90 text-slate-300 text-xs font-semibold rounded-full border border-slate-700 shadow">
+          Status: Idle
+        </span>
+        <button id="btnOpenCatalogModal" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition">
+          📋 JSON Catalog
+        </button>
+        <button id="btnOpenHistory" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition">
+          📁 R2 History
+        </button>
+      </div>
+    </header>
+
+    <!-- SOURCE SITE PRESETS -->
+    <section class="glass-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg border border-slate-800">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-slate-300">Quick Presets:</span>
+        <button id="presetHollywood" class="px-3.5 py-1.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
+          <span>🎬 Hollywood 2026 (isaidub.green)</span>
+        </button>
+        <button id="presetTamil" class="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
+          <span>🎭 Tamil 2026 (moviezda.me)</span>
+        </button>
+      </div>
+      <div class="text-xs text-slate-400">
+        Active Target: <span id="activePresetBadge" class="font-mono text-sky-400 font-bold">Hollywood 2026</span>
+      </div>
+    </section>
+
+    <!-- LIVE METRICS -->
+    <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+      <div class="glass-card rounded-2xl p-4 shadow-lg">
+        <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Page Progress</div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="statPage" class="text-2xl font-black text-sky-400">0</span>
+          <span class="text-xs text-slate-500 font-medium">/ <span id="statTotalPages">0</span> pages</span>
+        </div>
+        <div class="w-full bg-slate-950 rounded-full h-1.5 mt-2.5 overflow-hidden border border-slate-800">
+          <div id="pageProgressBar" class="bg-sky-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-4 shadow-lg">
+        <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Titles Discovered</div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="statMovies" class="text-2xl font-black text-amber-400">0</span>
+          <span class="text-xs text-slate-500 font-medium">/ ~<span id="statEstMovies">0</span></span>
+        </div>
+        <div class="w-full bg-slate-950 rounded-full h-1.5 mt-2.5 overflow-hidden border border-slate-800">
+          <div id="moviesProgressBar" class="bg-amber-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-4 shadow-lg">
+        <div class="text-[11px] uppercase tracking-wider text-emerald-400/90 font-semibold mb-1">Stored In R2</div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="statUploaded" class="text-2xl font-black text-emerald-400">0</span>
+          <span class="text-xs text-slate-500 font-medium">files</span>
+        </div>
+        <div class="text-[11px] text-emerald-400/70 mt-2 font-medium">tvk-movies bucket</div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-4 shadow-lg">
+        <div class="text-[11px] uppercase tracking-wider text-purple-400 font-semibold mb-1">D1 Database Synced</div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="statD1Synced" class="text-2xl font-black text-purple-400">0</span>
+          <span class="text-xs text-slate-500 font-medium">records</span>
+        </div>
+        <div class="text-[11px] text-purple-400/70 mt-2 font-medium">api-movies.akatsuki</div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-4 shadow-lg col-span-2 sm:col-span-1">
+        <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Skipped / Failed</div>
+        <div class="flex items-baseline gap-2">
+          <span id="statSkipped" class="text-xl font-bold text-slate-300">0</span>
+          <span class="text-xs text-slate-500">skip</span>
+          <span class="text-slate-600">|</span>
+          <span id="statFailed" class="text-xl font-bold text-rose-400">0</span>
+          <span class="text-xs text-rose-400/80">fail</span>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-2 font-medium">Zero duplicate uploads</div>
+      </div>
+    </section>
+
+    <!-- CONFIGURATION & CONTROLS -->
+    <section class="glass-card rounded-2xl p-5 shadow-xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 flex-wrap gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-base font-bold text-slate-200">⚙️ Automation Configuration</span>
+          <span class="text-xs text-slate-500 font-mono">(Customizable per run)</span>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="btnCleanReplaceD1" class="px-4 py-2 bg-gradient-to-r from-rose-600 via-purple-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-purple-900/40 transition active:scale-95 flex items-center gap-1.5" title="Wipes existing D1 table to 0 and replaces with clean 00001..N catalog">
+            <span>🔄 Clean 0 & Replace All in D1</span>
+          </button>
+          <button id="btnScanR2" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-indigo-900/40 transition active:scale-95 flex items-center gap-1.5" title="Directly inspects your R2 bucket and auto-populates all movie sources and series episode clickurls!">
+            <span>⚡ Scan R2 & Auto-Map URLs</span>
+          </button>
+          <button id="btnStart" class="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-900/40 transition active:scale-95 flex items-center gap-2">
+            <span>▶ Start Automation</span>
+          </button>
+          <button id="btnStop" class="px-4 py-2 bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 border border-rose-500/40 font-bold text-xs uppercase tracking-wider rounded-xl transition active:scale-95 flex items-center gap-1.5">
+            <span>⏹ Stop</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <!-- Source URL -->
+        <div class="lg:col-span-2 space-y-1">
+          <label class="block font-semibold text-slate-300">Source Movies Listing URL</label>
+          <input type="text" id="cfgSourceUrl" value="https://isaidub.green/tamil-2026-dubbed-movies/"
+            class="w-full bg-slate-950/80 border border-slate-700 focus:border-sky-500 rounded-xl px-3.5 py-2.5 text-slate-100 font-mono text-xs outline-none transition" />
+          <p class="text-[11px] text-slate-500">Supports isaidub.green & moviezda.me multi-page pagination.</p>
+        </div>
+
+        <!-- Release Year -->
+        <div class="space-y-1">
+          <label class="block font-semibold text-slate-300">Release Year</label>
+          <input type="text" id="cfgYear" value="2026"
+            class="w-full bg-slate-950/80 border border-slate-700 focus:border-sky-500 rounded-xl px-3.5 py-2.5 text-slate-100 font-mono text-xs outline-none transition" />
+        </div>
+
+        <!-- Category -->
+        <div class="space-y-1">
+          <label class="block font-semibold text-slate-300">Storage Category</label>
+          <select id="cfgCategory" class="w-full bg-slate-950/80 border border-slate-700 focus:border-sky-500 rounded-xl px-3.5 py-2.5 text-slate-100 font-mono text-xs outline-none transition">
+            <option value="hollywood" selected>Hollywood (Dubbed)</option>
+            <option value="tamil">Tamil (Original)</option>
+          </select>
+        </div>
+
+        <!-- Start ID Offset -->
+        <div class="space-y-1">
+          <label class="block font-semibold text-slate-300">Reverse-ID Start Number</label>
+          <input type="number" id="cfgIdStart" value="1" min="1"
+            class="w-full bg-slate-950/80 border border-slate-700 focus:border-sky-500 rounded-xl px-3.5 py-2.5 text-slate-100 font-mono text-xs outline-none transition" />
+          <p class="text-[11px] text-slate-500">Oldest movie starts at 00001.</p>
+        </div>
+
+        <!-- URL Mode -->
+        <div class="space-y-1">
+          <label class="block font-semibold text-slate-300">Video Storage URL Format</label>
+          <select id="cfgUrlMode" class="w-full bg-slate-950/80 border border-slate-700 focus:border-sky-500 rounded-xl px-3.5 py-2.5 text-slate-100 font-mono text-xs outline-none transition">
+            <option value="path" selected>R2 Object Key Only (Path Only e.g. hollywood/2026/...)</option>
+            <option value="cdn">Full CDN URL (https://api-download...)</option>
+          </select>
+          <p class="text-[11px] text-emerald-400/80 font-medium">✓ File path only (as specified)</p>
+        </div>
+
+        <!-- Duplicate Policy -->
+        <div class="space-y-1">
+          <label class="block font-semibold text-slate-300">Duplicate Policy</label>
+          <select id="cfgDuplicatePolicy" class="w-full bg-slate-950/80 border border-slate-700 focus:border-sky-500 rounded-xl px-3.5 py-2.5 text-slate-100 font-mono text-xs outline-none transition">
+            <option value="skip" selected>Skip (Fast-Bypass if in R2)</option>
+            <option value="replace">Overwrite / Replace</option>
+          </select>
+        </div>
+
+        <!-- Checkboxes -->
+        <div class="space-y-2 pt-4">
+          <label class="flex items-center gap-2 cursor-pointer text-slate-300 text-xs">
+            <input type="checkbox" id="cfgAutoSyncD1" checked class="w-4 h-4 rounded border-slate-700 text-purple-600 focus:ring-0 cursor-pointer" />
+            <span>Auto-Sync to Cloudflare D1 Database</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer text-slate-300 text-xs">
+            <input type="checkbox" id="cfgHeadless" checked class="w-4 h-4 rounded border-slate-700 text-sky-600 focus:ring-0 cursor-pointer" />
+            <span>Run Browser Headless (Background)</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACTIVE STREAMING TASK CARD -->
+    <section id="activeTaskCard" class="glass-card rounded-2xl p-4 border-l-4 border-l-sky-500 hidden transition-all">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-400 pulse-indicator"></span>
+          <span class="text-xs uppercase font-bold text-sky-400 tracking-wider">Active JIT Stream Transfer</span>
+          <span id="activeMovieTitle" class="text-sm font-semibold text-white">None</span>
+        </div>
+        <span id="activeSpeed" class="text-xs font-mono text-slate-400">Streaming JIT...</span>
+      </div>
+      <div class="space-y-1.5">
+        <div class="flex justify-between text-xs text-slate-400">
+          <span id="activeFile">Waiting for stream...</span>
+          <span id="activePercent" class="font-mono text-sky-400 font-semibold">0%</span>
+        </div>
+        <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+          <div id="activeProgressBar" class="bg-gradient-to-r from-sky-500 to-indigo-500 h-full rounded-full transition-all duration-200" style="width: 0%"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALL TITLES CATALOG TABLE -->
+    <section class="glass-card rounded-2xl p-5 shadow-xl space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+        <div>
+          <h2 class="text-base font-bold text-slate-200 flex items-center gap-2">
+            <span>📚 Catalog & Database Synchronization</span>
+            <span id="tableCountBadge" class="px-2 py-0.5 text-[11px] rounded-full bg-slate-800 text-slate-300 font-mono">0 titles</span>
+          </h2>
+          <p class="text-xs text-slate-400">Clean movie names only • Relative file paths • Exact image filenames</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input type="text" id="tableSearch" placeholder="Search clean title or ID..."
+            class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-sky-500" />
+          <button id="btnExportJson" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
+            <span>💾 Export JSON</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="overflow-x-auto max-h-[420px] rounded-xl border border-slate-800/80">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-950/90 text-[11px] uppercase tracking-wider text-slate-400 sticky top-0 border-b border-slate-800 z-10">
+            <tr>
+              <th class="py-3 px-3.5">ID (Reverse)</th>
+              <th class="py-3 px-3">Page</th>
+              <th class="py-3 px-3.5">Clean Movie Name</th>
+              <th class="py-3 px-3">Type</th>
+              <th class="py-3 px-3">Sources / Ep</th>
+              <th class="py-3 px-3">Status</th>
+              <th class="py-3 px-3 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="catalogTableBody" class="divide-y divide-slate-800/60 font-mono">
+            <tr>
+              <td colspan="7" class="py-8 text-center text-slate-500 font-sans">
+                No items scanned yet. Click "Start Automation" or "Scan R2" to begin.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- LIVE CONSOLE LOG -->
+    <section class="glass-card rounded-2xl p-5 shadow-xl space-y-3">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+          <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+          <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+          <span class="text-xs font-semibold text-slate-400 ml-2 font-mono">Live Execution Telemetry</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer">
+            <input type="checkbox" id="chkAutoScroll" checked class="w-3.5 h-3.5 rounded border-slate-700" />
+            <span>Auto-Scroll</span>
+          </label>
+          <button id="btnClearLog" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] rounded-lg transition">
+            Clear
+          </button>
+        </div>
+      </div>
+      <div id="logContainer" class="bg-slate-950 font-mono text-xs text-slate-300 p-4 rounded-xl h-64 overflow-y-auto space-y-1 select-text border border-slate-900">
+        <div class="text-slate-500">[SYSTEM] Ready. Enter parameters or select a preset and click Start.</div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- JSON PREVIEW MODAL -->
+  <div id="jsonModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="glass-card bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between p-4 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-bold text-slate-200">🔍 VIP Movies JSON Inspector</span>
+          <span id="jsonModalTitle" class="text-xs text-sky-400 font-mono"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnCopyModalJson" class="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold rounded-lg transition">
+            Copy JSON
+          </button>
+          <button id="btnCloseJsonModal" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition">
+            ✕
+          </button>
+        </div>
+      </div>
+      <div class="p-4 overflow-y-auto flex-1 font-mono text-xs">
+        <pre id="jsonModalContent" class="text-emerald-400 whitespace-pre-wrap select-all"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY MODAL -->
+  <div id="historyModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="glass-card bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between p-4 border-b border-slate-800">
+        <span class="text-sm font-bold text-slate-200">📁 Cloudflare R2 Upload History</span>
+        <button id="btnCloseHistoryModal" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition">✕</button>
+      </div>
+      <div id="historyList" class="p-4 overflow-y-auto flex-1 font-mono text-xs text-slate-300 space-y-1">
+        Loading...
+      </div>
+      <div class="p-4 border-t border-slate-800 flex justify-between items-center">
+        <button id="btnClearHistory" class="px-3 py-1.5 bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 text-xs font-semibold rounded-lg border border-rose-500/30">
+          Reset History
+        </button>
+        <span id="historyCount" class="text-xs text-slate-400">0 keys recorded</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = new WebSocket(`ws://${window.location.host}`);
+    let catalogItems = [];
+
+    const elements = {
+      connectionBadge: document.getElementById('connectionBadge'),
+      statusBadge: document.getElementById('statusBadge'),
+      statPage: document.getElementById('statPage'),
+      statTotalPages: document.getElementById('statTotalPages'),
+      pageProgressBar: document.getElementById('pageProgressBar'),
+      statMovies: document.getElementById('statMovies'),
+      statEstMovies: document.getElementById('statEstMovies'),
+      moviesProgressBar: document.getElementById('moviesProgressBar'),
+      statUploaded: document.getElementById('statUploaded'),
+      statD1Synced: document.getElementById('statD1Synced'),
+      statSkipped: document.getElementById('statSkipped'),
+      statFailed: document.getElementById('statFailed'),
+      activeTaskCard: document.getElementById('activeTaskCard'),
+      activeMovieTitle: document.getElementById('activeMovieTitle'),
+      activeFile: document.getElementById('activeFile'),
+      activeSpeed: document.getElementById('activeSpeed'),
+      activePercent: document.getElementById('activePercent'),
+      activeProgressBar: document.getElementById('activeProgressBar'),
+      catalogTableBody: document.getElementById('catalogTableBody'),
+      tableCountBadge: document.getElementById('tableCountBadge'),
+      tableSearch: document.getElementById('tableSearch'),
+      logContainer: document.getElementById('logContainer'),
+      chkAutoScroll: document.getElementById('chkAutoScroll'),
+      btnCleanReplaceD1: document.getElementById('btnCleanReplaceD1'),
+      btnScanR2: document.getElementById('btnScanR2'),
+      btnStart: document.getElementById('btnStart'),
+      btnStop: document.getElementById('btnStop'),
+      btnClearLog: document.getElementById('btnClearLog'),
+      btnExportJson: document.getElementById('btnExportJson'),
+      btnOpenCatalogModal: document.getElementById('btnOpenCatalogModal'),
+      btnOpenHistory: document.getElementById('btnOpenHistory'),
+      jsonModal: document.getElementById('jsonModal'),
+      jsonModalTitle: document.getElementById('jsonModalTitle'),
+      jsonModalContent: document.getElementById('jsonModalContent'),
+      btnCopyModalJson: document.getElementById('btnCopyModalJson'),
+      btnCloseJsonModal: document.getElementById('btnCloseJsonModal'),
+      historyModal: document.getElementById('historyModal'),
+      historyList: document.getElementById('historyList'),
+      historyCount: document.getElementById('historyCount'),
+      btnClearHistory: document.getElementById('btnClearHistory'),
+      btnCloseHistoryModal: document.getElementById('btnCloseHistoryModal'),
+      presetHollywood: document.getElementById('presetHollywood'),
+      presetTamil: document.getElementById('presetTamil'),
+      activePresetBadge: document.getElementById('activePresetBadge')
+    };
+
+    socket.onopen = () => {
+      elements.connectionBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Daemon Connected`;
+      elements.connectionBadge.className = "flex items-center gap-1.5 px-3 py-1 bg-emerald-950/70 border border-emerald-800/60 text-emerald-400 text-xs font-semibold rounded-full shadow";
+    };
+
+    socket.onclose = () => {
+      elements.connectionBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span> Disconnected`;
+      elements.connectionBadge.className = "flex items-center gap-1.5 px-3 py-1 bg-rose-950/70 border border-rose-800/60 text-rose-400 text-xs font-semibold rounded-full shadow";
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        handleSocketMessage(msg);
+      } catch (e) {}
+    };
+
+    function appendLog(line) {
+      const el = document.createElement('div');
+      el.className = 'font-mono text-xs';
+      if (line.includes('[SUCCESS]') || line.includes('✓') || line.includes('[D1 REPLACE COMPLETE]')) el.className += ' text-emerald-400 font-semibold';
+      else if (line.includes('[FAIL]') || line.includes('[ERROR]') || line.includes('[FATAL]')) el.className += ' text-rose-400';
+      else if (line.includes('[WARN]')) el.className += ' text-amber-400';
+      else if (line.includes('[PAGE') || line.includes('[ITEM') || line.includes('[ID MAPPING]')) el.className += ' text-sky-400 font-semibold';
+      else if (line.includes('[JIT UPLOAD]')) el.className += ' text-indigo-300';
+      else if (line.includes('[D1 REPLACE]')) el.className += ' text-purple-300';
+      else el.className += ' text-slate-300';
+
+      el.textContent = line;
+      elements.logContainer.appendChild(el);
+
+      if (elements.chkAutoScroll.checked) {
+        elements.logContainer.scrollTop = elements.logContainer.scrollHeight;
+      }
+    }
+
+    function renderCatalogTable() {
+      const q = (elements.tableSearch.value || '').toLowerCase().trim();
+      const filtered = catalogItems.filter(item => {
+        if (!q) return true;
+        return (item.id || '').toLowerCase().includes(q) || (item.title || '').toLowerCase().includes(q);
+      });
+
+      elements.tableCountBadge.textContent = `${catalogItems.length} titles`;
+
+      if (filtered.length === 0) {
+        elements.catalogTableBody.innerHTML = `
+          <tr><td colspan="7" class="py-8 text-center text-slate-500 font-sans">
+            ${catalogItems.length === 0 ? 'No items scanned yet. Click "Start Automation" or "Scan R2" to begin.' : 'No matching titles found.'}
+          </td></tr>`;
+        return;
+      }
+
+      elements.catalogTableBody.innerHTML = filtered.map(item => {
+        let statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">Queued</span>';
+        if (item.status === 'Scanning Links') statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-amber-950 text-amber-400 border border-amber-800 animate-pulse">Scanning</span>';
+        else if (item.status === 'Stored R2') statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-sky-950 text-sky-400 border border-sky-800">Stored R2</span>';
+        else if (item.status === 'Synced D1') statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">✓ Synced D1</span>';
+
+        const isSeries = item.contentType === 'series';
+        const typeBadge = isSeries
+          ? '<span class="px-2 py-0.5 rounded text-[10px] bg-purple-950 text-purple-300 border border-purple-800 font-semibold">Series</span>'
+          : '<span class="px-2 py-0.5 rounded text-[10px] bg-blue-950 text-blue-300 border border-blue-800 font-semibold">Movie</span>';
+
+        let sourcesText = '-';
+        if (isSeries) {
+          const epCount = Array.isArray(item.episodes) ? item.episodes.length : (item.data?.episodes?.length || 0);
+          sourcesText = `${epCount} Episodes`;
+        } else {
+          const s = [];
+          const mData = item.data || item;
+          if (mData.p360) s.push('360p');
+          if (mData.p720) s.push('720p');
+          if (mData.p1080) s.push('1080p');
+          sourcesText = s.length > 0 ? s.join(', ') : '3 Qualities';
+        }
+
+        return `
+          <tr class="hover:bg-slate-900/60 transition">
+            <td class="py-2.5 px-3.5 font-bold text-sky-300">${item.id}</td>
+            <td class="py-2.5 px-3 text-slate-500">${item.pageNum || '1'}</td>
+            <td class="py-2.5 px-3.5 font-sans font-bold text-slate-100 truncate max-w-xs">${item.title}</td>
+            <td class="py-2.5 px-3">${typeBadge}</td>
+            <td class="py-2.5 px-3 text-slate-400">${sourcesText}</td>
+            <td class="py-2.5 px-3">${statusBadge}</td>
+            <td class="py-2.5 px-3 text-right">
+              <button onclick="viewItemJson('${item.id}')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-sky-400 text-[11px] rounded transition">
+                JSON
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    window.viewItemJson = function(id) {
+      const item = catalogItems.find(i => i.id === id);
+      if (!item) return;
+      const dataToShow = item.data || item;
+      elements.jsonModalTitle.textContent = `(${id}) ${item.title}`;
+      elements.jsonModalContent.textContent = JSON.stringify(dataToShow, null, 2);
+      elements.jsonModal.classList.remove('hidden');
+      elements.jsonModal.classList.add('flex');
+    };
+
+    function handleSocketMessage(msg) {
+      if (msg.type === 'log') {
+        appendLog(`[${msg.timestamp || ''}] ${msg.data}`);
+      } else if (msg.type === 'status') {
+        elements.statusBadge.textContent = `Status: ${msg.data}`;
+        if (msg.data === 'Running') {
+          elements.statusBadge.className = "px-3.5 py-1 bg-emerald-950 text-emerald-400 text-xs font-semibold rounded-full border border-emerald-800 shadow animate-pulse";
+        } else {
+          elements.statusBadge.className = "px-3.5 py-1 bg-slate-900 text-slate-300 text-xs font-semibold rounded-full border border-slate-700 shadow";
+          elements.activeTaskCard.classList.add('hidden');
+        }
+      } else if (msg.type === 'stats') {
+        const s = msg.data;
+        elements.statPage.textContent = s.currentPage || 0;
+        elements.statTotalPages.textContent = s.totalPages || 0;
+        if (s.totalPages > 0) {
+          const pct = Math.min(100, Math.round(((s.currentPage || 1) / s.totalPages) * 100));
+          elements.pageProgressBar.style.width = `${pct}%`;
+        }
+
+        elements.statMovies.textContent = s.totalMoviesProcessed || 0;
+        elements.statEstMovies.textContent = s.totalMoviesEstimated || 0;
+        if (s.totalMoviesEstimated > 0) {
+          const pct = Math.min(100, Math.round(((s.totalMoviesProcessed || 0) / s.totalMoviesEstimated) * 100));
+          elements.moviesProgressBar.style.width = `${pct}%`;
+        }
+
+        elements.statUploaded.textContent = s.uploadedFilesCount || 0;
+        elements.statSkipped.textContent = s.skippedFilesCount || 0;
+        elements.statFailed.textContent = s.failedFilesCount || 0;
+      } else if (msg.type === 'progress') {
+        const p = msg.data;
+        elements.activeTaskCard.classList.remove('hidden');
+        elements.activeMovieTitle.textContent = p.title || '';
+        elements.activeFile.textContent = p.file || '';
+        elements.activePercent.textContent = `${p.percent || 0}%`;
+        elements.activeProgressBar.style.width = `${p.percent || 0}%`;
+        elements.activeSpeed.textContent = p.speed || '';
+      } else if (msg.type === 'catalog-init') {
+        catalogItems = msg.data || [];
+        renderCatalogTable();
+      } else if (msg.type === 'movie-update') {
+        const { id, status, data } = msg.data;
+        const target = catalogItems.find(i => i.id === id);
+        if (target) {
+          target.status = status;
+          if (data) {
+            target.data = data;
+            target.title = data.title;
+          }
+        } else if (data) {
+          catalogItems.push({ id, status, data, title: data.title, contentType: data.contentType });
+        }
+        renderCatalogTable();
+        if (status === 'Synced D1') {
+          const syncedCount = catalogItems.filter(i => i.status === 'Synced D1').length;
+          elements.statD1Synced.textContent = syncedCount;
+        }
+      }
+    }
+
+    elements.tableSearch.addEventListener('input', renderCatalogTable);
+
+    // Preset handlers
+    elements.presetHollywood.addEventListener('click', () => {
+      document.getElementById('cfgSourceUrl').value = 'https://isaidub.green/tamil-2026-dubbed-movies/';
+      document.getElementById('cfgCategory').value = 'hollywood';
+      document.getElementById('cfgYear').value = '2026';
+      elements.activePresetBadge.textContent = 'Hollywood 2026 (isaidub.green)';
+      appendLog('[PRESET] Selected Hollywood 2026 (isaidub.green)');
+    });
+
+    elements.presetTamil.addEventListener('click', () => {
+      document.getElementById('cfgSourceUrl').value = 'https://moviezda.me/tamil-2026-movies/';
+      document.getElementById('cfgCategory').value = 'tamil';
+      document.getElementById('cfgYear').value = '2026';
+      elements.activePresetBadge.textContent = 'Tamil 2026 (moviezda.me)';
+      appendLog('[PRESET] Selected Tamil 2026 (moviezda.me)');
+    });
+
+    // Clean 0 & Replace All in D1
+    elements.btnCleanReplaceD1.addEventListener('click', async () => {
+      const category = document.getElementById('cfgCategory').value.trim();
+      const year = document.getElementById('cfgYear').value.trim();
+      const table = `${category}_${year}`;
+
+      const confirmed = confirm(`⚠️ WARNING: "Clean 0 & Replace All" will:\n1. Delete ALL existing records from D1 table "${table}" (count = 0).\n2. Insert all ${catalogItems.length} clean, freshly ordered records (00001..N).\n\nAre you sure you want to proceed?`);
+      if (!confirmed) return;
+
+      appendLog(`[SYSTEM] Initiating Clean 0 & Replace All for table "${table}"...`);
+      try {
+        const res = await fetch('/api/sync-d1-replace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table })
+        });
+        const data = await res.json();
+        if (data.success) {
+          appendLog(`[D1 REPLACE SUCCESS] ✓ Cleaned table to 0 and replaced with ${data.count} freshly ordered records in "${table}"!`);
+          alert(`Successfully cleaned "${table}" and replaced with ${data.count} records!`);
+        } else {
+          appendLog(`[D1 REPLACE ERROR] ${data.error}`);
+        }
+      } catch (err) {
+        appendLog(`[D1 REPLACE ERROR] ${err.message}`);
+      }
+    });
+
+    // Controls
+    elements.btnScanR2.addEventListener('click', async () => {
+      const category = document.getElementById('cfgCategory').value.trim();
+      const year = document.getElementById('cfgYear').value.trim();
+      const urlMode = document.getElementById('cfgUrlMode').value;
+      const autoSyncD1 = document.getElementById('cfgAutoSyncD1').checked;
+
+      if (!confirm(`Directly scan all Cloudflare R2 folders under "${category}/${year}/" and map all video file paths?`)) return;
+
+      appendLog(`[SYSTEM] Requesting direct R2 bucket scan for ${category}/${year}...`);
+      try {
+        const res = await fetch('/api/scan-r2-catalog', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category, year, urlMode, autoSyncD1 })
+        });
+        const data = await res.json();
+        if (data.success) {
+          appendLog(`[R2 SCAN SUCCESS] ✓ Discovered and mapped ${data.processed} titles directly from R2! Synced: ${data.synced}`);
+        } else {
+          appendLog(`[R2 SCAN ERROR] ${data.error}`);
+        }
+      } catch (err) {
+        appendLog(`[R2 SCAN ERROR] ${err.message}`);
+      }
+    });
+
+    elements.btnStart.addEventListener('click', async () => {
+      const config = {
+        sourceUrl: document.getElementById('cfgSourceUrl').value.trim(),
+        year: document.getElementById('cfgYear').value.trim(),
+        category: document.getElementById('cfgCategory').value.trim(),
+        idStartOffset: parseInt(document.getElementById('cfgIdStart').value, 10) || 1,
+        urlMode: document.getElementById('cfgUrlMode').value,
+        duplicatePolicy: document.getElementById('cfgDuplicatePolicy').value,
+        autoSyncD1: document.getElementById('cfgAutoSyncD1').checked,
+        headless: document.getElementById('cfgHeadless').checked
+      };
+
+      try {
+        appendLog(`[SYSTEM] Dispatching automation request for ${config.sourceUrl}...`);
+        const res = await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+        const data = await res.json();
+        appendLog(`[SYSTEM] Response: ${data.message}`);
+      } catch (e) {
+        appendLog(`[SYSTEM ERROR] ${e.message}`);
+      }
+    });
+
+    elements.btnStop.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/stop', { method: 'POST' });
+        const data = await res.json();
+        appendLog(`[SYSTEM] ${data.message}`);
+      } catch (e) {
+        appendLog(`[SYSTEM ERROR] ${e.message}`);
+      }
+    });
+
+    elements.btnClearLog.addEventListener('click', () => {
+      elements.logContainer.innerHTML = '<div class="text-slate-500">[SYSTEM] Log buffer cleared.</div>';
+    });
+
+    elements.btnExportJson.addEventListener('click', () => {
+      if (catalogItems.length === 0) {
+        alert('Catalog is currently empty. Run automation or R2 scan first.');
+        return;
+      }
+      const exportList = catalogItems.map(i => i.data || i);
+      const blob = new Blob([JSON.stringify(exportList, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `movies_catalog_2026.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Modals
+    elements.btnOpenCatalogModal.addEventListener('click', () => {
+      const exportList = catalogItems.map(i => i.data || i);
+      elements.jsonModalTitle.textContent = `Full Catalog (${exportList.length} items)`;
+      elements.jsonModalContent.textContent = JSON.stringify(exportList, null, 2);
+      elements.jsonModal.classList.remove('hidden');
+      elements.jsonModal.classList.add('flex');
+    });
+
+    elements.btnCloseJsonModal.addEventListener('click', () => {
+      elements.jsonModal.classList.add('hidden');
+      elements.jsonModal.classList.remove('flex');
+    });
+
+    elements.btnCopyModalJson.addEventListener('click', () => {
+      navigator.clipboard.writeText(elements.jsonModalContent.textContent);
+      elements.btnCopyModalJson.textContent = 'Copied!';
+      setTimeout(() => elements.btnCopyModalJson.textContent = 'Copy JSON', 2000);
+    });
+
+    elements.btnOpenHistory.addEventListener('click', async () => {
+      elements.historyModal.classList.remove('hidden');
+      elements.historyModal.classList.add('flex');
+      elements.historyList.textContent = 'Loading R2 upload keys...';
+      try {
+        const res = await fetch('/api/history');
+        const data = await res.json();
+        const keys = data.completedKeys || [];
+        elements.historyCount.textContent = `${keys.length} keys in R2 history`;
+        if (keys.length === 0) {
+          elements.historyList.textContent = 'No uploads recorded yet.';
+        } else {
+          elements.historyList.innerHTML = keys.map(k => `<div class="truncate text-slate-300">✓ ${k}</div>`).join('');
+        }
+      } catch (e) {
+        elements.historyList.textContent = 'Failed to load history.';
+      }
+    });
+
+    elements.btnCloseHistoryModal.addEventListener('click', () => {
+      elements.historyModal.classList.add('hidden');
+      elements.historyModal.classList.remove('flex');
+    });
+
+    elements.btnClearHistory.addEventListener('click', async () => {
+      if (!confirm('Clear all recorded upload keys? (This allows re-uploading)')) return;
+      await fetch('/api/history/clear', { method: 'POST' });
+      elements.historyList.textContent = 'History reset.';
+      elements.historyCount.textContent = '0 keys recorded';
+      appendLog('[SYSTEM] Upload history cleared.');
+    });
+  </script>
+</body>
+</html>

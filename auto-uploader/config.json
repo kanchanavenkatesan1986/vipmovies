@@ -1,0 +1,12 @@
+{
+  "r2WorkerBase": "https://api-uploder.akatsuki-pvt-ltd.workers.dev",
+  "r2MediaBase": "https://api-download.akatsuki-pvt-ltd.workers.dev",
+  "r2Token": "VIP_SECURE_TOKEN_2026",
+  "defaultSourceUrl": "https://isaidub.green/tamil-2026-dubbed-movies/?get-page=1",
+  "defaultYear": "2026",
+  "defaultCategory": "Hollywood",
+  "defaultDuplicatePolicy": "replace",
+  "headless": false,
+  "port": 3456
+}
+

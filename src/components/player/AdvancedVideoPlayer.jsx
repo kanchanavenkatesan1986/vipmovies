@@ -8,6 +8,7 @@ import UpNextOverlay from './UpNextOverlay';
 import PlayerErrorOverlay from './PlayerErrorOverlay';
 import PlayerAdBreakOverlay from './PlayerAdBreakOverlay';
 import { adsConfigService } from '../../admin/services/adsConfigService';
+import { resolveMediaUrl } from '../../utils/mediaUtils';
 import {
   getAspectRatioStyle,
   mediaSessionEngine,
@@ -115,23 +116,35 @@ export default function AdvancedVideoPlayer({
     return list;
   }, [adsConfig]);
 
-  // ─── 1. RESOLVE AVAILABLE VIDEO SOURCES ───
+  // ─── 1. RESOLVE AVAILABLE VIDEO SOURCES (Supports Relative Paths & Full URLs) ───
   const availableSources = useMemo(() => {
     if (!movie) return [];
     const sources = [];
 
     if (movie.p1080 && movie.p1080.trim() !== '#' && movie.p1080.trim() !== '') {
-      sources.push({ id: '1080p', label: '1080p Full HD', badge: 'FHD', url: movie.p1080.trim() });
+      const resolved1080 = resolveMediaUrl(movie.p1080);
+      if (resolved1080) {
+        sources.push({ id: '1080p', label: '1080p Full HD', badge: 'FHD', url: resolved1080 });
+      }
     }
     if (movie.p720 && movie.p720.trim() !== '#' && movie.p720.trim() !== '') {
-      sources.push({ id: '720p', label: '720p HD', badge: 'HD', url: movie.p720.trim() });
+      const resolved720 = resolveMediaUrl(movie.p720);
+      if (resolved720) {
+        sources.push({ id: '720p', label: '720p HD', badge: 'HD', url: resolved720 });
+      }
     }
     const p360_460 = movie.p460 || movie.p360;
     if (p360_460 && p360_460.trim() !== '#' && p360_460.trim() !== '') {
-      sources.push({ id: '460p', label: '460p Standard', badge: 'SD', url: p360_460.trim() });
+      const resolved360 = resolveMediaUrl(p360_460);
+      if (resolved360) {
+        sources.push({ id: '460p', label: '460p Standard', badge: 'SD', url: resolved360 });
+      }
     }
-    if (movie.videoUrl && movie.videoUrl.trim() !== '#' && !sources.some(s => s.url === movie.videoUrl.trim())) {
-      sources.push({ id: 'source', label: 'Source Quality', badge: 'HD', url: movie.videoUrl.trim() });
+    if (movie.videoUrl && movie.videoUrl.trim() !== '#' && movie.videoUrl.trim() !== '') {
+      const resolvedVideo = resolveMediaUrl(movie.videoUrl);
+      if (resolvedVideo && !sources.some(s => s.url === resolvedVideo)) {
+        sources.push({ id: 'source', label: 'Source Quality', badge: 'HD', url: resolvedVideo });
+      }
     }
 
     return sources;
@@ -151,10 +164,10 @@ export default function AdvancedVideoPlayer({
     if (!movie) return [];
     const tracks = [];
     if (movie.subtitleUrl) {
-      tracks.push({ id: 'tam', label: 'Tamil', src: movie.subtitleUrl, srclang: 'ta' });
+      tracks.push({ id: 'tam', label: 'Tamil', src: resolveMediaUrl(movie.subtitleUrl), srclang: 'ta' });
     }
     if (movie.subtitleEn) {
-      tracks.push({ id: 'eng', label: 'English', src: movie.subtitleEn, srclang: 'en' });
+      tracks.push({ id: 'eng', label: 'English', src: resolveMediaUrl(movie.subtitleEn), srclang: 'en' });
     }
     return tracks;
   }, [movie]);

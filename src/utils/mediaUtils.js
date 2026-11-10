@@ -1,9 +1,75 @@
 /**
- * Media Metadata Utility for VIP Movies
+ * Media Metadata & URL Resolution Utility for VIP Movies
+ * Supports BOTH relative file paths (e.g. "hollywood/2026/run-away/file.mp4")
+ * and full CDN URLs (e.g. "https://api-download.akatsuki-pvt-ltd.workers.dev/...").
+ *
  * Probes exact video size (via HEAD / Range request Content-Length)
  * and exact video duration (via browser HTML5 video metadata probing)
  * with multi-tier caching (memory + sessionStorage).
  */
+
+export const DEFAULT_MEDIA_BASE_URL = 'https://api-download.akatsuki-pvt-ltd.workers.dev';
+
+/**
+ * Get current configured Media Base URL (from localStorage or environment fallback)
+ */
+export function getMediaBaseUrl() {
+  try {
+    const local = localStorage.getItem('vip_upload_settings');
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (parsed.mediaBaseUrl && typeof parsed.mediaBaseUrl === 'string' && parsed.mediaBaseUrl.trim()) {
+        let base = parsed.mediaBaseUrl.trim();
+        // Remove trailing slashes
+        return base.replace(/\/+$/, '');
+      }
+    }
+  } catch {}
+
+  const envBase = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_MEDIA_BASE_URL)
+    ? import.meta.env.VITE_MEDIA_BASE_URL
+    : DEFAULT_MEDIA_BASE_URL;
+
+  return (envBase || DEFAULT_MEDIA_BASE_URL).replace(/\/+$/, '');
+}
+
+/**
+ * Persist an updated Media Base URL to localStorage
+ */
+export function setMediaBaseUrl(newBaseUrl) {
+  try {
+    const local = localStorage.getItem('vip_upload_settings');
+    const parsed = local ? JSON.parse(local) : {};
+    const clean = (newBaseUrl || DEFAULT_MEDIA_BASE_URL).trim().replace(/\/+$/, '');
+    parsed.mediaBaseUrl = clean;
+    localStorage.setItem('vip_upload_settings', JSON.stringify(parsed));
+    return clean;
+  } catch {
+    return DEFAULT_MEDIA_BASE_URL;
+  }
+}
+
+/**
+ * Resolve any raw video or media string into a playable/downloadable full URL.
+ * Handles BOTH:
+ * 1. Relative storage paths: e.g. "hollywood/2026/slug/file.mp4" -> "https://api-download.../hollywood/2026/slug/file.mp4"
+ * 2. Absolute URLs: e.g. "https://api-download..." or "https://..." -> kept intact
+ */
+export function resolveMediaUrl(rawPathOrUrl) {
+  if (!rawPathOrUrl || typeof rawPathOrUrl !== 'string') return '';
+  const trimmed = rawPathOrUrl.trim();
+  if (trimmed === '' || trimmed === '#' || trimmed === 'null' || trimmed === 'undefined') return '';
+
+  // Already a complete absolute URL (HTTP/HTTPS) or data/blob URI
+  if (/^(?:https?:\/\/|data:|blob:)/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Relative storage path: prefix with current Media Base URL
+  const base = getMediaBaseUrl();
+  const cleanPath = trimmed.replace(/^\/+/, '');
+  return `${base}/${cleanPath}`;
+}
 
 // In-memory cache to prevent redundant network requests across component re-renders
 const memoryCache = new Map();
@@ -55,18 +121,20 @@ export function parseSizeFromUrl(rawUrl) {
 }
 
 /**
- * Convert any media streaming URL to a forced direct download URL
- * Automatically appends ?download=1 for Cloudflare R2 workers
+ * Convert any media streaming URL or relative path to a forced direct download URL
+ * Automatically resolves relative paths and appends ?download=1 for Cloudflare R2 workers
  * which triggers Content-Disposition: attachment; filename="..."
  */
-export function getDownloadUrl(rawUrl) {
-  if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.startsWith('http')) return rawUrl || '#';
+export function getDownloadUrl(rawPathOrUrl) {
+  if (!rawPathOrUrl || typeof rawPathOrUrl !== 'string') return '#';
+  const resolved = resolveMediaUrl(rawPathOrUrl);
+  if (!resolved || !resolved.startsWith('http')) return resolved || '#';
   try {
-    const url = new URL(rawUrl);
+    const url = new URL(resolved);
     url.searchParams.set('download', '1');
     return url.toString();
   } catch {
-    return rawUrl.includes('?') ? `${rawUrl}&download=1` : `${rawUrl}?download=1`;
+    return resolved.includes('?') ? `${resolved}&download=1` : `${resolved}?download=1`;
   }
 }
 
@@ -74,9 +142,12 @@ export function getDownloadUrl(rawUrl) {
  * Fetch exact video file size using HTTP HEAD / Range request
  * Works directly with Cloudflare R2 CDN Worker which sends Access-Control-Allow-Origin: *
  * and Content-Length / Accept-Ranges.
+ * Accepts either relative path or full URL.
  */
-export async function fetchExactVideoSize(url) {
-  if (!url || typeof url !== 'string' || !url.startsWith('http')) return '';
+export async function fetchExactVideoSize(rawPathOrUrl) {
+  if (!rawPathOrUrl || typeof rawPathOrUrl !== 'string') return '';
+  const url = resolveMediaUrl(rawPathOrUrl);
+  if (!url || !url.startsWith('http')) return '';
 
   // 1. Check memory cache
   const cached = memoryCache.get(url);
@@ -137,9 +208,14 @@ export async function fetchExactVideoSize(url) {
 /**
  * Probe exact video duration using browser HTML5 video metadata
  * Preloads moov atom only without downloading the entire video.
+ * Accepts either relative path or full URL.
  */
-export function probeVideoDuration(url, fallbackDuration = '') {
-  if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+export function probeVideoDuration(rawPathOrUrl, fallbackDuration = '') {
+  if (!rawPathOrUrl || typeof rawPathOrUrl !== 'string') {
+    return Promise.resolve(fallbackDuration || '');
+  }
+  const url = resolveMediaUrl(rawPathOrUrl);
+  if (!url || !url.startsWith('http')) {
     return Promise.resolve(fallbackDuration || '');
   }
 

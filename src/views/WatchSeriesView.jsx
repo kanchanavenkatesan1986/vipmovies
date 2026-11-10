@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../AppContext';
-import { fetchExactVideoSize, probeVideoDuration, parseSizeFromUrl, getDownloadUrl } from '../utils/mediaUtils';
+import { fetchExactVideoSize, probeVideoDuration, parseSizeFromUrl, getDownloadUrl, resolveMediaUrl } from '../utils/mediaUtils';
 
 function getSeriesImageUrl(series, episodeImage = '') {
   const img = episodeImage || (series ? series.image : '') || '';
@@ -22,7 +22,9 @@ function EpisodeRow({ ep, series, onPlay }) {
 
   useEffect(() => {
     let isMounted = true;
-    const url = ep.clickurl;
+    const raw = ep.clickurl;
+    if (!raw || !raw.trim() || raw.trim() === '#') return;
+    const url = resolveMediaUrl(raw);
     if (!url || !url.startsWith('http')) return;
 
     // Probe exact video size from Cloudflare R2 CDN Worker (Content-Length / Range header)

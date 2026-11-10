@@ -1,5 +1,6 @@
 import React from 'react';
 import { dbToDisplayType } from '../../utils/tableMapper';
+import { resolveMediaUrl } from '../../../utils/mediaUtils';
 
 function getPosterUrl(movie) {
   if (!movie) return '';
@@ -131,9 +132,9 @@ export default function MovieDetailsModal({ isOpen, movie, onEdit, onClose }) {
                   <i className="fa-solid fa-link"></i> Video Sources:
                 </strong>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
-                  <div><strong>360p (SD):</strong> {movie.p360 ? <a href={movie.p360} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p360}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
-                  <div><strong>720p (HD):</strong> {movie.p720 ? <a href={movie.p720} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p720}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
-                  <div><strong>1080p (Full HD):</strong> {movie.p1080 ? <a href={movie.p1080} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p1080}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
+                  <div><strong>360p (SD):</strong> {movie.p360 ? <a href={resolveMediaUrl(movie.p360)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p360}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
+                  <div><strong>720p (HD):</strong> {movie.p720 ? <a href={resolveMediaUrl(movie.p720)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p720}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
+                  <div><strong>1080p (Full HD):</strong> {movie.p1080 ? <a href={resolveMediaUrl(movie.p1080)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--admin-purple)' }}>{movie.p1080}</a> : <span style={{ color: 'var(--admin-text-dim)' }}>Not Available</span>}</div>
                 </div>
               </div>
             );

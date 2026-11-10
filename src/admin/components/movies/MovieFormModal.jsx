@@ -3,6 +3,7 @@ import { getMovieTable, dbToDisplayType, displayToDbType } from '../../utils/tab
 import { generateNextMovieId } from '../../utils/idGenerator';
 import { validateMovieData } from '../../utils/validation';
 import { movieApi } from '../../services/movieApi';
+import { getMediaBaseUrl, setMediaBaseUrl, resolveMediaUrl, DEFAULT_MEDIA_BASE_URL } from '../../../utils/mediaUtils';
 import EpisodeManager from './EpisodeManager';
 
 export default function MovieFormModal({
@@ -42,6 +43,40 @@ export default function MovieFormModal({
   const [errors, setErrors] = useState({});
   const [targetTable, setTargetTable] = useState('tamil_2026');
   const [contentTypeWarning, setContentTypeWarning] = useState(false);
+  const [cdnBaseUrl, setCdnBaseUrl] = useState(() => getMediaBaseUrl());
+  const [isEditingCdn, setIsEditingCdn] = useState(false);
+  const [cdnSavedMsg, setCdnSavedMsg] = useState('');
+
+  // Default path route calculation for current movie
+  const movieSlug = (formData.title || '')
+    .toLowerCase()
+    .replace(/\(\d{4}\)/g, '')
+    .replace(/\((original|dvd|hdrip|bdrip|tamil|telugu|dubbed|proper|web-series|season\s*\d+)\)/gi, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .trim();
+
+  const currentFolderType = displayToDbType(formData.type || targetType || 'tamil');
+  const currentFolderYear = String(formData.year || targetYear || '2026').trim();
+  const defaultPathRoute = `${currentFolderType}/${currentFolderYear}/${movieSlug ? `${movieSlug}/` : ''}`;
+
+  const handleSaveCdnBase = () => {
+    const saved = setMediaBaseUrl(cdnBaseUrl);
+    setCdnBaseUrl(saved);
+    setIsEditingCdn(false);
+    setCdnSavedMsg('✓ CDN Base URL Updated');
+    setTimeout(() => setCdnSavedMsg(''), 3000);
+  };
+
+  const handleApplyDefaultPathRoute = () => {
+    const baseSlug = movieSlug || 'movie';
+    setFormData(prev => ({
+      ...prev,
+      p360: `${defaultPathRoute}${baseSlug}_360p.mp4`,
+      p720: `${defaultPathRoute}${baseSlug}_720p.mp4`,
+      p1080: `${defaultPathRoute}${baseSlug}_1080p.mp4`
+    }));
+  };
 
   // Initialize form state
   useEffect(() => {
@@ -459,45 +494,196 @@ export default function MovieFormModal({
             />
           ) : (
             /* STREAMING VIDEO SOURCES FOR MOVIE */
-            <div style={{ borderTop: '1px solid var(--admin-border)', paddingTop: '12px', marginTop: '4px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--admin-purple)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-                <i className="fa-solid fa-play"></i> Streaming & Download Video Sources (URLs)
+            <div style={{ borderTop: '1px solid var(--admin-border)', paddingTop: '14px', marginTop: '4px' }}>
+              
+              {/* CDN BASE URL CONFIGURATION & DEFAULT ROUTE CONTROLS */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--admin-border)',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                marginBottom: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                {/* Header: CDN Worker Base URL with Manual Change Option */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 800, color: 'var(--admin-purple)', textTransform: 'uppercase' }}>
+                    <i className="fa-solid fa-server"></i> CDN Media Base URL:
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {cdnSavedMsg && <span style={{ color: '#10b981', fontSize: '11px', fontWeight: 700 }}>{cdnSavedMsg}</span>}
+                    <button
+                      type="button"
+                      className="admin-btn"
+                      style={{ padding: '2px 8px', fontSize: '11px' }}
+                      onClick={() => setIsEditingCdn(prev => !prev)}
+                    >
+                      <i className="fa-solid fa-gear"></i> {isEditingCdn ? 'Cancel' : 'Change CDN URL'}
+                    </button>
+                  </div>
+                </div>
+
+                {isEditingCdn ? (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      className="admin-input"
+                      style={{ fontSize: '12px', padding: '6px 10px', flex: 1 }}
+                      value={cdnBaseUrl}
+                      onChange={(e) => setCdnBaseUrl(e.target.value)}
+                      placeholder="https://api-download.akatsuki-pvt-ltd.workers.dev"
+                    />
+                    <button
+                      type="button"
+                      className="admin-btn primary"
+                      style={{ padding: '6px 12px', fontSize: '12px', whiteSpace: 'nowrap' }}
+                      onClick={handleSaveCdnBase}
+                    >
+                      <i className="fa-solid fa-check"></i> Save
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn"
+                      style={{ padding: '6px 10px', fontSize: '12px' }}
+                      onClick={() => {
+                        setCdnBaseUrl(DEFAULT_MEDIA_BASE_URL);
+                        setMediaBaseUrl(DEFAULT_MEDIA_BASE_URL);
+                        setIsEditingCdn(false);
+                      }}
+                      title="Reset to default CDN"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '12px', color: 'var(--admin-text-main)', fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px', wordBreak: 'break-all' }}>
+                    {cdnBaseUrl}
+                  </div>
+                )}
+
+                {/* Default Path Route Helper for this Movie */}
+                <div style={{
+                  background: 'rgba(139, 92, 246, 0.08)',
+                  border: '1px solid rgba(139, 92, 246, 0.25)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#fff' }}>
+                      <i className="fa-solid fa-folder-tree" style={{ color: 'var(--admin-accent)', marginRight: '5px' }}></i>
+                      Default Path Route: <code style={{ color: 'var(--admin-accent)', background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: '4px' }}>{defaultPathRoute}</code>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="admin-btn"
+                        style={{ padding: '3px 8px', fontSize: '11px', background: 'rgba(255,255,255,0.06)' }}
+                        onClick={() => {
+                          if (navigator.clipboard) {
+                            navigator.clipboard.writeText(defaultPathRoute);
+                            setCdnSavedMsg('✓ Route Copied!');
+                            setTimeout(() => setCdnSavedMsg(''), 2000);
+                          }
+                        }}
+                        title="Copy route to clipboard"
+                      >
+                        <i className="fa-regular fa-copy"></i> Copy Route
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn primary"
+                        style={{ padding: '3px 10px', fontSize: '11px' }}
+                        onClick={handleApplyDefaultPathRoute}
+                        title="Auto-fill 360p, 720p, 1080p with default path route and filenames"
+                      >
+                        <i className="fa-solid fa-wand-magic-sparkles"></i> Auto-Fill Paths
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: 'var(--admin-text-dim)' }}>
+                    Paste either <strong>relative storage path</strong> (e.g. <code>{defaultPathRoute}movie_1080p.mp4</code>) or <strong>full worker URL</strong> (<code>{cdnBaseUrl}/{defaultPathRoute}movie_1080p.mp4</code>). Both work everywhere!
+                  </div>
+                </div>
               </div>
               
-              <div className="admin-form-group full" style={{ marginBottom: '10px' }}>
-                <label>360p (SD) Download URL</label>
+              {/* 360p Input */}
+              <div className="admin-form-group full" style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label>360p (SD) Video Link (Path or Full URL)</label>
+                  {formData.p360 && (
+                    <span style={{ fontSize: '11px', color: formData.p360.startsWith('http') ? '#38bdf8' : '#10b981', fontWeight: 600 }}>
+                      {formData.p360.startsWith('http') ? 'Full URL' : 'Relative Storage Path'}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   className="admin-input"
-                  placeholder="https://..."
+                  placeholder={`${defaultPathRoute}${movieSlug || 'movie'}_360p.mp4 OR https://...`}
                   value={formData.p360}
                   onChange={(e) => handleChange('p360', e.target.value)}
                 />
                 {errors.p360 && <span className="error-text">{errors.p360}</span>}
+                {formData.p360 && !formData.p360.startsWith('http') && formData.p360.trim() !== '#' && (
+                  <div style={{ fontSize: '11px', color: '#10b981', marginTop: '3px', wordBreak: 'break-all' }}>
+                    <i className="fa-solid fa-cloud-arrow-up"></i> CDN Preview: <code>{resolveMediaUrl(formData.p360)}</code>
+                  </div>
+                )}
               </div>
 
-              <div className="admin-form-group full" style={{ marginBottom: '10px' }}>
-                <label>720p (HD) Download URL</label>
+              {/* 720p Input */}
+              <div className="admin-form-group full" style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label>720p (HD) Video Link (Path or Full URL)</label>
+                  {formData.p720 && (
+                    <span style={{ fontSize: '11px', color: formData.p720.startsWith('http') ? '#38bdf8' : '#10b981', fontWeight: 600 }}>
+                      {formData.p720.startsWith('http') ? 'Full URL' : 'Relative Storage Path'}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   className="admin-input"
-                  placeholder="https://..."
+                  placeholder={`${defaultPathRoute}${movieSlug || 'movie'}_720p.mp4 OR https://...`}
                   value={formData.p720}
                   onChange={(e) => handleChange('p720', e.target.value)}
                 />
                 {errors.p720 && <span className="error-text">{errors.p720}</span>}
+                {formData.p720 && !formData.p720.startsWith('http') && formData.p720.trim() !== '#' && (
+                  <div style={{ fontSize: '11px', color: '#10b981', marginTop: '3px', wordBreak: 'break-all' }}>
+                    <i className="fa-solid fa-cloud-arrow-up"></i> CDN Preview: <code>{resolveMediaUrl(formData.p720)}</code>
+                  </div>
+                )}
               </div>
 
-              <div className="admin-form-group full">
-                <label>1080p (Full HD) Download URL</label>
+              {/* 1080p Input */}
+              <div className="admin-form-group full" style={{ marginBottom: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label>1080p (Full HD) Video Link (Path or Full URL)</label>
+                  {formData.p1080 && (
+                    <span style={{ fontSize: '11px', color: formData.p1080.startsWith('http') ? '#38bdf8' : '#10b981', fontWeight: 600 }}>
+                      {formData.p1080.startsWith('http') ? 'Full URL' : 'Relative Storage Path'}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   className="admin-input"
-                  placeholder="https://..."
+                  placeholder={`${defaultPathRoute}${movieSlug || 'movie'}_1080p.mp4 OR https://...`}
                   value={formData.p1080}
                   onChange={(e) => handleChange('p1080', e.target.value)}
                 />
                 {errors.p1080 && <span className="error-text">{errors.p1080}</span>}
+                {formData.p1080 && !formData.p1080.startsWith('http') && formData.p1080.trim() !== '#' && (
+                  <div style={{ fontSize: '11px', color: '#10b981', marginTop: '3px', wordBreak: 'break-all' }}>
+                    <i className="fa-solid fa-cloud-arrow-up"></i> CDN Preview: <code>{resolveMediaUrl(formData.p1080)}</code>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { fetchExactVideoSize, probeVideoDuration } from '../../../utils/mediaUtils';
+import { fetchExactVideoSize, probeVideoDuration, resolveMediaUrl } from '../../../utils/mediaUtils';
 
 /**
  * Generate a stable unique episode ID that is preserved across edits.
@@ -86,18 +86,26 @@ export default function EpisodeManager({
     setEditingEpisode(ep);
     setDetectedMeta(ep.duration ? { duration: ep.duration } : null);
     setIsFormOpen(true);
-    if (ep.clickurl && ep.clickurl.startsWith('http')) {
-      fetchExactVideoSize(ep.clickurl).then(sz => {
-        if (sz) setDetectedMeta(prev => ({ ...(prev || {}), size: sz }));
-      });
+    if (ep.clickurl && ep.clickurl.trim() && ep.clickurl !== '#') {
+      const resolved = resolveMediaUrl(ep.clickurl);
+      if (resolved && resolved.startsWith('http')) {
+        fetchExactVideoSize(resolved).then(sz => {
+          if (sz) setDetectedMeta(prev => ({ ...(prev || {}), size: sz }));
+        });
+      }
     }
   };
 
-  // Auto-detect exact video size and duration from Cloudflare R2 CDN URL
+  // Auto-detect exact video size and duration from Cloudflare R2 CDN URL or relative path
   const handleAutoDetectMeta = async () => {
-    const url = formState.clickurl ? formState.clickurl.trim() : '';
+    const raw = formState.clickurl ? formState.clickurl.trim() : '';
+    if (!raw || raw === '#') {
+      setFormErrors(prev => ({ ...prev, clickurl: 'Enter a valid video URL or relative storage path first' }));
+      return;
+    }
+    const url = resolveMediaUrl(raw);
     if (!url || !url.startsWith('http')) {
-      setFormErrors(prev => ({ ...prev, clickurl: 'Enter a valid http/https video URL first' }));
+      setFormErrors(prev => ({ ...prev, clickurl: 'Enter a valid video URL or relative storage path first' }));
       return;
     }
     setDetectingMeta(true);
@@ -669,21 +677,34 @@ export default function EpisodeManager({
               </div>
 
               <div className="admin-form-group">
-                <label>Playback Video URL (clickurl) *</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label>Playback Video Link (Path or Full URL) *</label>
+                  <span style={{ fontSize: '11px', color: 'var(--admin-accent)', fontWeight: 600 }}>
+                    Relative Path &amp; Full URL Supported
+                  </span>
+                </div>
                 <input
                   type="text"
                   className="admin-input"
-                  placeholder="https://... direct streaming or CDN URL"
+                  placeholder="e.g. hollywood/2026/run-away/file.mp4 OR https://..."
                   value={formState.clickurl}
                   onChange={(e) => setFormState(prev => ({ ...prev, clickurl: e.target.value }))}
                   onBlur={() => {
                     const url = formState.clickurl ? formState.clickurl.trim() : '';
-                    if (url && url.startsWith('http')) {
+                    if (url && url !== '#') {
                       handleAutoDetectMeta();
                     }
                   }}
                 />
                 {formErrors.clickurl && <span className="error-text" style={{ color: '#f87171', fontSize: '11px' }}>{formErrors.clickurl}</span>}
+
+                {/* CDN Full Resolution Preview if Relative Path */}
+                {formState.clickurl && !formState.clickurl.startsWith('http') && formState.clickurl.trim() !== '#' && (
+                  <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px', wordBreak: 'break-all', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <i className="fa-solid fa-cloud-arrow-up"></i>
+                    <span>CDN Preview: <code>{resolveMediaUrl(formState.clickurl)}</code></span>
+                  </div>
+                )}
 
                 {/* Auto-detected Video Duration & Size Display */}
                 <div style={{
