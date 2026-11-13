@@ -27,7 +27,7 @@ export default function ListView({ type = '', year = '' }) {
     return matchType && matchYear;
   });
 
-  // Sort movies: active first, coming soon last, and ID 1 first
+  // Sort movies: active first, coming soon last, and highest ID first (newest movies first)
   const sortedMovies = [...filteredMovies].sort((a, b) => {
     const aComing = String(a.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
     const bComing = String(b.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
@@ -44,7 +44,7 @@ export default function ListView({ type = '', year = '' }) {
       const last = parseInt(parts[parts.length - 1], 10);
       return isNaN(last) ? 0 : last;
     };
-    return getNum(a.id) - getNum(b.id);
+    return getNum(b.id) - getNum(a.id); // descending: highest ID first
   });
 
   const totalMovies = sortedMovies.length;

@@ -42,7 +42,7 @@
             </span>
           </div>
           <p class="text-xs text-slate-400 mt-0.5">
-            isaidub.green & moviezda.me Engine • Clean Movie Names • Local Poster Download • File Path Storage • D1 Clean & Replace All
+            isaidub.green & moviezda.co Engine • Clean Movie Names • Local Poster Download • File Path Storage • D1 Clean & Replace All
           </p>
         </div>
       </div>
@@ -71,7 +71,7 @@
           <span>🎬 Hollywood 2026 (isaidub.green)</span>
         </button>
         <button id="presetTamil" class="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
-          <span>🎭 Tamil 2026 (moviezda.me)</span>
+          <span>🎭 Tamil 2026 (moviezda.co)</span>
         </button>
       </div>
       <div class="text-xs text-slate-400">
@@ -163,7 +163,7 @@
           <label class="block font-semibold text-slate-300">Source Movies Listing URL</label>
           <input type="text" id="cfgSourceUrl" value="https://isaidub.green/tamil-2026-dubbed-movies/"
             class="w-full bg-slate-950/80 border border-slate-700 focus:border-sky-500 rounded-xl px-3.5 py-2.5 text-slate-100 font-mono text-xs outline-none transition" />
-          <p class="text-[11px] text-slate-500">Supports isaidub.green & moviezda.me multi-page pagination.</p>
+          <p class="text-[11px] text-slate-500">Supports isaidub.green & moviezda.co multi-page pagination.</p>
         </div>
 
         <!-- Release Year -->
@@ -223,23 +223,31 @@
       </div>
     </section>
 
-    <!-- ACTIVE STREAMING TASK CARD -->
+    <!-- ACTIVE STREAMING TASK CARD WITH LIVE POSTER & STATUS -->
     <section id="activeTaskCard" class="glass-card rounded-2xl p-4 border-l-4 border-l-sky-500 hidden transition-all">
-      <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center gap-2.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-sky-400 pulse-indicator"></span>
-          <span class="text-xs uppercase font-bold text-sky-400 tracking-wider">Active JIT Stream Transfer</span>
-          <span id="activeMovieTitle" class="text-sm font-semibold text-white">None</span>
+      <div class="flex items-center gap-4">
+        <div id="activePosterBox" class="w-14 h-20 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 flex-shrink-0 flex items-center justify-center">
+          <img id="activePosterImg" src="" alt="Poster" class="w-full h-full object-cover hidden" onerror="this.classList.add('hidden'); document.getElementById('activePosterPlaceholder').classList.remove('hidden');" />
+          <span id="activePosterPlaceholder" class="text-[10px] text-slate-500 font-mono text-center px-1">Poster</span>
         </div>
-        <span id="activeSpeed" class="text-xs font-mono text-slate-400">Streaming JIT...</span>
-      </div>
-      <div class="space-y-1.5">
-        <div class="flex justify-between text-xs text-slate-400">
-          <span id="activeFile">Waiting for stream...</span>
-          <span id="activePercent" class="font-mono text-sky-400 font-semibold">0%</span>
-        </div>
-        <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-          <div id="activeProgressBar" class="bg-gradient-to-r from-sky-500 to-indigo-500 h-full rounded-full transition-all duration-200" style="width: 0%"></div>
+        <div class="flex-1 space-y-2 min-w-0">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-400 pulse-indicator flex-shrink-0"></span>
+              <span id="activeMovieTitle" class="text-sm font-bold text-white truncate">None</span>
+              <span id="activeCategoryBadge" class="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-purple-950 text-purple-300 border border-purple-800/60 flex-shrink-0">Movie</span>
+            </div>
+            <span id="activeSpeed" class="text-xs font-mono text-slate-400">Processing...</span>
+          </div>
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs text-slate-400">
+              <span id="activeFile" class="truncate pr-2">Waiting for stream...</span>
+              <span id="activePercent" class="font-mono text-sky-400 font-semibold flex-shrink-0">0%</span>
+            </div>
+            <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+              <div id="activeProgressBar" class="bg-gradient-to-r from-sky-500 to-indigo-500 h-full rounded-full transition-all duration-200" style="width: 0%"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -252,14 +260,22 @@
             <span>📚 Catalog & Database Synchronization</span>
             <span id="tableCountBadge" class="px-2 py-0.5 text-[11px] rounded-full bg-slate-800 text-slate-300 font-mono">0 titles</span>
           </h2>
-          <p class="text-xs text-slate-400">Clean movie names only • Relative file paths • Exact image filenames</p>
+          <p class="text-xs text-slate-400">Clean movie names only • Relative file paths • Dedicated category tables</p>
         </div>
 
-        <div class="flex items-center gap-2">
-          <input type="text" id="tableSearch" placeholder="Search clean title or ID..."
-            class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-sky-500" />
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+            <button id="btnTabAll" class="px-2.5 py-1 rounded-lg font-bold text-white bg-slate-800 transition">All</button>
+            <button id="btnTabTamil" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition">🎭 Tamil</button>
+            <button id="btnTabHollywood" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition">🎬 Hollywood</button>
+          </div>
+          <button id="btnCleanDirtyD1" class="px-3 py-1.5 bg-rose-950 hover:bg-rose-900 text-rose-300 font-bold text-xs rounded-xl border border-rose-800/60 shadow transition flex items-center gap-1" title="Purge cross-category or invalid records from active D1 table">
+            <span>🧹 Purge Dirty Records</span>
+          </button>
+          <input type="text" id="tableSearch" placeholder="Search title or ID..."
+            class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-sky-500 w-44" />
           <button id="btnExportJson" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
-            <span>💾 Export JSON</span>
+            <span>💾 Export</span>
           </button>
         </div>
       </div>
@@ -269,6 +285,7 @@
         <table class="w-full text-left text-xs text-slate-300">
           <thead class="bg-slate-950/90 text-[11px] uppercase tracking-wider text-slate-400 sticky top-0 border-b border-slate-800 z-10">
             <tr>
+              <th class="py-3 px-3">Poster</th>
               <th class="py-3 px-3.5">ID (Reverse)</th>
               <th class="py-3 px-3">Page</th>
               <th class="py-3 px-3.5">Clean Movie Name</th>
@@ -405,7 +422,13 @@
       btnCloseHistoryModal: document.getElementById('btnCloseHistoryModal'),
       presetHollywood: document.getElementById('presetHollywood'),
       presetTamil: document.getElementById('presetTamil'),
-      activePresetBadge: document.getElementById('activePresetBadge')
+      activePresetBadge: document.getElementById('activePresetBadge'),
+      activePosterImg: document.getElementById('activePosterImg'),
+      activeCategoryBadge: document.getElementById('activeCategoryBadge'),
+      btnTabAll: document.getElementById('btnTabAll'),
+      btnTabTamil: document.getElementById('btnTabTamil'),
+      btnTabHollywood: document.getElementById('btnTabHollywood'),
+      btnCleanDirtyD1: document.getElementById('btnCleanDirtyD1')
     };
 
     socket.onopen = () => {
@@ -444,19 +467,37 @@
       }
     }
 
+    let activeTabCategory = 'tamil'; // 'all' | 'tamil' | 'hollywood'
+
+    async function loadCategoryCatalog(category, year = '2026') {
+      try {
+        const url = category && category !== 'all' ? `/api/catalog?category=${category}&year=${year}` : '/api/catalog';
+        const res = await fetch(url);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          catalogItems = data;
+          renderCatalogTable();
+        }
+      } catch (e) {}
+    }
+
     function renderCatalogTable() {
       const q = (elements.tableSearch.value || '').toLowerCase().trim();
       const filtered = catalogItems.filter(item => {
+        if (activeTabCategory !== 'all') {
+          const itemCat = (item.type || (item.id && item.id.split('-')[0]) || '').toLowerCase();
+          if (itemCat !== activeTabCategory) return false;
+        }
         if (!q) return true;
         return (item.id || '').toLowerCase().includes(q) || (item.title || '').toLowerCase().includes(q);
       });
 
-      elements.tableCountBadge.textContent = `${catalogItems.length} titles`;
+      elements.tableCountBadge.textContent = `${filtered.length} titles`;
 
       if (filtered.length === 0) {
         elements.catalogTableBody.innerHTML = `
-          <tr><td colspan="7" class="py-8 text-center text-slate-500 font-sans">
-            ${catalogItems.length === 0 ? 'No items scanned yet. Click "Start Automation" or "Scan R2" to begin.' : 'No matching titles found.'}
+          <tr><td colspan="8" class="py-8 text-center text-slate-500 font-sans">
+            ${catalogItems.length === 0 ? 'No items scanned yet. Click "Start Automation" or "Scan R2" to begin.' : 'No matching titles found in this category.'}
           </td></tr>`;
         return;
       }
@@ -485,8 +526,18 @@
           sourcesText = s.length > 0 ? s.join(', ') : '3 Qualities';
         }
 
+        const catName = (item.type || (item.id && item.id.split('-')[0]) || 'tamil').toLowerCase();
+        const posterFile = item.image || `${item.title}.jpg`;
+        const posterSrc = `/${catName}/2026/${encodeURIComponent(posterFile)}`;
+
         return `
           <tr class="hover:bg-slate-900/60 transition">
+            <td class="py-2 px-3">
+              <div class="w-8 h-11 bg-slate-950 rounded overflow-hidden border border-slate-800 flex items-center justify-center flex-shrink-0">
+                <img src="${posterSrc}" alt="${item.title}" class="w-full h-full object-cover" 
+                  onerror="this.onerror=null; this.src='/posters/${catName}/2026/${encodeURIComponent(posterFile)}'; this.onerror=function(){this.style.display='none';};" />
+              </div>
+            </td>
             <td class="py-2.5 px-3.5 font-bold text-sky-300">${item.id}</td>
             <td class="py-2.5 px-3 text-slate-500">${item.pageNum || '1'}</td>
             <td class="py-2.5 px-3.5 font-sans font-bold text-slate-100 truncate max-w-xs">${item.title}</td>
@@ -566,6 +617,20 @@
         } else if (data) {
           catalogItems.push({ id, status, data, title: data.title, contentType: data.contentType });
         }
+        if (data) {
+          elements.activeTaskCard.classList.remove('hidden');
+          elements.activeMovieTitle.textContent = data.title || id;
+          if (data.image) {
+            const cat = (data.type || 'tamil').toLowerCase();
+            elements.activePosterImg.src = `/${cat}/2026/${encodeURIComponent(data.image)}`;
+            elements.activePosterImg.classList.remove('hidden');
+            const ph = document.getElementById('activePosterPlaceholder');
+            if (ph) ph.classList.add('hidden');
+          }
+          if (elements.activeCategoryBadge) {
+            elements.activeCategoryBadge.textContent = data.contentType === 'series' ? 'Series' : 'Movie';
+          }
+        }
         renderCatalogTable();
         if (status === 'Synced D1') {
           const syncedCount = catalogItems.filter(i => i.status === 'Synced D1').length;
@@ -576,6 +641,60 @@
 
     elements.tableSearch.addEventListener('input', renderCatalogTable);
 
+    // Category Tabs
+    function setCategoryTab(cat, btn) {
+      activeTabCategory = cat;
+      [elements.btnTabAll, elements.btnTabTamil, elements.btnTabHollywood].forEach(b => {
+        if (b) b.className = "px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition";
+      });
+      if (btn) btn.className = "px-2.5 py-1 rounded-lg font-bold text-white bg-slate-800 transition";
+      const yr = document.getElementById('cfgYear')?.value || '2026';
+      loadCategoryCatalog(cat, yr);
+    }
+
+    if (elements.btnTabAll) elements.btnTabAll.addEventListener('click', () => setCategoryTab('all', elements.btnTabAll));
+    if (elements.btnTabTamil) elements.btnTabTamil.addEventListener('click', () => setCategoryTab('tamil', elements.btnTabTamil));
+    if (elements.btnTabHollywood) elements.btnTabHollywood.addEventListener('click', () => setCategoryTab('hollywood', elements.btnTabHollywood));
+
+    // Listen for Storage Category dropdown change
+    const categorySelect = document.getElementById('cfgCategory');
+    if (categorySelect) {
+      categorySelect.addEventListener('change', (e) => {
+        const cat = e.target.value.toLowerCase().trim();
+        const targetBtn = cat === 'tamil' ? elements.btnTabTamil : (cat === 'hollywood' ? elements.btnTabHollywood : elements.btnTabAll);
+        setCategoryTab(cat, targetBtn);
+      });
+    }
+
+    // Clean Dirty Records in D1
+    if (elements.btnCleanDirtyD1) {
+      elements.btnCleanDirtyD1.addEventListener('click', async () => {
+        const category = document.getElementById('cfgCategory').value.trim();
+        const year = document.getElementById('cfgYear').value.trim();
+        const table = `${category}_${year}`;
+
+        if (!confirm(`🧹 Purge any cross-category or invalid junk records from D1 table "${table}"?`)) return;
+
+        appendLog(`[SYSTEM] Purging dirty records from table "${table}"...`);
+        try {
+          const res = await fetch('/api/clean-dirty-records', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table })
+          });
+          const data = await res.json();
+          if (data.success) {
+            appendLog(`[D1 CLEAN SUCCESS] ✓ Purged ${data.purged} dirty records from "${table}". Remaining clean records: ${data.remaining}`);
+            alert(`Purged ${data.purged} records! Table "${table}" now has ${data.remaining} clean records.`);
+          } else {
+            appendLog(`[D1 CLEAN ERROR] ${data.error}`);
+          }
+        } catch (err) {
+          appendLog(`[D1 CLEAN ERROR] ${err.message}`);
+        }
+      });
+    }
+
     // Preset handlers
     elements.presetHollywood.addEventListener('click', () => {
       document.getElementById('cfgSourceUrl').value = 'https://isaidub.green/tamil-2026-dubbed-movies/';
@@ -583,15 +702,20 @@
       document.getElementById('cfgYear').value = '2026';
       elements.activePresetBadge.textContent = 'Hollywood 2026 (isaidub.green)';
       appendLog('[PRESET] Selected Hollywood 2026 (isaidub.green)');
+      setCategoryTab('hollywood', elements.btnTabHollywood);
     });
 
     elements.presetTamil.addEventListener('click', () => {
-      document.getElementById('cfgSourceUrl').value = 'https://moviezda.me/tamil-2026-movies/';
+      document.getElementById('cfgSourceUrl').value = 'https://moviezda.co/tamil-2026-movies/';
       document.getElementById('cfgCategory').value = 'tamil';
       document.getElementById('cfgYear').value = '2026';
-      elements.activePresetBadge.textContent = 'Tamil 2026 (moviezda.me)';
-      appendLog('[PRESET] Selected Tamil 2026 (moviezda.me)');
+      elements.activePresetBadge.textContent = 'Tamil 2026 (moviezda.co)';
+      appendLog('[PRESET] Selected Tamil 2026 (moviezda.co)');
+      setCategoryTab('tamil', elements.btnTabTamil);
     });
+
+    // Initial Load
+    setCategoryTab('tamil', elements.btnTabTamil);
 
     // Clean 0 & Replace All in D1
     elements.btnCleanReplaceD1.addEventListener('click', async () => {
@@ -599,7 +723,7 @@
       const year = document.getElementById('cfgYear').value.trim();
       const table = `${category}_${year}`;
 
-      const confirmed = confirm(`⚠️ WARNING: "Clean 0 & Replace All" will:\n1. Delete ALL existing records from D1 table "${table}" (count = 0).\n2. Insert all ${catalogItems.length} clean, freshly ordered records (00001..N).\n\nAre you sure you want to proceed?`);
+      const confirmed = confirm(`⚠️ CLEAN 0 & REPLACE ALL for table "${table}":\n\n1. Wipes table "${table}" to count = 0.\n2. Inserts ONLY ${category.toUpperCase()} ${year} records (00001..N).\n3. Any cross-category data (e.g. Hollywood records) will NOT be inserted into ${table}.\n\nAre you sure you want to proceed?`);
       if (!confirmed) return;
 
       appendLog(`[SYSTEM] Initiating Clean 0 & Replace All for table "${table}"...`);

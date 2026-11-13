@@ -20,6 +20,7 @@ import MoviesPage from '../admin/pages/MoviesPage';
 import SlidesPage from '../admin/pages/SlidesPage';
 import FileManagerPage from '../admin/pages/FileManagerPage';
 import PlayerAdsPage from '../admin/pages/PlayerAdsPage';
+import SettingsPage from '../admin/pages/SettingsPage';
 import { authService } from '../admin/services/authService';
 import '../admin/styles/admin.css';
 
@@ -118,6 +119,10 @@ export default function Router() {
 
     if (path === 'admin/ads' || path === 'admin/player-ads') {
       return <PlayerAdsPage navigateTo={navigateTo} />;
+    }
+
+    if (path === 'admin/settings' || path === 'admin/setting') {
+      return <SettingsPage currentRoute={path} navigateTo={navigateTo} />;
     }
 
     if (path.startsWith('admin/movies')) {

@@ -290,7 +290,7 @@ var CacheManager = (function() {
 
     function populate(movies, slider) {
         _movies = (movies || []).slice().sort(function(a, b) {
-            return getMovieNumber(a.id) - getMovieNumber(b.id);
+            return getMovieNumber(b.id) - getMovieNumber(a.id); // descending: highest ID (newest) first
         });
         _slider = (slider || []).slice().sort(function(a, b) {
             return (Number(a.id) || 0) - (Number(b.id) || 0);

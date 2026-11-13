@@ -46,6 +46,7 @@ export default function MovieFormModal({
   const [cdnBaseUrl, setCdnBaseUrl] = useState(() => getMediaBaseUrl());
   const [isEditingCdn, setIsEditingCdn] = useState(false);
   const [cdnSavedMsg, setCdnSavedMsg] = useState('');
+  const [useFullUrlMode, setUseFullUrlMode] = useState(false);
 
   // Default path route calculation for current movie
   const movieSlug = (formData.title || '')
@@ -68,13 +69,39 @@ export default function MovieFormModal({
     setTimeout(() => setCdnSavedMsg(''), 3000);
   };
 
+  const toggleUrlMode = (enableFull) => {
+    setUseFullUrlMode(enableFull);
+    const base = cdnBaseUrl.replace(/\/+$/, '');
+    setFormData(prev => {
+      const convert = (val) => {
+        if (!val || val === '#' || val === '') return val;
+        if (enableFull) {
+          return val.startsWith('http') ? val : `${base}/${val.replace(/^\/+/, '')}`;
+        } else {
+          return val.startsWith('http') ? val.replace(new RegExp(`^${base}/?`), '') : val;
+        }
+      };
+      return {
+        ...prev,
+        p360: convert(prev.p360),
+        p720: convert(prev.p720),
+        p1080: convert(prev.p1080)
+      };
+    });
+  };
+
   const handleApplyDefaultPathRoute = () => {
     const baseSlug = movieSlug || 'movie';
+    const rel360 = `${defaultPathRoute}${baseSlug}_360p.mp4`;
+    const rel720 = `${defaultPathRoute}${baseSlug}_720p.mp4`;
+    const rel1080 = `${defaultPathRoute}${baseSlug}_1080p.mp4`;
+    const base = cdnBaseUrl.replace(/\/+$/, '');
+
     setFormData(prev => ({
       ...prev,
-      p360: `${defaultPathRoute}${baseSlug}_360p.mp4`,
-      p720: `${defaultPathRoute}${baseSlug}_720p.mp4`,
-      p1080: `${defaultPathRoute}${baseSlug}_1080p.mp4`
+      p360: useFullUrlMode ? `${base}/${rel360}` : rel360,
+      p720: useFullUrlMode ? `${base}/${rel720}` : rel720,
+      p1080: useFullUrlMode ? `${base}/${rel1080}` : rel1080
     }));
   };
 
@@ -611,6 +638,34 @@ export default function MovieFormModal({
                 </div>
               </div>
               
+              {/* URL Mode Tick Option */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid var(--admin-border)',
+                borderRadius: '8px',
+                marginBottom: '14px',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '12px', fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={useFullUrlMode}
+                    onChange={(e) => toggleUrlMode(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--admin-purple)', cursor: 'pointer' }}
+                  />
+                  <span>Full CDN URL Mode (Tick to convert/use full URLs)</span>
+                </label>
+                <span style={{ fontSize: '11px', color: useFullUrlMode ? '#38bdf8' : '#10b981', fontWeight: 700 }}>
+                  <i className={`fa-solid ${useFullUrlMode ? 'fa-globe' : 'fa-folder-closed'}`} style={{ marginRight: '4px' }}></i>
+                  {useFullUrlMode ? 'Full CDN URL Mode' : 'Default: Relative Path Mode'}
+                </span>
+              </div>
+
               {/* 360p Input */}
               <div className="admin-form-group full" style={{ marginBottom: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

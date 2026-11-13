@@ -88,7 +88,12 @@ function EpisodeRow({ ep, series, onPlay }) {
               alt={ep.title}
               style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s ease' }}
               onError={(e) => {
-                e.target.style.display = 'none';
+                const fallback = series?.image ? `/src/images/${(series.type || '').toLowerCase()}/${series.year || '2026'}/${series.image}` : '';
+                if (fallback && !e.target.src.endsWith(encodeURIComponent(series.image || ''))) {
+                  e.target.src = fallback;
+                } else {
+                  e.target.style.display = 'none';
+                }
               }}
             />
           ) : (

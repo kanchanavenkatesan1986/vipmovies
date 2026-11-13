@@ -24,21 +24,42 @@ function generateEpisodeId(seasonNum, epNum) {
 async function inspectR2Folder(r2, folderPrefix, urlMode = 'path', isSeries = false, folderSlug = '') {
   try {
     const cleanPrefix = folderPrefix.endsWith('/') ? folderPrefix : `${folderPrefix}/`;
-    const res = await r2.listObjects(cleanPrefix);
+    const res = await r2.listObjects(cleanPrefix, '');
     if (!res || !res.objects) return null;
 
-    const videoObjects = res.objects.filter(o => o.isVideo || (o.extension && o.extension.toLowerCase() === '.mp4'));
+    const videoObjects = res.objects.filter(o => 
+      o.isVideo || 
+      (o.extension && o.extension.toLowerCase() === '.mp4') ||
+      (o.filename && o.filename.toLowerCase().endsWith('.mp4')) ||
+      (o.key && o.key.toLowerCase().endsWith('.mp4'))
+    );
     if (videoObjects.length === 0) return null;
 
-    const getUrl = (key) => urlMode === 'cdn' ? `${MEDIA_BASE}/${key}` : key;
+    const mediaBaseUrl = (r2 && r2.mediaBase) ? r2.mediaBase : MEDIA_BASE;
+    const getUrl = (key) => urlMode === 'cdn' ? `${mediaBaseUrl}/${key.replace(/^\/+/, '')}` : key;
 
-    if (isSeries || videoObjects.some(v => /s\d+\s*e\d+|epi?\s*\d+/i.test(v.filename))) {
+    const seriesDetected = isSeries || videoObjects.some(v => 
+      /[_\s\(\[]Epi?(?:sode)?[_\s\(\[]*\d+/i.test(v.filename || v.key) ||
+      /(?:season|s)\s*\d+/i.test(v.filename || v.key) ||
+      /s\d+\s*e\d+/i.test(v.filename || v.key)
+    );
+
+    if (seriesDetected) {
       // Process as Series
       const episodes = videoObjects.map((obj, idx) => {
-        const epMatch = obj.filename.match(/(?:epi?|e)\s*(\d+)/i) || [null, idx + 1];
+        const name = obj.filename || obj.key.split('/').pop() || '';
+
+        const epMatch = name.match(/[_\s\(\[]Epi?(?:sode)?[_\s\(\[]*(\d+)/i)
+          || name.match(/(?:epi?|episode)[_\s]*(\d+)/i)
+          || name.match(/S\d+[_\s]*E(\d+)/i)
+          || name.match(/\bE(\d{1,3})\b/i)
+          || name.match(/\b(\d{1,3})\.mp4$/i)
+          || [null, idx + 1];
         const epNum = parseInt(epMatch[1], 10) || (idx + 1);
 
-        const seasonMatch = obj.filename.match(/(?:season|s)\s*(\d+)/i) || [null, 1];
+        const seasonMatch = name.match(/[_\s\(\[]Season[_\s\(\[]*(\d+)/i)
+          || name.match(/(?:season|s)[_\s]*(\d+)/i)
+          || [null, 1];
         const seasonNum = parseInt(seasonMatch[1], 10) || 1;
 
         return {
@@ -46,12 +67,12 @@ async function inspectR2Folder(r2, folderPrefix, urlMode = 'path', isSeries = fa
           seasonNumber: seasonNum,
           episodeNumber: epNum,
           title: `Episode ${epNum}`,
-          image: folderSlug ? `${folderSlug}/${epNum}.webp` : `${epNum}.webp`,
+          image: folderSlug ? `${folderSlug}/${epNum}.jpg` : `${epNum}.jpg`,
           duration: '45m',
           clickurl: getUrl(obj.key),
           rawKey: obj.key,
-          filename: obj.filename,
-          sizeFormatted: obj.sizeFormatted
+          filename: name,
+          sizeFormatted: obj.sizeFormatted || ''
         };
       }).sort((a, b) => {
         if (a.seasonNumber !== b.seasonNumber) return a.seasonNumber - b.seasonNumber;
@@ -70,7 +91,7 @@ async function inspectR2Folder(r2, folderPrefix, urlMode = 'path', isSeries = fa
       const rawKeys = { p360: '', p720: '', p1080: '' };
 
       videoObjects.forEach(v => {
-        const fn = v.filename.toLowerCase();
+        const fn = (v.filename || v.key).toLowerCase();
         if (fn.includes('360p') || fn.includes('480p') || fn.includes('360')) {
           sources.p360 = getUrl(v.key);
           rawKeys.p360 = v.key;

@@ -81,7 +81,7 @@ export default function SearchView({ query = '' }) {
       results = results.filter(m => (m.type || '').toLowerCase() === selectedLang);
     }
 
-    // Sort: active first, coming soon last
+    // Sort: active first, coming soon last, then highest ID first (newest movies first)
     return [...results].sort((a, b) => {
       const aComing = (a.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
       const bComing = (b.status || '').toLowerCase() === 'coming soon' ? 1 : 0;
@@ -91,7 +91,7 @@ export default function SearchView({ query = '' }) {
         const last = parts[parts.length - 1];
         return parseInt(last, 10) || 0;
       };
-      return getNum(a.id) - getNum(b.id);
+      return getNum(b.id) - getNum(a.id); // descending: highest ID first
     });
   }, [movies, searchText, selectedYear, selectedLang, isSearching]);
 

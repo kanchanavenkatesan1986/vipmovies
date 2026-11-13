@@ -139,19 +139,19 @@ export default function HomeView() {
   };
 
 
-  // Filter Tamil movies for 2026 and status active, sorted by ID order ascending
+  // Filter Tamil movies for 2026 and status active, sorted by ID descending (newest/highest ID first)
   const tamilMovies = useMemo(() => {
     return (movies || [])
       .filter(m => String(m.type).toLowerCase() === 'tamil' && String(m.year) === '2026' && String(m.status).toLowerCase() === 'active')
-      .sort((a, b) => getMovieNumericOrder(a.id) - getMovieNumericOrder(b.id))
+      .sort((a, b) => getMovieNumericOrder(b.id) - getMovieNumericOrder(a.id))
       .slice(0, 10);
   }, [movies]);
 
-  // Filter Hollywood movies for 2026 and status active, sorted by ID order ascending
+  // Filter Hollywood movies for 2026 and status active, sorted by ID descending (newest/highest ID first)
   const hollywoodMovies = useMemo(() => {
     return (movies || [])
       .filter(m => String(m.type).toLowerCase() === 'hollywood' && String(m.year) === '2026' && String(m.status).toLowerCase() === 'active')
-      .sort((a, b) => getMovieNumericOrder(a.id) - getMovieNumericOrder(b.id))
+      .sort((a, b) => getMovieNumericOrder(b.id) - getMovieNumericOrder(a.id))
       .slice(0, 10);
   }, [movies]);
 

@@ -23,10 +23,32 @@ class D1Client {
     }
   }
 
+  /**
+   * Upsert movie record:
+   * First tries PUT /api/{table}/{id}
+   * If not exists, tries POST /api/{table}
+   * If duplicate constraint, deletes and re-inserts
+   */
   async saveMovie(table, movieData) {
     try {
-      const url = `${this.apiBase}/api/${table}`;
-      const res = await fetch(url, {
+      // 1. Try PUT (update existing record)
+      const putUrl = `${this.apiBase}/api/${table}/${movieData.id}`;
+      const putRes = await fetch(putUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(movieData)
+      });
+
+      if (putRes.ok) {
+        return await putRes.json();
+      }
+
+      // 2. Try POST (insert new record)
+      const postUrl = `${this.apiBase}/api/${table}`;
+      const postRes = await fetch(postUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,12 +57,27 @@ class D1Client {
         body: JSON.stringify(movieData)
       });
 
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(`D1 HTTP ${res.status}: ${errText}`);
+      if (postRes.ok) {
+        return await postRes.json();
       }
 
-      return await res.json();
+      // 3. Fallback: delete then insert
+      await this.deleteMovie(table, movieData.id).catch(() => {});
+      const retryRes = await fetch(postUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(movieData)
+      });
+
+      if (!retryRes.ok) {
+        const errText = await retryRes.text().catch(() => '');
+        throw new Error(`D1 HTTP ${retryRes.status}: ${errText}`);
+      }
+
+      return await retryRes.json();
     } catch (err) {
       console.error(`[D1Client] Save error for ${movieData.id}:`, err.message);
       throw err;

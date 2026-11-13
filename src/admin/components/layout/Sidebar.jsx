@@ -157,6 +157,16 @@ export default function Sidebar({ isOpen, onClose, currentRoute, navigateTo, onL
           <span>Player Ads Control</span>
         </div>
 
+        <div className="admin-nav-section">System</div>
+
+        <div
+          className={`admin-nav-item ${isActive('admin/settings') ? 'active' : ''}`}
+          onClick={() => go('admin/settings')}
+        >
+          <i className="fa-solid fa-gear" style={{ color: 'var(--admin-purple)' }}></i>
+          <span>Settings</span>
+        </div>
+
       </div>
 
       {/* Footer */}

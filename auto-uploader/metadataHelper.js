@@ -7,21 +7,37 @@ function cleanMovieTitle(rawTitle) {
   if (!rawTitle) return '';
   return rawTitle
     .replace(/\(\d{4}\)/gi, '') // remove (2026), (2025), etc.
-    .replace(/\b(2024|2025|2026)\b/gi, '') // remove standalone years
-    .replace(/\((original|dvd|hdrip|bdrip|tamil|telugu|dubbed|proper|web-series|season\s*\d+|s0\d+|hq|hdts)\)/gi, '')
+    .replace(/\b(19\d\d|20\d\d)\b/gi, '') // remove standalone 4-digit years
+    .replace(/\((original|dvd|hdrip|bdrip|tamil|telugu|dubbed|proper|web-series|season\s*\d+|s0\d+|hq|hdts|hd|proper|uncut|multi|line|audio)\)/gi, '')
     .replace(/tamil\s*dubbed\s*web\s*series/gi, '')
-    .replace(/tamil\s*dubbed\s*movie/gi, '')
-    .replace(/tamil\s*dubbed\s*movies/gi, '')
+    .replace(/tamil\s*dubbed\s*movies?/gi, '')
     .replace(/tamil\s*dubbed/gi, '')
     .replace(/tamil\s*web\s*series/gi, '')
-    .replace(/tamil\s*movie/gi, '')
-    .replace(/tamil\s*movies/gi, '')
+    .replace(/tamil\s*movies?/gi, '')
     .replace(/web\s*series/gi, '')
     .replace(/download/gi, '')
+    .replace(/original\s*hd/gi, '')
+    .replace(/\boriginal\b/gi, '')
+    .replace(/season\s*\d+/gi, '')
+    .replace(/s0\d+/gi, '')
     .replace(/\[\+\]/g, '')
     .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\(\s*\)/g, '') // remove empty ()
+    .replace(/\[\s*\]/g, '') // remove empty []
+    .replace(/^[-\s.:,;()\[\]]+|[-\s.:,;()\[\]]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function isValidMovieTitle(title) {
+  if (!title || typeof title !== 'string') return false;
+  const s = title.trim();
+  if (s.length < 2) return false;
+  if (/^\d+$/.test(s)) return false; // purely numbers e.g. "1", "45", "418"
+  if (/^[()\[\]\s\-+»«.,/]+$/.test(s)) return false; // purely symbols
+  if (/^page\s*\d+$/i.test(s)) return false;
+  if (/^(home|telegram|contact|about|disclaimer|policy|dmca)$/i.test(s)) return false;
+  return true;
 }
 
 async function fetchWikiInfo(cleanTitle) {
@@ -126,4 +142,4 @@ async function buildMetadata({ title, year = '2026', category = 'hollywood', lan
   };
 }
 
-module.exports = { cleanMovieTitle, buildMetadata, formatDate };
+module.exports = { cleanMovieTitle, isValidMovieTitle, buildMetadata, formatDate };
