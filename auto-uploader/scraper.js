@@ -769,6 +769,7 @@ async function processMovieItem(page, r2, item, year, category, targetPrefix, ur
  */
 async function processSeriesItem(page, r2, item, year, category, targetPrefix, urlMode, duplicatePolicy, history, stats, savedPosterName, pageMetadata = {}, existingR2 = null, broadcast = console.log) {
   await r2.createFolder(targetPrefix).catch(() => {});
+  const isMoviezda = (item.href || '').includes('moviezda') || category === 'tamil';
 
   let innerLinks = (await page.$$eval('a', (els) =>
     els.map((e) => ({ text: e.innerText.trim(), href: e.href }))
