@@ -255,6 +255,45 @@ async function resolveDirectDownloadUrl(page, filePageUrl, broadcast) {
   }
 }
 
+/**
+ * Deep recursive poster/shot finder for nested directory structures (especially isaidub.green)
+ */
+async function findPosterDeep(page, url, depth = 0, maxDepth = 4, visited = new Set()) {
+  if (depth > maxDepth || visited.has(url)) return null;
+  visited.add(url);
+
+  try {
+    await safeGoto(page, url, 20000);
+    await page.waitForTimeout(100);
+
+    const shot = await page.evaluate(() => {
+      const img = document.querySelector('img[src*="/uploads/shots/"]') ||
+                  document.querySelector('img[src*="/uploads/posters/"]') ||
+                  document.querySelector('img[src*="/uploads/"]');
+      if (img && img.src && !img.src.includes('folder') && !img.src.includes('logo') && !img.src.includes('icon') && !img.src.includes('share')) {
+        return img.src;
+      }
+      return null;
+    }).catch(() => null);
+
+    if (shot) return shot;
+
+    const nextLinks = await page.$$eval('a', els =>
+      els.map(e => e.href).filter(h =>
+        h && (h.includes('/movie/') || h.includes('/download/page/') || h.includes('season') || h.includes('epi'))
+      )
+    ).catch(() => []);
+
+    const cleanNext = nextLinks.filter(h => h && h.startsWith('http') && !visited.has(h));
+    for (const nextUrl of cleanNext.slice(0, 4)) {
+      const found = await findPosterDeep(page, nextUrl, depth + 1, maxDepth, visited);
+      if (found) return found;
+    }
+  } catch (err) {}
+
+  return null;
+}
+
 async function parseDownloadPageDetails(page) {
   try {
     const text = await page.innerText('body').catch(() => '');
@@ -516,6 +555,7 @@ async function startPipeline(userConfig = {}, broadcast = console.log) {
       posterUrl = await page.evaluate(() => {
         const candidates = [
           document.querySelector('img[src*="/uploads/posters/"]'),
+          document.querySelector('img[src*="/uploads/shots/"]'),
           document.querySelector('img.wp-post-image'),
           document.querySelector('img[class*="poster"]'),
           document.querySelector('.post-thumbnail img'),
@@ -529,6 +569,11 @@ async function startPipeline(userConfig = {}, broadcast = console.log) {
         const found = candidates.find(el => el && el.src && !el.src.includes('logo') && !el.src.includes('icon') && !el.src.includes('folder'));
         return found ? found.src : null;
       }).catch(() => null);
+
+      // If posterUrl is not found on top-level entry page (common on isaidub.green nested folders):
+      if (!posterUrl) {
+        posterUrl = await findPosterDeep(page, item.href);
+      }
 
       // Extract real metadata from page content
       const pageMetadata = await page.evaluate(() => {
