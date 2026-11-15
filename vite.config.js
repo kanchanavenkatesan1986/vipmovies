@@ -11,6 +11,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    host: true
+    host: true,
+    watch: {
+      // Exclude auto-uploader folder to avoid EBUSY conflicts while pipeline writes posters
+      ignored: ['**/auto-uploader/**', '**/node_modules/**']
+    }
   }
 });

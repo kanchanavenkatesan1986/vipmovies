@@ -51,8 +51,11 @@ export default function AdvancedVideoPlayer({
   const [isControlsVisible, setIsControlsVisible] = useState(true);
 
   // ─── ORIENTATION & FULLSCREEN MODES ───
-  const [isHorizontalMode, setIsHorizontalMode] = useState(false); // 90° Rotated Mode (Phone held sideways in portrait)
+  const [isHorizontalMode, setIsHorizontalMode] = useState(false); // Rotated / Full Screen Mode
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDevicePortrait, setIsDevicePortrait] = useState(() =>
+    typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false
+  );
   const [isTheatreMode, setIsTheatreMode] = useState(settings.theatreMode || false);
   const [isPipActive, setIsPipActive] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -433,19 +436,127 @@ export default function AdvancedVideoPlayer({
     }
   };
 
-  // ─── 7. HORIZONTAL & FULLSCREEN HANDLERS ───
-  const toggleHorizontal = () => {
-    setIsHorizontalMode(prev => !prev);
+  // Track device viewport orientation (portrait vs landscape) for gestures & transforms
+  useEffect(() => {
+    const handleOrientationChange = () => {
+      setIsDevicePortrait(window.innerHeight > window.innerWidth);
+    };
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    if (window.screen?.orientation) {
+      window.screen.orientation.addEventListener('change', handleOrientationChange);
+    }
+    return () => {
+      window.removeEventListener('resize', handleOrientationChange);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      if (window.screen?.orientation) {
+        window.screen.orientation.removeEventListener('change', handleOrientationChange);
+      }
+    };
+  }, []);
+
+  // Unlock orientation on player unmount
+  useEffect(() => {
+    return () => {
+      if (window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch (e) {}
+      }
+    };
+  }, []);
+
+  // ─── 7. HORIZONTAL & FULLSCREEN HANDLERS (Android & Mobile Responsive) ───
+  const toggleHorizontal = async () => {
+    const nextMode = !isHorizontalMode;
+    setIsHorizontalMode(nextMode);
     setIsControlsVisible(true);
     resetControlsTimer();
+
+    if (nextMode) {
+      // 1. Enter native fullscreen on container
+      if (containerRef.current) {
+        try {
+          if (containerRef.current.requestFullscreen) {
+            await containerRef.current.requestFullscreen();
+          } else if (containerRef.current.webkitRequestFullscreen) {
+            await containerRef.current.webkitRequestFullscreen();
+          } else if (containerRef.current.mozRequestFullScreen) {
+            await containerRef.current.mozRequestFullScreen();
+          } else if (containerRef.current.msRequestFullscreen) {
+            await containerRef.current.msRequestFullscreen();
+          }
+          setIsFullscreen(true);
+        } catch (fsErr) {
+          console.debug('[Fullscreen] request failed or blocked:', fsErr);
+        }
+      }
+
+      // 2. Lock screen orientation to landscape (Android & supported mobile browsers)
+      if (window.screen?.orientation?.lock) {
+        try {
+          await window.screen.orientation.lock('landscape');
+        } catch (e1) {
+          try {
+            await window.screen.orientation.lock('landscape-primary');
+          } catch (e2) {
+            console.debug('[OrientationLock] Landscape lock not supported/allowed:', e2);
+          }
+        }
+      } else if (window.screen?.lockOrientation) {
+        try {
+          window.screen.lockOrientation('landscape');
+        } catch (e) {}
+      }
+    } else {
+      // Exiting Full Screen & Horizontal view
+      if (screenEngine.isFullscreen()) {
+        try {
+          await screenEngine.exitFullscreen();
+        } catch (e) {}
+        setIsFullscreen(false);
+      }
+
+      // Unlock screen orientation
+      if (window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch (e) {}
+      } else if (window.screen?.unlockOrientation) {
+        try {
+          window.screen.unlockOrientation();
+        } catch (e) {}
+      }
+    }
   };
 
   const toggleFullscreen = async () => {
-    if (containerRef.current) {
-      await screenEngine.toggleFullscreen(containerRef.current);
-      setIsFullscreen(screenEngine.isFullscreen());
+    if (screenEngine.isFullscreen() || isFullscreen) {
+      await screenEngine.exitFullscreen();
+      setIsFullscreen(false);
+      setIsHorizontalMode(false);
+      if (window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch (e) {}
+      }
     } else {
-      setIsFullscreen(prev => !prev);
+      if (containerRef.current) {
+        await screenEngine.toggleFullscreen(containerRef.current);
+        setIsFullscreen(screenEngine.isFullscreen());
+
+        // On mobile / Android touch screens, also trigger landscape mode
+        if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768) {
+          setIsHorizontalMode(true);
+          if (window.screen?.orientation?.lock) {
+            try {
+              await window.screen.orientation.lock('landscape');
+            } catch (e) {}
+          }
+        }
+      } else {
+        setIsFullscreen(prev => !prev);
+      }
     }
   };
 
@@ -463,7 +574,17 @@ export default function AdvancedVideoPlayer({
 
   useEffect(() => {
     const onFullscreenChange = () => {
-      setIsFullscreen(screenEngine.isFullscreen());
+      const activeFs = screenEngine.isFullscreen();
+      setIsFullscreen(activeFs);
+      // If user exited fullscreen natively (e.g. Android back gesture or browser exit button)
+      if (!activeFs && isHorizontalMode) {
+        setIsHorizontalMode(false);
+        if (window.screen?.orientation?.unlock) {
+          try {
+            window.screen.orientation.unlock();
+          } catch (e) {}
+        }
+      }
     };
     document.addEventListener('fullscreenchange', onFullscreenChange);
     document.addEventListener('webkitfullscreenchange', onFullscreenChange);
@@ -471,7 +592,7 @@ export default function AdvancedVideoPlayer({
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
     };
-  }, []);
+  }, [isHorizontalMode]);
 
   // ─── 8. BACK ACTION IN STRICT PRIORITY ORDER ───
   const handleSmartBack = useCallback(() => {
@@ -483,13 +604,17 @@ export default function AdvancedVideoPlayer({
       setIsStatsOpen(false);
       return;
     }
-    if (isFullscreen) {
-      screenEngine.exitFullscreen();
+    if (isFullscreen || isHorizontalMode) {
+      if (screenEngine.isFullscreen()) {
+        screenEngine.exitFullscreen().catch(() => {});
+      }
       setIsFullscreen(false);
-      return;
-    }
-    if (isHorizontalMode) {
       setIsHorizontalMode(false);
+      if (window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch (e) {}
+      }
       return;
     }
     if (onBack) {
@@ -942,7 +1067,7 @@ export default function AdvancedVideoPlayer({
         onSpeedTemporary={handleTemporarySpeed}
         onSpeedRestore={handleRestoreSpeed}
         onTogglePlay={togglePlay}
-        isRotated90={isHorizontalMode}
+        isRotated90={isHorizontalMode && isDevicePortrait}
       >
         {/* Native HTML5 Video Element */}
         <video

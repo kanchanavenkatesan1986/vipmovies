@@ -96,17 +96,17 @@ export default function PlayerControls({
             </button>
           )}
 
-          {/* ↻ HORIZONTAL / ↶ EXIT BUTTON */}
+          {/* ↻ FULL SCREEN / ↶ EXIT BUTTON */}
           <button
             type="button"
             className={`vip-ctrl-btn vip-horizontal-btn ${isHorizontalMode ? 'active' : ''}`}
             onClick={onToggleHorizontal}
-            title={isHorizontalMode ? 'Exit Horizontal Mode' : 'Rotate to Full Horizontal Screen'}
-            aria-label={isHorizontalMode ? 'Exit Horizontal' : 'Horizontal Player'}
+            title={isHorizontalMode ? 'Exit Full Screen' : 'Full Screen'}
+            aria-label={isHorizontalMode ? 'Exit Full Screen' : 'Full Screen'}
           >
-            <i className={`fa-solid ${isHorizontalMode ? 'fa-arrow-rotate-left' : 'fa-rotate'}`}></i>
+            <i className={`fa-solid ${isHorizontalMode ? 'fa-compress' : 'fa-expand'}`}></i>
             <span className="vip-btn-label">
-              {isHorizontalMode ? 'EXIT' : 'HORIZONTAL'}
+              {isHorizontalMode ? 'EXIT' : 'Full Screen'}
             </span>
           </button>
         </div>
