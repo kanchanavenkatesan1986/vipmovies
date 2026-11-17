@@ -5,357 +5,387 @@ const COUNTDOWN_SECONDS = 5;
 
 export default function HomePopup() {
   const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
-  const [closing, setClosing] = useState(false);
-  const timerRef = useRef(null);
   const countRef = useRef(null);
+  const closeTimerRef = useRef(null);
 
   useEffect(() => {
     // Only mobile: max-width 768px
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    // Only show once per session
     const alreadyShown = sessionStorage.getItem(POPUP_SESSION_KEY);
     if (!isMobile || alreadyShown) return;
 
-    // Show after 300ms so page loads first
     const delay = setTimeout(() => {
       setVisible(true);
       sessionStorage.setItem(POPUP_SESSION_KEY, '1');
+      requestAnimationFrame(() => setTimeout(() => setMounted(true), 30));
 
-      // Countdown timer
       countRef.current = setInterval(() => {
-        setCountdown(prev => {
+        setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(countRef.current);
+            // Auto close when countdown finishes
+            setTimeout(() => {
+              handleClose();
+            }, 600);
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
-    }, 300);
+    }, 350);
 
     return () => {
       clearTimeout(delay);
       clearInterval(countRef.current);
-      clearTimeout(timerRef.current);
+      clearTimeout(closeTimerRef.current);
     };
   }, []);
 
+  // When popup is open: move bottom nav down & lock background scroll
+  useEffect(() => {
+    if (visible && mounted) {
+      document.body.classList.add('vip-home-popup-active');
+    } else {
+      document.body.classList.remove('vip-home-popup-active');
+    }
+    return () => {
+      document.body.classList.remove('vip-home-popup-active');
+    };
+  }, [visible, mounted]);
+
   const handleClose = () => {
-    setClosing(true);
-    timerRef.current = setTimeout(() => setVisible(false), 350);
+    setMounted(false);
+    clearInterval(countRef.current);
+    closeTimerRef.current = setTimeout(() => {
+      setVisible(false);
+      document.body.classList.remove('vip-home-popup-active');
+    }, 380);
   };
 
   if (!visible) return null;
 
+  const R = 23;
+  const CIRC = 2 * Math.PI * R;
+  const strokeOffset = CIRC * (1 - countdown / COUNTDOWN_SECONDS);
+  const progressPercent = (countdown / COUNTDOWN_SECONDS) * 100;
+
   return (
     <>
-      {/* Backdrop */}
+      {/* ── Dynamic CSS injection for smooth bottom-nav move ── */}
+      <style>{`
+        body.vip-home-popup-active .bottom-nav {
+          transform: translate(-50%, 120%) !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease !important;
+        }
+        @keyframes vipPulseRing {
+          0%, 100% { transform: scale(1); opacity: 0.9; }
+          50% { transform: scale(1.06); opacity: 1; }
+        }
+        @keyframes vipShimmerBar {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+      `}</style>
+
+      {/* ── 1. Full-screen Dark Backdrop Layer (covers everything including bottom-nav) ── */}
       <div
         onClick={handleClose}
         style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.75)',
-          zIndex: 9998,
-          opacity: closing ? 0 : 1,
-          transition: 'opacity 0.35s ease',
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.88)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 100000,
+          opacity: mounted ? 1 : 0,
+          transition: 'opacity 0.38s ease',
         }}
       />
 
-      {/* Popup Box — 10% margin all sides */}
+      {/* ── 2. Ambient moving glow layer behind popup ── */}
       <div
         style={{
           position: 'fixed',
-          top: '10%', left: '10%',
-          width: '80%', height: '80%',
-          zIndex: 9999,
-          borderRadius: '18px',
+          inset: 0,
+          zIndex: 100001,
+          pointerEvents: 'none',
           overflow: 'hidden',
-          boxShadow: '0 0 60px rgba(255,200,0,0.4), 0 8px 40px rgba(0,0,0,0.9)',
-          transform: closing ? 'scale(0.85)' : 'scale(1)',
-          opacity: closing ? 0 : 1,
-          transition: 'transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease',
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#0a0a0a',
         }}
       >
-        {/* Film-strip top border */}
-        <div style={filmStripStyle} />
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: '120vw',
+            height: '120vw',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255, 200, 0, 0.16) 0%, rgba(255, 120, 0, 0.05) 50%, transparent 70%)',
+            transform: mounted
+              ? 'translate(-50%, -50%) scale(1)'
+              : 'translate(-50%, -50%) scale(0.6)',
+            transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          }}
+        />
+      </div>
 
-        {/* Close Button with Countdown */}
-        <button
+      {/* ── 3. Main Popup Card — 10% space on top, bottom, left, right ── */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '10%',
+          bottom: '10%',
+          left: '10%',
+          right: '10%',
+          width: '80%',
+          height: '80%',
+          zIndex: 100002,
+          /* 5px white border + intense black shadow */
+          border: '5px solid #ffffff',
+          borderRadius: '18px',
+          boxShadow: '0 0 0 3px #000000, 0 15px 50px rgba(0, 0, 0, 0.98), 0 0 120px rgba(0, 0, 0, 0.95)',
+          overflow: 'hidden',
+          backgroundColor: '#000000',
+          display: 'flex',
+          flexDirection: 'column',
+          transform: mounted ? 'scale(1) translateY(0)' : 'scale(0.85) translateY(24px)',
+          opacity: mounted ? 1 : 0,
+          transition: 'transform 0.38s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.35s ease',
+        }}
+      >
+        {/* Exact Banner Image — clickable to start watching */}
+        <div
           onClick={handleClose}
-          style={closeButtonStyle}
-          aria-label="Close popup"
+          style={{
+            flex: 1,
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            cursor: 'pointer',
+            overflow: 'hidden',
+          }}
         >
-          {countdown > 0 ? (
-            <>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ opacity: 0.5 }}>
-                <circle cx="7" cy="7" r="6" stroke="white" strokeWidth="1.5" />
-              </svg>
-              <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1 }}>{countdown}</span>
-            </>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="white">
-              <path d="M1 1l12 12M13 1L1 13" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-            </svg>
-          )}
-        </button>
-
-        {/* Countdown Ring */}
-        {countdown > 0 && (
-          <svg
-            style={ringStyle}
-            viewBox="0 0 44 44"
-          >
-            <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="3" />
-            <circle
-              cx="22" cy="22" r="18"
-              fill="none"
-              stroke="#FFD700"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray={`${2 * Math.PI * 18}`}
-              strokeDashoffset={`${2 * Math.PI * 18 * (1 - countdown / COUNTDOWN_SECONDS)}`}
-              transform="rotate(-90 22 22)"
-              style={{ transition: 'stroke-dashoffset 1s linear' }}
-            />
-          </svg>
-        )}
-
-        {/* Main Content */}
-        <div style={contentStyle}>
-
-          {/* Logo */}
-          <div style={logoStyle}>
-            <span style={{ color: '#FFD700', fontSize: 'clamp(26px, 8vw, 36px)', fontWeight: 900, fontStyle: 'italic', textShadow: '0 0 20px rgba(255,215,0,0.6)' }}>
-              ✦ VIP
-            </span>
-            <span style={{ color: '#fff', fontSize: 'clamp(26px, 8vw, 36px)', fontWeight: 900, fontStyle: 'italic' }}>
-              {' '}MOVIES
-            </span>
-            <div style={{ fontSize: 'clamp(9px, 2.5vw, 11px)', letterSpacing: '3px', color: '#aaa', marginTop: '2px' }}>
-              VIPMOVIES.COM
-            </div>
-          </div>
-
-          {/* Welcome Text */}
-          <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-            <p style={{ color: '#fff', fontSize: 'clamp(13px, 3.5vw, 16px)', fontWeight: 600, margin: 0 }}>
-              Welcome to VIP Movies!
-            </p>
-          </div>
-
-          {/* Yellow Banner */}
-          <div style={yellowBannerStyle}>
-            <p style={{ margin: 0, fontSize: 'clamp(13px, 3.8vw, 17px)', fontWeight: 900, color: '#111', textAlign: 'center', lineHeight: 1.3 }}>
-              Watch <span style={{ color: '#c0392b' }}>Tamil</span> , <span style={{ color: '#c0392b' }}>Hollywood</span>
-              <br />Movies <span style={{ color: '#c0392b' }}>2018</span> to <span style={{ color: '#c0392b' }}>2026</span>
-            </p>
-          </div>
-
-          {/* Movie Count Badge */}
-          <div style={{ textAlign: 'center', margin: '6px 0' }}>
-            <span style={{ color: '#fff', fontSize: 'clamp(14px, 4vw, 18px)', fontWeight: 800 }}>
-              All <span style={{ color: '#FFD700', fontSize: 'clamp(20px, 6vw, 28px)' }}>1000+</span> Movies Available!
-            </span>
-          </div>
-
-          {/* Hero Image strip */}
-          <div style={heroStyle}>
-            <div style={heroGradientTop} />
-            <div style={heroGradientBottom} />
-            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', fontSize: 'clamp(28px, 9vw, 42px)', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.8))' }}>
-              🎬🦸‍♂️🎥🦾🎭
-            </div>
-          </div>
-
-          {/* Feature Buttons */}
-          <div style={featureRowStyle}>
-            {[
-              { icon: '▶', label: 'Watch\nOnline' },
-              { icon: '⬇', label: 'Download\nNow' },
-              { icon: '🎞', label: 'HD Quality\nMovies' },
-              { icon: '★', label: 'FREE\n100% Free', gold: true },
-            ].map((f, i) => (
-              <div key={i} style={{ ...featureBtnStyle, ...(f.gold ? { background: 'linear-gradient(135deg, #FFD700, #FFA500)' } : {}) }}>
-                <span style={{ fontSize: 'clamp(14px, 4vw, 18px)', color: f.gold ? '#000' : '#FFD700' }}>{f.icon}</span>
-                <span style={{ fontSize: 'clamp(8px, 2.3vw, 11px)', color: f.gold ? '#000' : '#fff', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'pre-line', textAlign: 'center' }}>{f.label}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Category Bar */}
-          <div style={categoryBarStyle}>
-            🎬 <span style={{ color: '#FFD700', fontWeight: 700 }}>Tamil</span> | <span style={{ color: '#FFD700', fontWeight: 700 }}>Hollywood</span> | 2018 – 2026
-          </div>
-
-          {/* CTA Button */}
-          <button onClick={handleClose} style={ctaStyle}>
-            ▶ &nbsp;Start Watching Now
-          </button>
-
-          {/* Footer badges */}
-          <div style={badgeRowStyle}>
-            {['Latest Movies', 'Popular Movies', 'Dubbed Movies', 'Series & More'].map((b, i) => (
-              <span key={i} style={badgeStyle}>✔ {b}</span>
-            ))}
-          </div>
-
-          <div style={{ textAlign: 'center', color: '#aaa', fontSize: 'clamp(8px, 2.3vw, 10px)', marginTop: '4px', fontStyle: 'italic' }}>
-            Enjoy Unlimited Movies on <span style={{ color: '#FFD700' }}>VIP Movies!</span>
-          </div>
+          <img
+            src="/home-popup-banner.jpg"
+            alt="VIP Movies"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center top',
+              display: 'block',
+            }}
+          />
         </div>
 
-        {/* Film-strip bottom border */}
-        <div style={filmStripStyle} />
+        {/* ── Close Button (Top-Right): 100% Dark Color, Big, Increased Visibility ── */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClose();
+          }}
+          aria-label="Close"
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            backgroundColor: '#000000', // 100% solid jet black dark color
+            border: '3px solid #ffffff', // Crisp white outer border
+            boxShadow: '0 0 0 2px #000000, 0 6px 20px rgba(0, 0, 0, 0.95), 0 0 12px rgba(255, 215, 0, 0.5)',
+            cursor: 'pointer',
+            padding: 0,
+            zIndex: 100005,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 0.15s ease, background-color 0.2s',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {/* Animated circular progress indicator */}
+          <svg
+            width="56"
+            height="56"
+            viewBox="0 0 56 56"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              transform: 'rotate(-90deg)',
+              pointerEvents: 'none',
+            }}
+          >
+            {/* Background ring track */}
+            <circle
+              cx="28"
+              cy="28"
+              r={R}
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.25)"
+              strokeWidth="3.5"
+            />
+            {/* Moving progress countdown stroke */}
+            {countdown > 0 && (
+              <circle
+                cx="28"
+                cy="28"
+                r={R}
+                fill="none"
+                stroke="#FFD700"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeDasharray={CIRC}
+                strokeDashoffset={strokeOffset}
+                style={{ transition: 'stroke-dashoffset 1s linear' }}
+              />
+            )}
+          </svg>
+
+          {/* Center Content: Big countdown seconds or crisp white ✕ */}
+          <div
+            style={{
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {countdown > 0 ? (
+              <>
+                <span
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 900,
+                    color: '#FFD700',
+                    lineHeight: 1,
+                    textShadow: '0 0 10px rgba(255, 215, 0, 0.8)',
+                    fontFamily: 'monospace, sans-serif',
+                  }}
+                >
+                  {countdown}
+                </span>
+                <span
+                  style={{
+                    fontSize: '8px',
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    letterSpacing: '0.5px',
+                    lineHeight: 1,
+                    marginTop: '1px',
+                  }}
+                >
+                  SEC
+                </span>
+              </>
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <line x1="4" y1="4" x2="20" y2="20" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" />
+                <line x1="20" y1="4" x2="4" y2="20" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" />
+              </svg>
+            )}
+          </div>
+        </button>
+
+        {/* ── Bottom Moving Layer: Dark Nav Layer that moves and shows countdown seconds ── */}
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClose();
+          }}
+          style={{
+            position: 'relative',
+            width: '100%',
+            backgroundColor: '#0a0a0c', // 100% dark solid bar
+            borderTop: '2px solid rgba(255, 255, 255, 0.2)',
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            cursor: 'pointer',
+            boxShadow: '0 -4px 15px rgba(0, 0, 0, 0.8)',
+            zIndex: 100004,
+          }}
+        >
+          {/* Moving Progress Bar at top edge of bottom layer */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              height: '3px',
+              width: `${progressPercent}%`,
+              background: 'linear-gradient(90deg, #FFD700, #FF6B00)',
+              boxShadow: '0 0 8px #FFD700',
+              transition: 'width 1s linear',
+            }}
+          />
+
+          {/* Left: Seconds status & countdown message */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                backgroundColor: '#FFD700',
+                color: '#000000',
+                fontWeight: 900,
+                fontSize: '12px',
+              }}
+            >
+              {countdown}s
+            </span>
+            <span
+              style={{
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.3px',
+              }}
+            >
+              {countdown > 0 ? `Closing in ${countdown} sec...` : 'Enjoy VIP Movies!'}
+            </span>
+          </div>
+
+          {/* Right: Big visible Close / Watch button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClose();
+            }}
+            style={{
+              backgroundColor: '#1f1f23',
+              color: '#ffffff',
+              border: '1.5px solid rgba(255, 255, 255, 0.35)',
+              borderRadius: '20px',
+              padding: '5px 12px',
+              fontSize: '11px',
+              fontWeight: 800,
+              letterSpacing: '0.5px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
+            }}
+          >
+            <span>CLOSE</span>
+            <span style={{ color: '#FFD700', fontSize: '13px' }}>✕</span>
+          </button>
+        </div>
       </div>
     </>
   );
 }
-
-/* ─── Styles ─── */
-
-const filmStripStyle = {
-  height: '12px',
-  background: 'repeating-linear-gradient(90deg, #111 0px, #111 10px, #FFD700 10px, #FFD700 14px, #111 14px, #111 24px)',
-  flexShrink: 0,
-};
-
-const closeButtonStyle = {
-  position: 'absolute',
-  top: '14px',
-  right: '14px',
-  width: '34px',
-  height: '34px',
-  borderRadius: '50%',
-  background: 'rgba(0,0,0,0.75)',
-  border: '1.5px solid rgba(255,255,255,0.3)',
-  color: '#fff',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexDirection: 'column',
-  gap: '1px',
-  zIndex: 10001,
-  backdropFilter: 'blur(4px)',
-  transition: 'background 0.2s',
-};
-
-const ringStyle = {
-  position: 'absolute',
-  top: '7px',
-  right: '7px',
-  width: '44px',
-  height: '44px',
-  zIndex: 10002,
-  pointerEvents: 'none',
-};
-
-const contentStyle = {
-  flex: 1,
-  overflowY: 'auto',
-  padding: '10px 12px 8px',
-  background: 'radial-gradient(ellipse at top, #1a0a00 0%, #0a0a0a 60%)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '6px',
-};
-
-const logoStyle = {
-  textAlign: 'center',
-  paddingTop: '4px',
-};
-
-const yellowBannerStyle = {
-  background: 'linear-gradient(135deg, #FFD700, #FFA500)',
-  borderRadius: '10px',
-  padding: '8px 12px',
-  boxShadow: '0 4px 15px rgba(255,165,0,0.4)',
-};
-
-const heroStyle = {
-  position: 'relative',
-  background: 'linear-gradient(180deg, #1a0500 0%, #2d1000 50%, #1a0500 100%)',
-  borderRadius: '10px',
-  padding: '14px 10px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  overflow: 'hidden',
-  minHeight: '54px',
-};
-
-const heroGradientTop = {
-  position: 'absolute', top: 0, left: 0, right: 0, height: '30px',
-  background: 'linear-gradient(to bottom, #1a0a00, transparent)',
-  pointerEvents: 'none',
-};
-
-const heroGradientBottom = {
-  position: 'absolute', bottom: 0, left: 0, right: 0, height: '30px',
-  background: 'linear-gradient(to top, #1a0a00, transparent)',
-  pointerEvents: 'none',
-};
-
-const featureRowStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
-  gap: '5px',
-};
-
-const featureBtnStyle = {
-  background: 'linear-gradient(135deg, #1e1e1e, #2a2a2a)',
-  border: '1px solid rgba(255,215,0,0.25)',
-  borderRadius: '10px',
-  padding: '8px 4px',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: '4px',
-};
-
-const categoryBarStyle = {
-  background: '#111',
-  border: '1px solid rgba(255,215,0,0.3)',
-  borderRadius: '8px',
-  padding: '7px 10px',
-  textAlign: 'center',
-  color: '#ccc',
-  fontSize: 'clamp(9px, 2.6vw, 12px)',
-  fontWeight: 600,
-  letterSpacing: '0.5px',
-};
-
-const ctaStyle = {
-  background: 'linear-gradient(135deg, #FFD700, #FFA500)',
-  color: '#000',
-  fontWeight: 900,
-  fontSize: 'clamp(13px, 4vw, 17px)',
-  border: 'none',
-  borderRadius: '50px',
-  padding: '12px 20px',
-  cursor: 'pointer',
-  letterSpacing: '0.5px',
-  boxShadow: '0 4px 20px rgba(255,165,0,0.5)',
-  transition: 'transform 0.15s, box-shadow 0.15s',
-  width: '100%',
-};
-
-const badgeRowStyle = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '4px',
-  justifyContent: 'center',
-};
-
-const badgeStyle = {
-  color: '#FFD700',
-  fontSize: 'clamp(8px, 2.2vw, 10px)',
-  background: 'rgba(255,215,0,0.08)',
-  borderRadius: '20px',
-  padding: '3px 7px',
-  border: '1px solid rgba(255,215,0,0.2)',
-};
