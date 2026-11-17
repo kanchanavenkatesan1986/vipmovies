@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../AppContext';
+import HomePopup from '../components/HomePopup';
 
 export default function HomeView() {
   const { movies, slider, openMoviePreview, getWatchUrl } = useApp();
@@ -401,6 +402,7 @@ export default function HomeView() {
           </div>
         )}
       </div>
+      <HomePopup />
     </>
   );
 }
