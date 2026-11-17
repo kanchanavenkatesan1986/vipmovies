@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 const POPUP_SESSION_KEY = 'vip_home_popup_shown';
-const COUNTDOWN_SECONDS = 5;
+const COUNTDOWN_SECONDS = 10;
 
 export default function HomePopup() {
   const [visible, setVisible] = useState(false);
@@ -25,10 +25,7 @@ export default function HomePopup() {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(countRef.current);
-            // Auto close when countdown finishes
-            setTimeout(() => {
-              handleClose();
-            }, 600);
+            // DO NOT close automatically — user must click close button
             return 0;
           }
           return prev - 1;
@@ -43,7 +40,7 @@ export default function HomePopup() {
     };
   }, []);
 
-  // When popup is open: move bottom nav down & lock background scroll
+  // When popup is open: move bottom nav down smoothly & lock background
   useEffect(() => {
     if (visible && mounted) {
       document.body.classList.add('vip-home-popup-active');
@@ -61,33 +58,25 @@ export default function HomePopup() {
     closeTimerRef.current = setTimeout(() => {
       setVisible(false);
       document.body.classList.remove('vip-home-popup-active');
-    }, 380);
+    }, 350);
   };
 
   if (!visible) return null;
 
-  const R = 23;
+  const R = 22;
   const CIRC = 2 * Math.PI * R;
   const strokeOffset = CIRC * (1 - countdown / COUNTDOWN_SECONDS);
   const progressPercent = (countdown / COUNTDOWN_SECONDS) * 100;
 
   return (
     <>
-      {/* ── Dynamic CSS injection for smooth bottom-nav move ── */}
+      {/* ── CSS for moving bottom nav & animation ── */}
       <style>{`
         body.vip-home-popup-active .bottom-nav {
           transform: translate(-50%, 120%) !important;
           opacity: 0 !important;
           pointer-events: none !important;
           transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease !important;
-        }
-        @keyframes vipPulseRing {
-          0%, 100% { transform: scale(1); opacity: 0.9; }
-          50% { transform: scale(1.06); opacity: 1; }
-        }
-        @keyframes vipShimmerBar {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
         }
       `}</style>
 
@@ -102,7 +91,7 @@ export default function HomePopup() {
           WebkitBackdropFilter: 'blur(8px)',
           zIndex: 100000,
           opacity: mounted ? 1 : 0,
-          transition: 'opacity 0.38s ease',
+          transition: 'opacity 0.35s ease',
         }}
       />
 
@@ -133,56 +122,64 @@ export default function HomePopup() {
         />
       </div>
 
-      {/* ── 3. Main Popup Card — 10% space on top, bottom, left, right ── */}
+      {/* ── 3. Adaptive Popup Card: adopts natural image size (not fixed), 2px white border ── */}
       <div
         style={{
           position: 'fixed',
-          top: '10%',
-          bottom: '10%',
-          left: '10%',
-          right: '10%',
-          width: '80%',
-          height: '80%',
+          top: '50%',
+          left: '50%',
+          transform: mounted
+            ? 'translate(-50%, -50%) scale(1)'
+            : 'translate(-50%, -50%) scale(0.85)',
+          /* Full adopt: width & height adapt to natural 682/1024 poster ratio with min 10% screen margin */
+          width: 'min(80vw, calc(80vh * 682 / 1024))',
+          maxHeight: '80vh',
           zIndex: 100002,
-          /* 5px white border + intense black shadow */
-          border: '5px solid #ffffff',
-          borderRadius: '18px',
-          boxShadow: '0 0 0 3px #000000, 0 15px 50px rgba(0, 0, 0, 0.98), 0 0 120px rgba(0, 0, 0, 0.95)',
+          /* 2px white border as requested */
+          border: '2px solid #ffffff',
+          borderRadius: '16px',
+          boxShadow: '0 0 0 2px #000000, 0 15px 45px rgba(0, 0, 0, 0.95), 0 0 100px rgba(0, 0, 0, 0.85)',
           overflow: 'hidden',
           backgroundColor: '#000000',
-          display: 'flex',
-          flexDirection: 'column',
-          transform: mounted ? 'scale(1) translateY(0)' : 'scale(0.85) translateY(24px)',
           opacity: mounted ? 1 : 0,
           transition: 'transform 0.38s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.35s ease',
+          lineHeight: 0,
         }}
       >
-        {/* Exact Banner Image — clickable to start watching */}
-        <div
+        {/* Exact Banner Image — 100% visible, fully adopted width & height, zero crop */ }
+        <img
+          src="/home-popup-banner.jpg"
+          alt="VIP Movies Welcome"
           onClick={handleClose}
           style={{
-            flex: 1,
-            position: 'relative',
             width: '100%',
-            height: '100%',
+            height: 'auto',
+            maxHeight: '80vh',
+            display: 'block',
+            objectFit: 'contain',
             cursor: 'pointer',
-            overflow: 'hidden',
           }}
-        >
-          <img
-            src="/home-popup-banner.jpg"
-            alt="VIP Movies"
+        />
+
+        {/* Thin dynamic countdown progress bar along the bottom border (does NOT cover artwork) */}
+        {countdown > 0 && (
+          <div
             style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center top',
-              display: 'block',
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              height: '3px',
+              width: `${progressPercent}%`,
+              background: 'linear-gradient(90deg, #FFD700, #FF5500)',
+              boxShadow: '0 0 8px #FFD700',
+              transition: 'width 1s linear',
+              pointerEvents: 'none',
+              zIndex: 10,
             }}
           />
-        </div>
+        )}
 
-        {/* ── Close Button (Top-Right): 100% Dark Color, Big, Increased Visibility ── */}
+        {/* ── Close Button (Top-Right): Big, 100% Dark Solid Color, Highly Visible ── */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -193,27 +190,27 @@ export default function HomePopup() {
             position: 'absolute',
             top: '8px',
             right: '8px',
-            width: '56px',
-            height: '56px',
+            width: '54px',
+            height: '54px',
             borderRadius: '50%',
-            backgroundColor: '#000000', // 100% solid jet black dark color
-            border: '3px solid #ffffff', // Crisp white outer border
-            boxShadow: '0 0 0 2px #000000, 0 6px 20px rgba(0, 0, 0, 0.95), 0 0 12px rgba(255, 215, 0, 0.5)',
+            backgroundColor: '#000000', // 100% solid jet black
+            border: '2.5px solid #ffffff', // Crisp white outer border
+            boxShadow: '0 0 0 2px #000000, 0 6px 20px rgba(0, 0, 0, 0.95)',
             cursor: 'pointer',
             padding: 0,
-            zIndex: 100005,
+            zIndex: 20,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'transform 0.15s ease, background-color 0.2s',
             WebkitTapHighlightColor: 'transparent',
+            transition: 'transform 0.15s ease',
           }}
         >
           {/* Animated circular progress indicator */}
           <svg
-            width="56"
-            height="56"
-            viewBox="0 0 56 56"
+            width="54"
+            height="54"
+            viewBox="0 0 54 54"
             style={{
               position: 'absolute',
               top: 0,
@@ -224,22 +221,22 @@ export default function HomePopup() {
           >
             {/* Background ring track */}
             <circle
-              cx="28"
-              cy="28"
+              cx="27"
+              cy="27"
               r={R}
               fill="none"
               stroke="rgba(255, 255, 255, 0.25)"
-              strokeWidth="3.5"
+              strokeWidth="3"
             />
             {/* Moving progress countdown stroke */}
             {countdown > 0 && (
               <circle
-                cx="28"
-                cy="28"
+                cx="27"
+                cy="27"
                 r={R}
                 fill="none"
                 stroke="#FFD700"
-                strokeWidth="3.5"
+                strokeWidth="3"
                 strokeLinecap="round"
                 strokeDasharray={CIRC}
                 strokeDashoffset={strokeOffset}
@@ -248,7 +245,7 @@ export default function HomePopup() {
             )}
           </svg>
 
-          {/* Center Content: Big countdown seconds or crisp white ✕ */}
+          {/* Center Content: Countdown number (10 to 1) or crisp bold white ✕ */}
           <div
             style={{
               position: 'relative',
@@ -262,11 +259,11 @@ export default function HomePopup() {
               <>
                 <span
                   style={{
-                    fontSize: '18px',
+                    fontSize: '17px',
                     fontWeight: 900,
                     color: '#FFD700',
                     lineHeight: 1,
-                    textShadow: '0 0 10px rgba(255, 215, 0, 0.8)',
+                    textShadow: '0 0 8px rgba(255, 215, 0, 0.8)',
                     fontFamily: 'monospace, sans-serif',
                   }}
                 >
@@ -274,12 +271,12 @@ export default function HomePopup() {
                 </span>
                 <span
                   style={{
-                    fontSize: '8px',
+                    fontSize: '7px',
                     fontWeight: 800,
                     color: '#ffffff',
                     letterSpacing: '0.5px',
                     lineHeight: 1,
-                    marginTop: '1px',
+                    marginTop: '2px',
                   }}
                 >
                   SEC
@@ -294,97 +291,31 @@ export default function HomePopup() {
           </div>
         </button>
 
-        {/* ── Bottom Moving Layer: Dark Nav Layer that moves and shows countdown seconds ── */}
-        <div
-          onClick={(e) => {
-            e.stopPropagation();
-            handleClose();
-          }}
-          style={{
-            position: 'relative',
-            width: '100%',
-            backgroundColor: '#0a0a0c', // 100% dark solid bar
-            borderTop: '2px solid rgba(255, 255, 255, 0.2)',
-            padding: '8px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '10px',
-            cursor: 'pointer',
-            boxShadow: '0 -4px 15px rgba(0, 0, 0, 0.8)',
-            zIndex: 100004,
-          }}
-        >
-          {/* Moving Progress Bar at top edge of bottom layer */}
+        {/* Small badge below close button when countdown reaches 0 to prompt user click */}
+        {countdown === 0 && (
           <div
+            onClick={handleClose}
             style={{
               position: 'absolute',
-              top: 0,
-              left: 0,
-              height: '3px',
-              width: `${progressPercent}%`,
-              background: 'linear-gradient(90deg, #FFD700, #FF6B00)',
-              boxShadow: '0 0 8px #FFD700',
-              transition: 'width 1s linear',
-            }}
-          />
-
-          {/* Left: Seconds status & countdown message */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                backgroundColor: '#FFD700',
-                color: '#000000',
-                fontWeight: 900,
-                fontSize: '12px',
-              }}
-            >
-              {countdown}s
-            </span>
-            <span
-              style={{
-                color: '#ffffff',
-                fontSize: '11px',
-                fontWeight: 700,
-                letterSpacing: '0.3px',
-              }}
-            >
-              {countdown > 0 ? `Closing in ${countdown} sec...` : 'Enjoy VIP Movies!'}
-            </span>
-          </div>
-
-          {/* Right: Big visible Close / Watch button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClose();
-            }}
-            style={{
-              backgroundColor: '#1f1f23',
+              top: '68px',
+              right: '6px',
+              backgroundColor: '#000000',
               color: '#ffffff',
-              border: '1.5px solid rgba(255, 255, 255, 0.35)',
-              borderRadius: '20px',
-              padding: '5px 12px',
-              fontSize: '11px',
+              border: '1.5px solid #ffffff',
+              borderRadius: '12px',
+              padding: '3px 8px',
+              fontSize: '10px',
               fontWeight: 800,
               letterSpacing: '0.5px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.9)',
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
+              zIndex: 20,
+              whiteSpace: 'nowrap',
             }}
           >
-            <span>CLOSE</span>
-            <span style={{ color: '#FFD700', fontSize: '13px' }}>✕</span>
-          </button>
-        </div>
+            TAP TO CLOSE ✕
+          </div>
+        )}
       </div>
     </>
   );
