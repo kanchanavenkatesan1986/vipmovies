@@ -62,50 +62,17 @@ export default function SettingsPage({ currentRoute, navigateTo }) {
   // Initial load
   useEffect(() => {
     const s = getSettings();
-    const initialApi = s.apiBaseUrl || DEFAULT_API_BASE;
     setMediaBase(s.mediaBaseUrl || getMediaBaseUrl() || DEFAULT_MEDIA_BASE_URL);
-    setApiBase(initialApi);
+    setApiBase(s.apiBaseUrl || DEFAULT_API_BASE);
     setUrlMode(s.urlMode || 'path');
     loadTableData(selectedTable);
-
-    // Fetch live settings from Cloudflare D1
-    fetch(`${initialApi.replace(/\/+$/, '')}/api/settings`)
-      .then(r => r.json())
-      .then(data => {
-        if (data && data.success && data.settings && data.settings.mediaBaseUrl) {
-          setMediaBase(data.settings.mediaBaseUrl);
-          setMediaBaseUrl(data.settings.mediaBaseUrl);
-        }
-      })
-      .catch(() => {});
   }, []);
 
-  const handleSaveConfig = async () => {
+  const handleSaveConfig = () => {
     setMediaBaseUrl(mediaBase);
     saveSettings({ mediaBaseUrl: mediaBase, apiBaseUrl: apiBase, urlMode });
-
-    setSavedMsg('Saving to Cloudflare D1...');
-    try {
-      const token = localStorage.getItem('vip_upload_api_token') || 'VIP_SECURE_TOKEN_2026';
-      const cleanApi = apiBase.replace(/\/+$/, '');
-      const res = await fetch(`${cleanApi}/api/settings/media-base`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ mediaBaseUrl: mediaBase })
-      });
-      const data = await res.json();
-      if (data && data.success) {
-        setSavedMsg('✓ Settings saved globally to Cloudflare D1! All user devices updated.');
-      } else {
-        setSavedMsg(`✓ Saved locally (${data.error || 'Cloudflare D1 requires token'})`);
-      }
-    } catch (e) {
-      setSavedMsg('✓ Saved locally (Cloudflare D1 sync offline)');
-    }
-    setTimeout(() => setSavedMsg(''), 4000);
+    setSavedMsg('✓ Settings saved successfully!');
+    setTimeout(() => setSavedMsg(''), 3000);
   };
 
   const handleResetConfig = () => {

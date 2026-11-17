@@ -1,21 +1,13 @@
 /**
  * Cloudflare D1 Worker Database Client
- * Interacts with unified API worker
+ * Interacts with https://api-movies.akatsuki-pvt-ltd.workers.dev
  */
 
-const fs = require('fs');
-const path = require('path');
-
-let config = {};
-try {
-  config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
-} catch (e) {}
-
-const DEFAULT_API_BASE = config.d1WorkerBase || config.apiBase || config.r2WorkerBase || 'https://api-movies.akatsuki-pvt-ltd.workers.dev';
+const API_BASE = 'https://api-movies.akatsuki-pvt-ltd.workers.dev';
 
 class D1Client {
-  constructor(apiBase = DEFAULT_API_BASE) {
-    this.apiBase = (apiBase || DEFAULT_API_BASE).replace(/\/+$/, '');
+  constructor(apiBase = API_BASE) {
+    this.apiBase = apiBase.replace(/\/+$/, '');
   }
 
   async getMovies(table) {

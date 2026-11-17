@@ -2,7 +2,7 @@
  * Cloudflare R2 File Manager API Client
  */
 const DEFAULT_R2_CONFIG = {
-  apiBase: import.meta.env.VITE_UPLOAD_API_BASE || 'https://api-movies.akatsuki-pvt-ltd.workers.dev',
+  apiBase: import.meta.env.VITE_UPLOAD_API_BASE || 'https://api-uploder.akatsuki-pvt-ltd.workers.dev',
   mediaBaseUrl: import.meta.env.VITE_MEDIA_BASE_URL || 'https://api-download.akatsuki-pvt-ltd.workers.dev'
 };
 

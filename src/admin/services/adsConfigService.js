@@ -90,11 +90,10 @@ let cachedConfig = null;
 let lastFetchTime = 0;
 
 function getApiBase() {
-  try {
-    const s = localStorage.getItem('vip_upload_settings');
-    if (s) { const p = JSON.parse(s); if (p.apiBaseUrl || p.mediaBaseUrl) return (p.apiBaseUrl || p.mediaBaseUrl).replace(/\/+$/, ''); }
-  } catch {}
-  return (import.meta.env.VITE_UPLOAD_API_BASE || 'https://api-movies.akatsuki-pvt-ltd.workers.dev').replace(/\/+$/, '');
+  return (
+    import.meta.env.VITE_UPLOAD_API_BASE ||
+    'https://api-uploder.akatsuki-pvt-ltd.workers.dev'
+  ).replace(/\/+$/, '');
 }
 
 function getAuthToken() {

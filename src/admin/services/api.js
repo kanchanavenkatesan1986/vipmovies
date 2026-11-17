@@ -1,11 +1,4 @@
-function getApiBaseUrl() {
-  try {
-    const s = localStorage.getItem('vip_upload_settings');
-    if (s) { const p = JSON.parse(s); if (p.apiBaseUrl) return p.apiBaseUrl.replace(/\/+$/, ''); }
-  } catch {}
-  return (import.meta.env.VITE_API_BASE_URL || 'https://api-movies.akatsuki-pvt-ltd.workers.dev').replace(/\/+$/, '');
-}
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api-movies.akatsuki-pvt-ltd.workers.dev';
 
 // Map for in-flight concurrent GET request deduplication
 const inFlightGets = new Map();

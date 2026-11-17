@@ -4,8 +4,7 @@
  * resolution qualities (360p/720p/1080p), and series episode chains.
  */
 
-const configFile = (() => { try { return require('./config.json'); } catch { return {}; } })();
-const MEDIA_BASE = (configFile.r2MediaBase || configFile.apiBase || 'https://api-download.akatsuki-pvt-ltd.workers.dev').replace(/\/+$/, '');
+const MEDIA_BASE = 'https://api-download.akatsuki-pvt-ltd.workers.dev';
 
 function generateEpisodeId(seasonNum, epNum) {
   const sStr = String(seasonNum || 1).padStart(2, '0');
