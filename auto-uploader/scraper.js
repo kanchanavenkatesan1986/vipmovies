@@ -323,6 +323,7 @@ async function startPipeline(userConfig = {}, broadcast = console.log) {
 
   const history = loadHistory();
   const r2 = new R2Client(userConfig);
+  await r2.syncDynamicSettings().catch(e => console.warn('[scraper] syncDynamicSettings skipped:', e.message));
   const d1 = new D1Client();
 
   const {

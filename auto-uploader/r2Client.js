@@ -30,6 +30,17 @@ class R2Client {
     return headers;
   }
 
+  async syncDynamicSettings() {
+    try {
+      const res = await fetch(`${this.apiBase}/api/settings`);
+      const data = await res.json();
+      if (data && data.success && data.settings && data.settings.mediaBaseUrl) {
+        this.mediaBase = data.settings.mediaBaseUrl.replace(/\/+$/, '');
+        console.log(`[R2Client] Auto-synced dynamic mediaBaseUrl from Cloudflare: ${this.mediaBase}`);
+      }
+    } catch (e) {}
+  }
+
   async createFolder(prefix) {
     const cleanPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
     const res = await fetch(`${this.apiBase}/create-folder`, {

@@ -49,6 +49,12 @@ export function setMediaBaseUrl(newBaseUrl) {
   }
 }
 
+// Expose globally for API sync without circular module imports
+if (typeof window !== 'undefined') {
+  window.setVipMediaBaseUrl = setMediaBaseUrl;
+  window.getVipMediaBaseUrl = getMediaBaseUrl;
+}
+
 /**
  * Resolve any raw video or media string into a playable/downloadable full URL.
  * Handles BOTH:

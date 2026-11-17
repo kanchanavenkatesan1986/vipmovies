@@ -1,0 +1,32 @@
+name = "vip-api"
+main = "worker.js"
+compatibility_date = "2024-04-01"
+
+# ============================================================================
+# VIP Movies - Master Unified Cloudflare Worker Configuration
+# Merges:
+#   1. api-movies   (Cloudflare D1 Catalog, Edge Caching, Versions)
+#   2. api-uploder  (Cloudflare R2 Multipart Uploader, Object Manager)
+#   3. api-download (Cloudflare R2 HTTP 206 Video Streaming & Direct Download)
+# ============================================================================
+
+# Cloudflare D1 Database Binding (Catalog & Dynamic System Settings)
+[[d1_databases]]
+binding = "DB"
+database_name = "tvk-movies"
+database_id = "9acf968f-c714-4ca0-ad86-975c889cb58e"
+
+# Cloudflare R2 Bucket Binding (Active when R2 is in this account)
+# If R2 moves to another Cloudflare account, keep this or configure external R2 via Admin Settings
+[[r2_buckets]]
+binding = "MY_BUCKET"
+bucket_name = "tvk-movies"
+
+# Configuration Variables
+[vars]
+# Secure API token for upload and write operations
+UPLOAD_API_TOKEN = "VIP_SECURE_TOKEN_2026"
+
+# Default fallback media stream / CDN URL if not configured in D1 system_settings
+DEFAULT_MEDIA_BASE_URL = "https://api-download.akatsuki-pvt-ltd.workers.dev"
+

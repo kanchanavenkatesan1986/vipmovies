@@ -2,8 +2,18 @@ name = "api-movies"
 main = "worker.js"
 compatibility_date = "2024-04-01"
 
-# Cloudflare D1 Database Binding
+# Cloudflare D1 Database Binding (Catalog & Dynamic System Settings)
 [[d1_databases]]
 binding = "DB"
 database_name = "tvk-movies"
 database_id = "9acf968f-c714-4ca0-ad86-975c889cb58e"
+
+# Cloudflare R2 Bucket Binding (Active when R2 is in this account)
+[[r2_buckets]]
+binding = "MY_BUCKET"
+bucket_name = "tvk-movies"
+
+# Configuration Variables
+[vars]
+UPLOAD_API_TOKEN = "VIP_SECURE_TOKEN_2026"
+DEFAULT_MEDIA_BASE_URL = "https://api-download.akatsuki-pvt-ltd.workers.dev"

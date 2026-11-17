@@ -1,3 +1,8 @@
+// ============================================================================
+// VIP MOVIES MASTER UNIFIED CLOUDFLARE WORKER (v2.0)
+// Merged: D1 Catalog API + R2 Multipart Uploader + HTTP 206 Media Streaming
+// ============================================================================
+
 /**
  * ============================================================================
  * Cloudflare Worker: Production-Ready R2 File Manager + Movie Upload Center
@@ -1285,10 +1290,43 @@ async function handleRenameFolder(request, env) {
  * GET /stream-media & GET /download
  * HTTP Range streaming with 206 Partial Content
  */
-async function handleStreamMedia(request, env) {
+
+// ==========================================
+// 3e. ENHANCED MEDIA STREAMING & CDN ROUTER (HTTP 206 Partial Content)
+// ==========================================
+
+function extractMediaKey(path, searchParams) {
+  const queryKey = searchParams.get("key");
+  if (queryKey) {
+    return queryKey.replace(/^\/+/, "");
+  }
+
+  const p = path.replace(/^\/+/, "");
+  if (p === "stream-media" || p === "download") {
+    return null;
+  }
+  if (p.startsWith("media/")) {
+    return p.substring(6);
+  }
+  if (p.startsWith("download/")) {
+    return p.substring(9);
+  }
+
+  const firstSlash = p.indexOf("/");
+  if (firstSlash !== -1) {
+    const firstSegment = p.substring(0, firstSlash).toLowerCase();
+    if (CONFIG.allowedCategories.includes(firstSegment)) {
+      return p;
+    }
+  }
+
+  return null;
+}
+
+async function handleStreamMedia(request, env, explicitKey = null, isDownloadParam = false) {
   const url = new URL(request.url);
-  let key = url.searchParams.get("key");
-  const isDownload = url.pathname.includes("/download") || url.searchParams.get("download") === "1" || url.searchParams.get("dl") === "1";
+  let key = explicitKey || url.searchParams.get("key");
+  const isDownload = isDownloadParam || url.pathname.includes("/download") || url.searchParams.get("download") === "1" || url.searchParams.get("dl") === "1";
 
   if (!key) {
     return jsonResponse({ success: false, error: "Invalid or missing key query parameter", code: "INVALID_KEY" }, 400, {}, request);
@@ -1323,170 +1361,126 @@ async function handleStreamMedia(request, env) {
     }
   }
 
-  // Handle HEAD request
-  if (request.method === "HEAD") {
-    let headObj = cachedMeta;
-    if (!headObj) {
-      headObj = await env.MY_BUCKET.head(key);
-      if (!headObj) {
+  // 1. If R2 bucket is bound to this worker, stream directly with zero RAM buffering
+  if (env && env.MY_BUCKET) {
+    try {
+      // Handle HEAD request
+      if (request.method === "HEAD") {
+        let headObj = cachedMeta;
+        if (!headObj) {
+          headObj = await env.MY_BUCKET.head(key);
+          if (!headObj) {
+            // Check dynamic mediaBaseUrl fallback redirect
+            const remoteBase = await getActiveMediaBaseUrl(env);
+            if (remoteBase && !remoteBase.includes(url.host)) {
+              return Response.redirect(`${remoteBase}/${key}`, 302);
+            }
+            return jsonResponse({ success: false, error: `Object '${key}' not found`, code: "NOT_FOUND" }, 404, {}, request);
+          }
+          const sEtag = headObj.httpEtag || headObj.etag;
+          headObj = {
+            size: headObj.size,
+            etag: sEtag,
+            uploaded: headObj.uploaded,
+            httpMetadata: headObj.httpMetadata || {},
+            contentType: headObj.httpMetadata?.contentType || resolveContentType(filename)
+          };
+          setCachedWorkerMetadata(key, headObj);
+        }
+
+        if (!rangeHeader && ((ifNoneMatch && etagsMatch(ifNoneMatch, headObj.etag)) ||
+            (ifModifiedSince && ifModifiedSinceMatches(ifModifiedSince, headObj.uploaded)))) {
+          const h304 = new Headers(getCorsHeaders(request));
+          if (headObj.etag) h304.set("ETag", headObj.etag);
+          h304.set("Accept-Ranges", "bytes");
+          h304.set("Vary", "Range");
+          h304.set("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
+          if (headObj.uploaded) h304.set("Last-Modified", new Date(headObj.uploaded).toUTCString());
+          return new Response(null, { status: 304, headers: h304 });
+        }
+
+        const headHeaders = new Headers(getCorsHeaders(request));
+        headHeaders.set("Content-Type", headObj.contentType);
+        headHeaders.set("Content-Length", String(headObj.size));
+        headHeaders.set("Accept-Ranges", "bytes");
+        headHeaders.set("Vary", "Range");
+        headHeaders.set("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
+        if (headObj.etag) headHeaders.set("ETag", headObj.etag);
+        if (headObj.uploaded) headHeaders.set("Last-Modified", new Date(headObj.uploaded).toUTCString());
+
+        const disposition = isDownload ? "attachment" : "inline";
+        headHeaders.set("Content-Disposition", `${disposition}; filename="${encodeURIComponent(filename)}"`);
+        return new Response(null, { status: 200, headers: headHeaders });
+      }
+
+      // Handle GET request with HTTP Range 206 streaming
+      let getOptions = {};
+      let isPartial = false;
+      let rangeInfo = null;
+
+      if (rangeHeader) {
+        rangeInfo = parseRangeHeader(rangeHeader);
+        if (rangeInfo) {
+          getOptions.range = rangeInfo;
+          isPartial = true;
+        }
+      }
+
+      const obj = await env.MY_BUCKET.get(key, getOptions);
+      if (!obj) {
+        // Fallback redirect if object not found locally
+        const remoteBase = await getActiveMediaBaseUrl(env);
+        if (remoteBase && !remoteBase.includes(url.host)) {
+          return Response.redirect(`${remoteBase}/${key}`, 302);
+        }
         return jsonResponse({ success: false, error: `Object '${key}' not found`, code: "NOT_FOUND" }, 404, {}, request);
       }
-      const sEtag = headObj.httpEtag || headObj.etag;
-      headObj = {
-        size: headObj.size,
-        etag: sEtag,
-        uploaded: headObj.uploaded,
-        httpMetadata: headObj.httpMetadata || {},
-        contentType: headObj.httpMetadata?.contentType || resolveContentType(filename)
-      };
-      setCachedWorkerMetadata(key, headObj);
-    }
 
-    if (!rangeHeader && ((ifNoneMatch && etagsMatch(ifNoneMatch, headObj.etag)) ||
-        (ifModifiedSince && ifModifiedSinceMatches(ifModifiedSince, headObj.uploaded)))) {
-      const h304 = new Headers(getCorsHeaders(request));
-      if (headObj.etag) h304.set("ETag", headObj.etag);
-      h304.set("Accept-Ranges", "bytes");
-      h304.set("Vary", "Range");
-      h304.set("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
-      if (headObj.uploaded) h304.set("Last-Modified", new Date(headObj.uploaded).toUTCString());
-      return new Response(null, { status: 304, headers: h304 });
-    }
+      const contentType = obj.httpMetadata?.contentType || resolveContentType(filename);
+      const sEtag = obj.httpEtag || obj.etag;
+      const respHeaders = new Headers(getCorsHeaders(request));
 
-    const headers = new Headers(getCorsHeaders(request));
-    headers.set("Content-Type", isDownload ? "application/octet-stream" : (headObj.contentType || resolveContentType(filename)));
-    headers.set("Accept-Ranges", "bytes");
-    headers.set("Vary", "Range");
-    if (headObj.etag) headers.set("ETag", headObj.etag);
-    if (headObj.uploaded) headers.set("Last-Modified", new Date(headObj.uploaded).toUTCString());
-    headers.set("Cache-Control", isDownload ? "public, max-age=86400" : "public, max-age=604800, stale-while-revalidate=86400");
-    if (isDownload) {
-      headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
-    } else {
-      headers.set("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`);
-    }
+      respHeaders.set("Content-Type", contentType);
+      respHeaders.set("Accept-Ranges", "bytes");
+      respHeaders.set("Vary", "Range");
+      respHeaders.set("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
+      if (sEtag) respHeaders.set("ETag", sEtag);
+      if (obj.uploaded) respHeaders.set("Last-Modified", new Date(obj.uploaded).toUTCString());
 
-    if (rangeHeader) {
-      const parsedRange = parseRangeHeader(rangeHeader);
-      if (parsedRange) {
-        const resolved = resolveRange(parsedRange, headObj.size);
-        if (resolved.unsatisfied) {
-          headers.set("Content-Range", `bytes */${headObj.size}`);
-          return new Response(null, { status: 416, headers });
-        }
-        headers.set("Content-Range", `bytes ${resolved.start}-${resolved.end}/${headObj.size}`);
-        headers.set("Content-Length", resolved.length.toString());
-        return new Response(null, { status: 206, headers });
+      const disposition = isDownload ? "attachment" : "inline";
+      respHeaders.set("Content-Disposition", `${disposition}; filename="${encodeURIComponent(filename)}"`);
+
+      if (isPartial && obj.range) {
+        const offset = obj.range.offset ?? 0;
+        const length = obj.range.length ?? obj.size;
+        const total = obj.size;
+        const end = offset + length - 1;
+
+        respHeaders.set("Content-Range", `bytes ${offset}-${end}/${total}`);
+        respHeaders.set("Content-Length", String(length));
+
+        return new Response(obj.body, { status: 206, headers: respHeaders });
       }
-    }
 
-    headers.set("Content-Length", headObj.size.toString());
-    return new Response(null, { status: 200, headers });
+      respHeaders.set("Content-Length", String(obj.size));
+      return new Response(obj.body, { status: 200, headers: respHeaders });
+    } catch (err) {
+      console.error("[STREAM_ERROR]", err);
+      return jsonResponse({ success: false, error: err.message }, 500, {}, request);
+    }
   }
 
-  // Handle GET request
-  try {
-    const getOptions = {};
-    if (rangeHeader) {
-      const parsedRange = parseRangeHeader(rangeHeader);
-      if (parsedRange) {
-        if (parsedRange.isSuffix) {
-          getOptions.range = { suffix: parsedRange.end };
-        } else if (parsedRange.end !== null) {
-          getOptions.range = {
-            offset: parsedRange.start,
-            length: parsedRange.end - parsedRange.start + 1
-          };
-        } else {
-          // Open-ended range: Range: bytes=start-
-          // For streaming playback, bound the chunk to 20 MB to prevent multi-GB stream churn
-          if (!isDownload) {
-            getOptions.range = {
-              offset: parsedRange.start,
-              length: 20 * 1024 * 1024
-            };
-          } else {
-            getOptions.range = { offset: parsedRange.start };
-          }
-        }
-      } else {
-        getOptions.range = request.headers;
-      }
-    }
-
-    const object = await env.MY_BUCKET.get(key, getOptions);
-    if (!object) {
-      return jsonResponse({ success: false, error: `Object '${key}' not found`, code: "NOT_FOUND" }, 404, {}, request);
-    }
-
-    let contentType = object.httpMetadata?.contentType;
-    if (!contentType || contentType === "application/octet-stream" || contentType.trim() === "") {
-      contentType = resolveContentType(filename);
-    }
-
-    const sEtag = object.httpEtag || object.etag;
-
-    // Cache metadata in memory
-    setCachedWorkerMetadata(key, {
-      size: object.size,
-      etag: sEtag,
-      uploaded: object.uploaded,
-      httpMetadata: object.httpMetadata || {},
-      contentType
-    });
-
-    // Check 304 conditional after getting object if no range
-    if (!rangeHeader && ((ifNoneMatch && etagsMatch(ifNoneMatch, sEtag)) ||
-        (ifModifiedSince && ifModifiedSinceMatches(ifModifiedSince, object.uploaded)))) {
-      if (object.body) await object.body.cancel();
-      const h304 = new Headers(getCorsHeaders(request));
-      if (sEtag) h304.set("ETag", sEtag);
-      h304.set("Accept-Ranges", "bytes");
-      h304.set("Vary", "Range");
-      h304.set("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
-      if (object.uploaded) h304.set("Last-Modified", object.uploaded.toUTCString());
-      return new Response(null, { status: 304, headers: h304 });
-    }
-
-    const headers = new Headers();
-    object.writeHttpMetadata(headers);
-    headers.set("Content-Type", isDownload ? "application/octet-stream" : contentType);
-    headers.set("Accept-Ranges", "bytes");
-    headers.set("Vary", "Range");
-    if (sEtag) headers.set("ETag", sEtag);
-    if (object.uploaded) headers.set("Last-Modified", object.uploaded.toUTCString());
-    headers.set("Cache-Control", isDownload ? "public, max-age=86400" : "public, max-age=604800, stale-while-revalidate=86400");
-
-    if (object.range) {
-      const start = object.range.offset;
-      const end = object.range.offset + object.range.length - 1;
-      const total = object.size;
-      headers.set("Content-Range", `bytes ${start}-${end}/${total}`);
-      headers.set("Content-Length", object.range.length.toString());
-    } else {
-      headers.set("Content-Length", object.size.toString());
-    }
-
-    const cors = getCorsHeaders(request);
-    for (const [k, v] of Object.entries(cors)) {
-      headers.set(k, v);
-    }
-
-    if (isDownload) {
-      headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
-    } else {
-      headers.set("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`);
-    }
-
-    const status = object.range ? 206 : 200;
-    return new Response(object.body, {
-      status,
-      headers
-    });
-  } catch (err) {
-    console.error(`[STREAM_MEDIA] Error streaming ${key}:`, err);
-    return jsonResponse({ success: false, error: err.message, code: "STREAM_ERROR" }, 500, {}, request);
+  // 2. If R2 bucket is on another account -> Seamless redirect to active mediaBaseUrl
+  const remoteBase = await getActiveMediaBaseUrl(env);
+  if (remoteBase && !remoteBase.includes(url.host)) {
+    return Response.redirect(`${remoteBase}/${key}`, 302);
   }
+
+  return jsonResponse({
+    success: false,
+    error: "R2 bucket is not bound and no external mediaBaseUrl is configured.",
+    code: "STORAGE_NOT_CONFIGURED"
+  }, 503, {}, request);
 }
 
 // ==========================================
@@ -2470,9 +2464,1160 @@ async function handleUpdateAdsConfig(request, env) {
 
 // 5. MAIN ROUTER / WORKER FETCH HANDLER
 // ==========================================
+
+
+// ============================================================================
+// D1 DATABASE CATALOG & CACHING ENGINE
+// ============================================================================
+
+/**
+ * ============================================================================
+ * Cloudflare Worker: api-movies (Optimized D1 & Edge Cache Engine)
+ * ============================================================================
+ * Production-safe D1 read optimization for VIP Movies.
+ * - Normalized Cloudflare Edge Caching (caches.default)
+ * - Cache key normalization (strips cache-busting timestamp queries)
+ * - HTTP 304 ETag support (bandwidth and row-read reduction)
+ * - Single-table ID routing (eliminates multi-table query scans)
+ * - Reliable clean-key cache invalidation on mutations (POST/PUT/DELETE)
+ * - 100% backwards-compatible response payloads and endpoints
+ * ============================================================================
+ */
+
+// ─── 1. ALLOWED TABLES & CONSTANTS ───────────────────────────────────────────
+const ALLOWED_TABLES = new Set([
+  "tamil_2024",
+  "tamil_2025",
+  "tamil_2026",
+  "hollywood_2024",
+  "hollywood_2025",
+  "hollywood_2026",
+  "slider"
+]);
+
+const MOVIE_TABLES = [
+  "tamil_2024",
+  "tamil_2025",
+  "tamil_2026",
+  "hollywood_2024",
+  "hollywood_2025",
+  "hollywood_2026"
+];
+
+
+// In-memory catalog revision counter per isolate
+
+// ─── 2. UTILITY & VALIDATION HELPERS ─────────────────────────────────────────
+
+function validateId(id) {
+  if (id === undefined || id === null || id === "") return false;
+  const idStr = String(id).trim();
+  if (idStr === "") return false;
+  if (/^\d+$/.test(idStr)) return true;
+  return /^[a-zA-Z0-9\-_]+$/.test(idStr);
+}
+
+
+function parseTimestamp(dateStr) {
+  if (!dateStr) return 0;
+  const d = new Date(dateStr);
+  const time = d.getTime();
+  return isNaN(time) ? 0 : time;
+}
+
+async function generateETag(text) {
+  const msgUint8 = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return `"${hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")}"`;
+}
+
+
+// In-memory cache for table schemas to avoid repeated PRAGMA queries
+const cachedSchemas = new Map();
+
+async function getTableSchema(env, tableName) {
+  if (!ALLOWED_TABLES.has(tableName)) {
+    throw new Error(`Unauthorized table access: ${tableName}`);
+  }
+  if (cachedSchemas.has(tableName)) {
+    return cachedSchemas.get(tableName);
+  }
+  try {
+    const { results } = await env.DB.prepare(`PRAGMA table_info(\`${tableName}\`)`).all();
+    const columns = new Set(results.map((r) => r.name));
+    cachedSchemas.set(tableName, columns);
+    return columns;
+  } catch (err) {
+    console.error(`Failed to fetch schema details for table ${tableName}:`, err);
+    throw new Error(`Schema lookup failure for table ${tableName}`);
+  }
+}
+
+async function validateColumns(env, tableName, body) {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { valid: false, message: "Body must be a JSON object" };
+  }
+  try {
+    const validColumns = await getTableSchema(env, tableName);
+    const keys = Object.keys(body).filter((k) => k !== "id");
+    for (const key of keys) {
+      if (!/^[a-zA-Z0-9_]+$/.test(key)) {
+        return { valid: false, message: `Invalid character in column name: ${key}` };
+      }
+      if (!validColumns.has(key)) {
+        return { valid: false, message: `Column '${key}' does not exist in table '${tableName}'` };
+      }
+    }
+    return { valid: true };
+  } catch (err) {
+    return { valid: false, message: err.message };
+  }
+}
+
+function formatRecord(row, tableName) {
+  if (!row) return row;
+  if (tableName === "slider") return row;
+  const isTamil = tableName && tableName.startsWith("tamil");
+  if (!row.type) {
+    row.type = isTamil ? "tamil" : "hollywood";
+  }
+  // Safe episodes parsing
+  if (typeof row.episodes === "string") {
+    try {
+      row.episodes = JSON.parse(row.episodes);
+    } catch {
+      row.episodes = [];
+    }
+  } else if (!Array.isArray(row.episodes)) {
+    row.episodes = [];
+  }
+  // Safe contentType fallback
+  if (!row.contentType) {
+    row.contentType = (Array.isArray(row.episodes) && row.episodes.length > 0) ? "series" : "movie";
+  }
+  return row;
+}
+
+// ─── 3. CANONICAL CACHE KEY & CLOUDFLARE EDGE CACHE ──────────────────────────
+
+/**
+ * Normalizes request URL by removing non-semantic cache-busting timestamp queries.
+ * This transforms repeated user visits with `?t=1729...` into a stable cache hit.
+ */
+function getNormalizedCacheUrl(requestUrl) {
+  const url = new URL(requestUrl);
+  url.searchParams.delete("t");
+  url.searchParams.delete("_t");
+  url.searchParams.delete("_");
+  url.searchParams.delete("timestamp");
+  url.searchParams.delete("nocache");
+  url.searchParams.sort();
+  return url.toString();
+}
+
+/**
+ * Matches edge cache using normalized clean key.
+ */
+async function matchCache(request) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return null;
+  }
+
+  try {
+    const cache = caches.default;
+    const cleanUrl = getNormalizedCacheUrl(request.url);
+    const lookupRequest = new Request(cleanUrl, {
+      method: "GET",
+      headers: {
+        Accept: request.headers.get("Accept") || "application/json"
+      }
+    });
+
+    const cachedResponse = await cache.match(lookupRequest);
+    if (!cachedResponse) return null;
+
+    // HTTP 304 Validation
+    const cachedEtag = cachedResponse.headers.get("ETag");
+    const ifNoneMatch = request.headers.get("If-None-Match");
+    if (cachedEtag && ifNoneMatch && etagsMatch(cachedEtag, ifNoneMatch)) {
+      const respHeaders = new Headers(cachedResponse.headers);
+      respHeaders.set("CF-Cache-Status", "HIT");
+      respHeaders.set("X-Cache-Lookup", "HIT-304");
+      return new Response(null, {
+        status: 304,
+        headers: respHeaders
+      });
+    }
+
+    if (request.method === "HEAD") {
+      const respHeaders = new Headers(cachedResponse.headers);
+      respHeaders.set("CF-Cache-Status", "HIT");
+      return new Response(null, {
+        status: 200,
+        headers: respHeaders
+      });
+    }
+
+    // Return cached response with HIT diagnostic header
+    const freshHeaders = new Headers(cachedResponse.headers);
+    freshHeaders.set("CF-Cache-Status", "HIT");
+    freshHeaders.set("X-Cache-Lookup", "HIT-EDGE");
+    for (const [k, v] of Object.entries(CORS_HEADERS)) {
+      if (!freshHeaders.has(k)) freshHeaders.set(k, v);
+    }
+
+    return new Response(cachedResponse.body, {
+      status: cachedResponse.status,
+      statusText: cachedResponse.statusText,
+      headers: freshHeaders
+    });
+  } catch (err) {
+    console.warn("Edge cache match warning:", err);
+    return null;
+  }
+}
+
+/**
+ * Saves response to Cloudflare Edge Cache under normalized clean key.
+ */
+async function putCache(request, response) {
+  if (request.method !== "GET" || response.status !== 200) {
+    return;
+  }
+
+  try {
+    const cache = caches.default;
+    const cleanUrl = getNormalizedCacheUrl(request.url);
+    const cacheRequest = new Request(cleanUrl, {
+      method: "GET",
+      headers: {
+        Accept: request.headers.get("Accept") || "application/json"
+      }
+    });
+
+    const cacheHeaders = new Headers(response.headers);
+    cacheHeaders.set("CF-Cache-Status", "HIT");
+    cacheHeaders.set("X-Cache-Key", cleanUrl);
+
+    const cachedClone = new Response(response.clone().body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: cacheHeaders
+    });
+
+    await cache.put(cacheRequest, cachedClone);
+  } catch (err) {
+    console.warn("Edge cache put warning:", err);
+  }
+}
+
+/**
+ * Purges normalized cache keys on data mutation (create, update, delete).
+ */
+async function purgeCache(env, urlStr, tableName, resourceId) {
+  try {
+    GLOBAL_REVISION++;
+    const cache = caches.default;
+    const url = new URL(urlStr);
+    const origin = url.origin;
+
+    const pathsToPurge = [
+      "/api/app",
+      "/app",
+      "/api/version",
+      "/version",
+      "/api/movies",
+      "/movies",
+      "/api/slider",
+      "/slider",
+      "/api/stats",
+      "/stats",
+      "/api/dashboard-summary"
+    ];
+
+    if (tableName && ALLOWED_TABLES.has(tableName)) {
+      pathsToPurge.push(`/api/${tableName}`);
+      pathsToPurge.push(`/${tableName}`);
+    }
+
+    if (resourceId) {
+      pathsToPurge.push(`/api/movies/${resourceId}`);
+      pathsToPurge.push(`/movies/${resourceId}`);
+      if (tableName && ALLOWED_TABLES.has(tableName)) {
+        pathsToPurge.push(`/api/${tableName}/${resourceId}`);
+        pathsToPurge.push(`/${tableName}/${resourceId}`);
+      }
+    }
+
+    const deletePromises = pathsToPurge.map((path) => {
+      const cleanPurgeUrl = `${origin}${path}`;
+      const purgeRequest = new Request(cleanPurgeUrl, { method: "GET" });
+      return cache.delete(purgeRequest).catch(() => false);
+    });
+
+    await Promise.all(deletePromises);
+  } catch (err) {
+    console.error("Failed to complete cache purge sequence:", err);
+  }
+}
+
+// ─── 4. VERSION ENGINE ───────────────────────────────────────────────────────
+
+function computeVersion(movieCount, latestMovieTime, sliderCount, latestSliderTime) {
+  const movieSec = Math.floor(latestMovieTime / 1000);
+  const sliderSec = Math.floor(latestSliderTime / 1000);
+  const sum = movieCount * 17 + sliderCount * 31 + movieSec + sliderSec;
+  return (Math.abs(sum) % 90000) + 10000;
+}
+
+async function getVersionMetadata(env) {
+  const tables = [
+    "tamil_2024",
+    "tamil_2025",
+    "tamil_2026",
+    "hollywood_2024",
+    "hollywood_2025",
+    "hollywood_2026",
+    "slider"
+  ];
+
+  const promises = tables.map(async (table) => {
+    try {
+      const columns = await getTableSchema(env, table);
+      const selectParts = ["COUNT(*) as cnt"];
+      if (columns.has("updated_at")) selectParts.push("MAX(updated_at) as max_upd");
+      if (columns.has("created_at")) selectParts.push("MAX(created_at) as max_cre");
+      if (columns.has("release")) selectParts.push("MAX(release) as max_rel");
+      if (columns.has("updated")) selectParts.push("MAX(updated) as max_upd_legacy");
+
+      const sql = `SELECT ${selectParts.join(", ")} FROM \`${table}\``;
+      const row = await env.DB.prepare(sql).first();
+      return { table, row };
+    } catch (e) {
+      console.error(`Metadata query failed for table ${table}:`, e);
+      return { table, row: null };
+    }
+  });
+
+  const results = await Promise.all(promises);
+
+  let movieCount = 0;
+  let sliderCount = 0;
+  let latestMovieTime = 0;
+  let latestSliderTime = 0;
+
+  for (const item of results) {
+    const { table, row } = item;
+    if (!row) continue;
+    const count = parseInt(row.cnt, 10) || 0;
+    let maxTime = 0;
+    const dateValues = [row.max_upd, row.max_cre, row.max_rel, row.max_upd_legacy].filter(Boolean);
+    for (const val of dateValues) {
+      const time = parseTimestamp(val);
+      if (time > maxTime) maxTime = time;
+    }
+
+    if (table === "slider") {
+      sliderCount = count;
+      latestSliderTime = maxTime;
+    } else {
+      movieCount += count;
+      if (maxTime > latestMovieTime) latestMovieTime = maxTime;
+    }
+  }
+
+  return { movieCount, sliderCount, latestMovieTime, latestSliderTime };
+}
+
+async function handleVersionRequest(request, env, ctx) {
+  const cachedResponse = await matchCache(request);
+  if (cachedResponse) return cachedResponse;
+
+  const [metadata, mediaBaseUrl] = await Promise.all([getVersionMetadata(env), getActiveMediaBaseUrl(env)]);
+  const version = computeVersion(
+    metadata.movieCount,
+    metadata.latestMovieTime,
+    metadata.sliderCount,
+    metadata.latestSliderTime
+  );
+
+  const maxTime = Math.max(metadata.latestMovieTime, metadata.latestSliderTime);
+  const updated = maxTime > 0 ? new Date(maxTime).toISOString() : new Date().toISOString();
+
+  const responseBody = {
+    success: true,
+    version,
+    updated,
+    count: metadata.movieCount,
+    mediaBaseUrl
+  };
+
+  const bodyText = JSON.stringify(responseBody);
+  const etag = await generateETag(bodyText);
+
+  // Conservative Edge Cache TTL: 5 minutes edge, 1 minute browser
+  const headers = new Headers({
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=60",
+    "ETag": etag,
+    "CF-Cache-Status": "MISS",
+    ...CORS_HEADERS
+  });
+
+  const ifNoneMatch = request.headers.get("If-None-Match");
+  if (ifNoneMatch && etagsMatch(ifNoneMatch, etag)) {
+    return new Response(null, { status: 304, headers });
+  }
+
+  const response200 = new Response(bodyText, { status: 200, headers });
+  ctx.waitUntil(putCache(request, response200));
+
+  if (request.method === "HEAD") {
+    return new Response(null, { status: 200, headers });
+  }
+  return response200;
+}
+
+// ─── 5. FULL APP CATALOG ENGINE ──────────────────────────────────────────────
+
+async function handleAppRequest(request, env, ctx) {
+  const cachedResponse = await matchCache(request);
+  if (cachedResponse) return cachedResponse;
+
+  const tables = [
+    "tamil_2024",
+    "tamil_2025",
+    "tamil_2026",
+    "hollywood_2024",
+    "hollywood_2025",
+    "hollywood_2026",
+    "slider"
+  ];
+
+  const promises = tables.map(async (table) => {
+    try {
+      const { results } = await env.DB.prepare(`SELECT * FROM \`${table}\``).all();
+      return { table, results: results || [] };
+    } catch (e) {
+      console.error(`Error querying table ${table} for app aggregation:`, e);
+      return { table, results: [] };
+    }
+  });
+
+  const resultsArray = await Promise.all(promises);
+
+  let allMovies = [];
+  let allSliders = [];
+  let latestMovieTime = 0;
+  let latestSliderTime = 0;
+
+  for (const item of resultsArray) {
+    const { table, results } = item;
+    if (table === "slider") {
+      allSliders = results;
+      for (const row of results) {
+        const time = parseTimestamp(row.updated_at || row.created_at || row.updated);
+        if (time > latestSliderTime) latestSliderTime = time;
+      }
+    } else {
+      const isTamil = table.startsWith("tamil");
+      const processedMovies = results.map((row) => {
+        formatRecord(row, table);
+        const time = parseTimestamp(row.updated_at || row.created_at || row.release || row.updated);
+        if (time > latestMovieTime) latestMovieTime = time;
+        return row;
+      });
+      allMovies.push(...processedMovies);
+    }
+  }
+
+  allMovies.sort((a, b) => {
+    const yearA = parseInt(a.year, 10) || 0;
+    const yearB = parseInt(b.year, 10) || 0;
+    if (yearB !== yearA) return yearB - yearA;
+    const titleA = String(a.title || "").toLowerCase();
+    const titleB = String(b.title || "").toLowerCase();
+    return titleA.localeCompare(titleB);
+  });
+
+  const version = computeVersion(
+    allMovies.length,
+    latestMovieTime,
+    allSliders.length,
+    latestSliderTime
+  );
+
+  const maxTime = Math.max(latestMovieTime, latestSliderTime);
+  const updated = maxTime > 0 ? new Date(maxTime).toISOString() : new Date().toISOString();
+
+  const appResponse = {
+    success: true,
+    version,
+    updated,
+    count: allMovies.length,
+    slider: allSliders,
+    movies: allMovies
+  };
+
+  const bodyText = JSON.stringify(appResponse);
+  const etag = await generateETag(bodyText);
+
+  // Edge cache: 10 mins, browser: 5 mins
+  const headers = new Headers({
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "public, max-age=300, s-maxage=600, stale-while-revalidate=120",
+    "ETag": etag,
+    "Version": String(version),
+    "Count": String(allMovies.length),
+    "Updated": updated,
+    "CF-Cache-Status": "MISS",
+    ...CORS_HEADERS
+  });
+
+  const ifNoneMatch = request.headers.get("If-None-Match");
+  if (ifNoneMatch && etagsMatch(ifNoneMatch, etag)) {
+    return new Response(null, { status: 304, headers });
+  }
+
+  const response200 = new Response(bodyText, { status: 200, headers });
+  ctx.waitUntil(putCache(request, response200));
+
+  if (request.method === "HEAD") {
+    return new Response(null, { status: 200, headers });
+  }
+  return response200;
+}
+
+// ─── 6. LIGHTWEIGHT STATS / DASHBOARD SUMMARY ────────────────────────────────
+
+async function handleStatsRequest(request, env, ctx) {
+  const cachedResponse = await matchCache(request);
+  if (cachedResponse) return cachedResponse;
+
+  const tables = [
+    "tamil_2024",
+    "tamil_2025",
+    "tamil_2026",
+    "hollywood_2024",
+    "hollywood_2025",
+    "hollywood_2026",
+    "slider"
+  ];
+
+  const promises = tables.map(async (table) => {
+    try {
+      const row = await env.DB.prepare(`SELECT count(*) as count FROM \`${table}\``).first();
+      return { table, count: row ? Number(row.count) || 0 : 0 };
+    } catch (e) {
+      return { table, count: 0 };
+    }
+  });
+
+  const counts = await Promise.all(promises);
+  const tableCounts = {};
+  let totalTamil = 0;
+  let totalHollywood = 0;
+  let totalSlides = 0;
+
+  for (const item of counts) {
+    tableCounts[item.table] = item.count;
+    if (item.table.startsWith("tamil_")) totalTamil += item.count;
+    else if (item.table.startsWith("hollywood_")) totalHollywood += item.count;
+    else if (item.table === "slider") totalSlides = item.count;
+  }
+
+  const payload = {
+    success: true,
+    totalMovies: totalTamil + totalHollywood,
+    tamilMovies: totalTamil,
+    hollywoodMovies: totalHollywood,
+    totalSlides,
+    tables: tableCounts
+  };
+
+  const bodyText = JSON.stringify(payload);
+  const etag = await generateETag(bodyText);
+
+  const headers = new Headers({
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=60",
+    "ETag": etag,
+    "CF-Cache-Status": "MISS",
+    ...CORS_HEADERS
+  });
+
+  const response200 = new Response(bodyText, { status: 200, headers });
+  ctx.waitUntil(putCache(request, response200));
+  return response200;
+}
+
+// ─── 7. SINGLE-TABLE ROUTING FOR ID LOOKUPS ──────────────────────────────────
+
+/**
+ * Parses target table directly from structured movie ID.
+ * e.g. 'tamil-2026-00001' -> 'tamil_2026'
+ * Eliminates querying 6 separate tables!
+ */
+function inferTableFromId(id) {
+  if (!id) return null;
+  const str = String(id).toLowerCase().trim();
+  for (const t of MOVIE_TABLES) {
+    const prefix = t.replace("_", "-");
+    if (str.startsWith(prefix)) {
+      return t;
+    }
+  }
+  return null;
+}
+
+async function findMovieAndTableById(env, id) {
+  const parsedId = /^\d+$/.test(id) ? parseInt(id, 10) : id;
+
+  // Optimized single-table route:
+  const directTable = inferTableFromId(id);
+  if (directTable) {
+    try {
+      const movie = await env.DB.prepare(`SELECT * FROM \`${directTable}\` WHERE \`id\` = ?`)
+        .bind(parsedId)
+        .first();
+      if (movie) {
+        return { movie, table: directTable };
+      }
+    } catch (e) {
+      console.warn(`Direct table query for ${directTable} failed:`, e);
+    }
+  }
+
+  // Fallback to searching all tables only if direct lookup didn't match
+  const promises = MOVIE_TABLES.map(async (table) => {
+    if (table === directTable) return null; // already checked
+    try {
+      const movie = await env.DB.prepare(`SELECT * FROM \`${table}\` WHERE \`id\` = ?`)
+        .bind(parsedId)
+        .first();
+      if (movie) return { movie, table };
+    } catch (e) {
+      console.error(`Error querying table ${table} for ID ${id}:`, e);
+    }
+    return null;
+  });
+
+  const resolved = await Promise.all(promises);
+  return resolved.find((r) => r !== null) || null;
+}
+
+function getTableNameFromMovie(movie) {
+  const category = String(movie.category || movie.type || "").toLowerCase().trim();
+  const year = String(movie.year || "").trim();
+  if (category === "tamil" && ["2024", "2025", "2026"].includes(year)) {
+    return `tamil_${year}`;
+  }
+  if (category === "hollywood" && ["2024", "2025", "2026"].includes(year)) {
+    return `hollywood_${year}`;
+  }
+  return null;
+}
+
+// ─── 8. CRUD TABLE ROUTE HANDLER ─────────────────────────────────────────────
+
+async function handleTableRoute(request, env, ctx, tableName, id, preParsedBody = null) {
+  const method = request.method;
+
+  if (!ALLOWED_TABLES.has(tableName)) {
+    return jsonResponse({ success: false, message: "Unauthorized table access" }, 403);
+  }
+
+  if (id !== null && !validateId(id)) {
+    return jsonResponse({ success: false, message: "Invalid ID format" }, 400);
+  }
+
+  const parsedId = id !== null && /^\d+$/.test(id) ? parseInt(id, 10) : id;
+
+  // ── GET & HEAD ──
+  if (method === "GET" || method === "HEAD") {
+    const cachedResponse = await matchCache(request);
+    if (cachedResponse) return cachedResponse;
+
+    let data;
+    if (id !== null) {
+      data = await env.DB.prepare(`SELECT * FROM \`${tableName}\` WHERE \`id\` = ?`)
+        .bind(parsedId)
+        .first();
+      if (!data) {
+        return jsonResponse({ success: false, message: "Record not found" }, 404);
+      }
+      data = formatRecord(data, tableName);
+    } else {
+      const { results } = await env.DB.prepare(`SELECT * FROM \`${tableName}\``).all();
+      data = (results || []).map((r) => formatRecord(r, tableName));
+    }
+
+    const bodyText = JSON.stringify(data);
+    const etag = await generateETag(bodyText);
+
+    // Edge cache: 5 mins, browser: 2 mins
+    const headers = new Headers({
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=60",
+      "ETag": etag,
+      "CF-Cache-Status": "MISS",
+      ...CORS_HEADERS
+    });
+
+    const ifNoneMatch = request.headers.get("If-None-Match");
+    if (ifNoneMatch && etagsMatch(ifNoneMatch, etag)) {
+      return new Response(null, { status: 304, headers });
+    }
+
+    const response200 = new Response(bodyText, { status: 200, headers });
+    ctx.waitUntil(putCache(request, response200));
+
+    if (method === "HEAD") {
+      return new Response(null, { status: 200, headers });
+    }
+    return response200;
+  }
+
+  // ── POST ──
+  if (method === "POST") {
+    let body = preParsedBody;
+    if (!body) {
+      try {
+        body = await request.json();
+      } catch (e) {
+        return jsonResponse({ success: false, message: "Invalid JSON body" }, 400);
+      }
+    }
+
+    if (tableName === "slider") {
+      if (!body || !body.image || !body.url) {
+        return jsonResponse({ success: false, message: "slider requires 'image' and 'url' fields" }, 400);
+      }
+    } else {
+      if (!body || !body.title) {
+        return jsonResponse({ success: false, message: "movie requires a 'title' field" }, 400);
+      }
+    }
+
+    const validation = await validateColumns(env, tableName, body);
+    if (!validation.valid) {
+      return jsonResponse({ success: false, message: validation.message }, 400);
+    }
+
+    const sanitizedBody = { ...body };
+    if (tableName !== "slider") {
+      if (sanitizedBody.contentType === undefined) {
+        sanitizedBody.contentType = (Array.isArray(sanitizedBody.episodes) && sanitizedBody.episodes.length > 0) ? "series" : "movie";
+      }
+      if (sanitizedBody.episodes !== undefined) {
+        if (typeof sanitizedBody.episodes === "object" && sanitizedBody.episodes !== null) {
+          sanitizedBody.episodes = JSON.stringify(sanitizedBody.episodes);
+        } else if (typeof sanitizedBody.episodes !== "string") {
+          sanitizedBody.episodes = "[]";
+        }
+      }
+    }
+
+    const keys = Object.keys(sanitizedBody);
+    const columns = keys.map((k) => `\`${k}\``).join(", ");
+    const placeholders = keys.map(() => "?").join(", ");
+    const values = keys.map((k) => sanitizedBody[k]);
+    const sql = `INSERT INTO \`${tableName}\` (${columns}) VALUES (${placeholders})`;
+
+    await env.DB.prepare(sql).bind(...values).run();
+
+    // Invalidate edge caches immediately
+    ctx.waitUntil(purgeCache(env, request.url, tableName, body.id || null));
+
+    return jsonResponse(formatRecord({ ...body }, tableName) || { success: true, message: "Record inserted successfully" }, 201);
+  }
+
+  // ── PUT ──
+  if (method === "PUT") {
+    if (id === null) {
+      return jsonResponse({ success: false, message: "Missing ID in path" }, 400);
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return jsonResponse({ success: false, message: "Invalid JSON body" }, 400);
+    }
+
+    const validation = await validateColumns(env, tableName, body);
+    if (!validation.valid) {
+      return jsonResponse({ success: false, message: validation.message }, 400);
+    }
+
+    const sanitizedBody = { ...body };
+    if (tableName !== "slider") {
+      if (sanitizedBody.episodes !== undefined) {
+        if (typeof sanitizedBody.episodes === "object" && sanitizedBody.episodes !== null) {
+          sanitizedBody.episodes = JSON.stringify(sanitizedBody.episodes);
+        } else if (typeof sanitizedBody.episodes !== "string") {
+          sanitizedBody.episodes = "[]";
+        }
+      }
+    }
+
+    const keys = Object.keys(sanitizedBody).filter((k) => k !== "id");
+    if (keys.length === 0) {
+      return jsonResponse({ success: false, message: "No fields to update" }, 400);
+    }
+
+    const setClause = keys.map((k) => `\`${k}\` = ?`).join(", ");
+    const values = keys.map((k) => sanitizedBody[k]);
+    values.push(parsedId);
+
+    const updateSql = `UPDATE \`${tableName}\` SET ${setClause} WHERE \`id\` = ?`;
+    const res = await env.DB.prepare(updateSql).bind(...values).run();
+
+    if (res.meta && res.meta.changes === 0) {
+      return jsonResponse({ success: false, message: "Record not found" }, 404);
+    }
+
+    // Invalidate edge caches immediately
+    ctx.waitUntil(purgeCache(env, request.url, tableName, parsedId));
+
+    const updatedData = formatRecord({ id: parsedId, ...body }, tableName);
+    return jsonResponse({ success: true, message: "Record updated successfully", ...updatedData });
+  }
+
+  // ── DELETE ──
+  if (method === "DELETE") {
+    if (id === null) {
+      return jsonResponse({ success: false, message: "Missing ID in path" }, 400);
+    }
+
+    const deleteSql = `DELETE FROM \`${tableName}\` WHERE \`id\` = ?`;
+    const res = await env.DB.prepare(deleteSql).bind(parsedId).run();
+
+    if (res.meta && res.meta.changes === 0) {
+      return jsonResponse({ success: false, message: "Record not found" }, 404);
+    }
+
+    // Invalidate edge caches immediately
+    ctx.waitUntil(purgeCache(env, request.url, tableName, parsedId));
+
+    return jsonResponse({ success: true, message: "Record deleted successfully" });
+  }
+
+  return jsonResponse({ success: false, message: "Method not allowed" }, 405);
+}
+
+// ─── 9. MOVIES ROUTE HANDLER ─────────────────────────────────────────────────
+
+async function handleMoviesRoute(request, env, ctx, id) {
+  const method = request.method;
+
+  if (id !== null && !validateId(id)) {
+    return jsonResponse({ success: false, message: "Invalid ID format" }, 400);
+  }
+
+  if (method === "GET" || method === "HEAD") {
+    const cachedResponse = await matchCache(request);
+    if (cachedResponse) return cachedResponse;
+
+    let responseData;
+    if (id !== null) {
+      const found = await findMovieAndTableById(env, id);
+      if (!found) {
+        return jsonResponse({ success: false, message: "Movie not found" }, 404);
+      }
+      responseData = found.movie ? formatRecord(found.movie, found.table) : null;
+    } else {
+      const promises = MOVIE_TABLES.map(async (table) => {
+        try {
+          const { results } = await env.DB.prepare(`SELECT * FROM \`${table}\``).all();
+          return (results || []).map((row) => formatRecord(row, table));
+        } catch (e) {
+          console.error(`Error loading table ${table} for movies endpoint:`, e);
+          return [];
+        }
+      });
+
+      const resultsArray = await Promise.all(promises);
+      const allMovies = resultsArray.flat();
+
+      allMovies.sort((a, b) => {
+        const yearA = parseInt(a.year, 10) || 0;
+        const yearB = parseInt(b.year, 10) || 0;
+        if (yearB !== yearA) return yearB - yearA;
+        const titleA = String(a.title || "").toLowerCase();
+        const titleB = String(b.title || "").toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+
+      responseData = allMovies;
+    }
+
+    const bodyText = JSON.stringify(responseData);
+    const etag = await generateETag(bodyText);
+
+    const headers = new Headers({
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "public, max-age=180, s-maxage=300, stale-while-revalidate=60",
+      "ETag": etag,
+      "CF-Cache-Status": "MISS",
+      ...CORS_HEADERS
+    });
+
+    const ifNoneMatch = request.headers.get("If-None-Match");
+    if (ifNoneMatch && etagsMatch(ifNoneMatch, etag)) {
+      return new Response(null, { status: 304, headers });
+    }
+
+    const response200 = new Response(bodyText, { status: 200, headers });
+    ctx.waitUntil(putCache(request, response200));
+
+    if (method === "HEAD") {
+      return new Response(null, { status: 200, headers });
+    }
+    return response200;
+  }
+
+  if (method === "POST") {
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return jsonResponse({ success: false, message: "Invalid JSON body" }, 400);
+    }
+
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return jsonResponse({ success: false, message: "Body must be a JSON object" }, 400);
+    }
+    if (!body.title) {
+      return jsonResponse({ success: false, message: "movie requires a 'title' field" }, 400);
+    }
+
+    const targetTable = getTableNameFromMovie(body);
+    if (!targetTable) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Could not determine target movie table from category/type and year"
+        },
+        400
+      );
+    }
+    return await handleTableRoute(request, env, ctx, targetTable, null, body);
+  }
+
+  if (method === "PUT") {
+    if (id === null) {
+      return jsonResponse({ success: false, message: "Missing ID in path" }, 400);
+    }
+    const found = await findMovieAndTableById(env, id);
+    if (!found) {
+      return jsonResponse({ success: false, message: "Movie not found" }, 404);
+    }
+    return await handleTableRoute(request, env, ctx, found.table, id);
+  }
+
+  if (method === "DELETE") {
+    if (id === null) {
+      return jsonResponse({ success: false, message: "Missing ID in path" }, 400);
+    }
+    const found = await findMovieAndTableById(env, id);
+    if (!found) {
+      return jsonResponse({ success: false, message: "Movie not found" }, 404);
+    }
+    return await handleTableRoute(request, env, ctx, found.table, id);
+  }
+
+  return jsonResponse({ success: false, message: "Method not allowed" }, 405);
+}
+
+// ─── 10. MAIN ROUTER ─────────────────────────────────────────────────────────
+
+
+
+
+// ==========================================
+// DYNAMIC STORAGE & SYSTEM SETTINGS ENGINE
+// ==========================================
+
+let GLOBAL_REVISION = 1;
+let cachedMediaBaseUrl = null;
+let cachedMediaBaseUrlExpiry = 0;
+
+async function getActiveMediaBaseUrl(env) {
+  const now = Date.now();
+  if (cachedMediaBaseUrl && now < cachedMediaBaseUrlExpiry) {
+    return cachedMediaBaseUrl;
+  }
+
+  // 1. Try reading from D1 system_settings
+  if (env && env.DB) {
+    try {
+      const row = await env.DB.prepare(
+        "SELECT value FROM system_settings WHERE key = 'media_base_url'"
+      ).first();
+      if (row && row.value && typeof row.value === 'string' && row.value.trim()) {
+        cachedMediaBaseUrl = row.value.trim().replace(/\/+$/, '');
+        cachedMediaBaseUrlExpiry = now + 60000;
+        return cachedMediaBaseUrl;
+      }
+    } catch (d1Err) {
+      // Table may not exist yet
+    }
+  }
+
+  // 2. Check environment variables
+  if (env && env.MEDIA_BASE_URL) {
+    cachedMediaBaseUrl = env.MEDIA_BASE_URL.trim().replace(/\/+$/, '');
+    cachedMediaBaseUrlExpiry = now + 60000;
+    return cachedMediaBaseUrl;
+  }
+  if (env && env.DEFAULT_MEDIA_BASE_URL) {
+    cachedMediaBaseUrl = env.DEFAULT_MEDIA_BASE_URL.trim().replace(/\/+$/, '');
+    cachedMediaBaseUrlExpiry = now + 60000;
+    return cachedMediaBaseUrl;
+  }
+
+  // 3. Fallback constant
+  cachedMediaBaseUrl = "https://api-download.akatsuki-pvt-ltd.workers.dev";
+  cachedMediaBaseUrlExpiry = now + 60000;
+  return cachedMediaBaseUrl;
+}
+
+async function setActiveMediaBaseUrl(env, newBaseUrl) {
+  const cleanUrl = String(newBaseUrl || '').trim().replace(/\/+$/, '');
+  if (!cleanUrl || !/^https?:\/\//i.test(cleanUrl)) {
+    throw new Error("Invalid URL. Must start with http:// or https://");
+  }
+
+  if (!env || !env.DB) {
+    throw new Error("Database (DB) binding is not available in environment");
+  }
+
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `).run();
+
+  const now = new Date().toISOString();
+  await env.DB.prepare(`
+    INSERT INTO system_settings (key, value, updated_at)
+    VALUES ('media_base_url', ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      value = excluded.value,
+      updated_at = excluded.updated_at
+  `).bind(cleanUrl, now).run();
+
+  cachedMediaBaseUrl = cleanUrl;
+  cachedMediaBaseUrlExpiry = Date.now() + 60000;
+  return cleanUrl;
+}
+
+async function handleGetSettings(request, env) {
+  const activeMediaBase = await getActiveMediaBaseUrl(env);
+  const hasD1 = !!(env && env.DB);
+  const hasR2 = !!(env && env.MY_BUCKET);
+  return jsonResponse({
+    success: true,
+    settings: {
+      mediaBaseUrl: activeMediaBase,
+      hasD1,
+      hasR2,
+      r2BucketName: hasR2 ? "tvk-movies" : null,
+      serverTime: new Date().toISOString(),
+      globalRevision: GLOBAL_REVISION
+    }
+  }, 200, {}, request);
+}
+
+async function handleUpdateSettings(request, env, ctx) {
+  if (!authenticate(request, env)) {
+    return jsonResponse({ success: false, error: "Unauthorized", code: "UNAUTHORIZED" }, 401, {}, request);
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ success: false, error: "Invalid JSON body" }, 400, {}, request);
+  }
+
+  const newUrl = body.mediaBaseUrl || body.media_base_url || body.value;
+  if (!newUrl) {
+    return jsonResponse({ success: false, error: "Missing mediaBaseUrl parameter" }, 400, {}, request);
+  }
+
+  try {
+    const saved = await setActiveMediaBaseUrl(env, newUrl);
+    ctx.waitUntil(purgeCache(env, request.url, null, null));
+    return jsonResponse({
+      success: true,
+      message: "Media Base URL updated successfully",
+      mediaBaseUrl: saved
+    }, 200, {}, request);
+  } catch (err) {
+    return jsonResponse({ success: false, error: err.message }, 500, {}, request);
+  }
+}
+
+
+
+// ==========================================
+// PUBLIC HEALTH CHECK & DIAGNOSTICS
+// ==========================================
+
+async function handleHealth(request, env) {
+  const activeMediaBase = await getActiveMediaBaseUrl(env);
+  const hasD1 = !!(env && env.DB);
+  const hasR2 = !!(env && env.MY_BUCKET);
+
+  let d1Status = "unbound";
+  let sampleCount = 0;
+
+  if (hasD1) {
+    try {
+      const row = await env.DB.prepare("SELECT count(*) as cnt FROM `tamil_2026`").first();
+      d1Status = "connected";
+      sampleCount = row ? Number(row.cnt) || 0 : 0;
+    } catch (e) {
+      d1Status = "error: " + e.message;
+    }
+  }
+
+  return jsonResponse({
+    status: "ok",
+    service: "vip-movies-master-unified-api",
+    version: "2.0.0",
+    uptime: Math.round(performance.now()),
+    timestamp: new Date().toISOString(),
+    d1: {
+      status: d1Status,
+      databaseName: "tvk-movies",
+      sampleCount
+    },
+    r2: {
+      status: hasR2 ? "bound" : "external",
+      bucketName: hasR2 ? "tvk-movies" : null
+    },
+    mediaBaseUrl: activeMediaBase,
+    globalRevision: GLOBAL_REVISION
+  }, 200, {}, request);
+}
+
+
+
+// ==========================================
+// MASTER UNIFIED FETCH ROUTER
+// ==========================================
+
 export default {
   async fetch(request, env, ctx) {
-    // 1. Handle CORS Preflight
+    const url = new URL(request.url);
+    let path = url.pathname.replace(/\/+$/, "") || "/";
+
+    // 1. Universal CORS Preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -2480,48 +3625,65 @@ export default {
       });
     }
 
-    // 2. Verify R2 Binding exists
-    if (!env || !env.MY_BUCKET) {
-      console.error("[CRITICAL] R2 Bucket binding 'MY_BUCKET' is missing!");
-      return jsonResponse({
-        success: false,
-        error: "R2 Bucket binding 'MY_BUCKET' is not configured on this Worker",
-        code: "MISSING_R2_BINDING"
-      }, 500, {}, request);
+    // 2. Public Health Check
+    if ((request.method === "GET" || request.method === "HEAD") && (path === "/health" || path === "/api/health")) {
+      return handleHealth(request, env);
     }
 
-    const url = new URL(request.url);
-    const path = url.pathname.replace(/\/+$/, "") || "/";
-
-    // 3. Public Health Route
-    if (request.method === "GET" && path === "/health") {
-      return handleHealth(request);
-    }
-
-    // 3b. Public Player Ads Config Route
-    if (request.method === "GET" && (path === "/ads-config" || path === "/get-ads-config")) {
+    // 3. Dynamic Player Ads Configuration
+    if ((request.method === "GET" || request.method === "HEAD") &&
+        (path === "/ads-config" || path === "/get-ads-config" || path === "/api/ads-config")) {
       return handleGetAdsConfig(request, env);
     }
-
-    // 4. Media Streaming / Download Routes (GET & HEAD)
-    if ((request.method === "GET" || request.method === "HEAD") && (path === "/stream-media" || path === "/download")) {
+    if (request.method === "POST" &&
+        (path === "/update-ads-config" || path === "/api/ads-config" || path === "/ads-config")) {
       if (!authenticate(request, env)) {
         return jsonResponse({ success: false, error: "Unauthorized", code: "UNAUTHORIZED" }, 401, {}, request);
       }
-      return handleStreamMedia(request, env);
+      return handleUpdateAdsConfig(request, env);
     }
 
-    // 4b. GET /probe-url
-    if (request.method === "GET" && path === "/probe-url") {
+    // 4. Dynamic System & Media Base Settings
+    if ((request.method === "GET" || request.method === "HEAD") && path === "/api/settings") {
+      return handleGetSettings(request, env);
+    }
+    if (request.method === "POST" && (path === "/api/settings" || path === "/api/settings/media-base")) {
+      return handleUpdateSettings(request, env, ctx);
+    }
+
+    // 5. Version Check Engine (Returns catalog version + active mediaBaseUrl)
+    if ((request.method === "GET" || request.method === "HEAD") && (path === "/api/version" || path === "/version")) {
+      return handleVersionRequest(request, env, ctx);
+    }
+
+    // 6. Full App Catalog Engine (Full offline bundle + active mediaBaseUrl)
+    if ((request.method === "GET" || request.method === "HEAD") && (path === "/api/app" || path === "/app")) {
+      return handleAppRequest(request, env, ctx);
+    }
+
+    // 7. Stats & Dashboard Summary
+    if ((request.method === "GET" || request.method === "HEAD") &&
+        (path === "/api/stats" || path === "/stats" || path === "/api/dashboard-summary")) {
+      return handleStatsRequest(request, env, ctx);
+    }
+
+    // 8. Probe Remote URL
+    if ((request.method === "GET" || request.method === "POST") && (path === "/probe-url" || path === "/api/probe-url")) {
       if (!authenticate(request, env)) {
         return jsonResponse({ success: false, error: "Unauthorized", code: "UNAUTHORIZED" }, 401, {}, request);
       }
       return handleProbeUrl(request, env);
     }
 
-    // 5. POST Dispatch Routes Table
+    // 9. Public Video Streaming & Download (HTTP 206 Range Partial Content)
+    const mediaKey = extractMediaKey(path, url.searchParams);
+    if ((request.method === "GET" || request.method === "HEAD") && mediaKey) {
+      const isDownload = path.includes("/download") || url.searchParams.get("download") === "1" || url.searchParams.get("dl") === "1";
+      return handleStreamMedia(request, env, mediaKey, isDownload);
+    }
+
+    // 10. R2 File Manager & Multipart Uploader (POST Routes - Authenticated)
     const postRoutes = {
-      // Multipart Uploader
       "/create-upload": handleCreateUpload,
       "/upload-part": handleUploadPart,
       "/complete-upload": handleCompleteUpload,
@@ -2529,12 +3691,7 @@ export default {
       "/upload-status": handleUploadStatus,
       "/abort-upload": handleAbortUpload,
       "/cleanup-upload": handleAbortUpload,
-
-      // Direct URL Import & Probe
       "/upload-from-url": handleUploadFromUrl,
-      "/probe-url": handleProbeUrl,
-
-      // File & Folder Management
       "/list-objects": handleListObjects,
       "/object-details": handleObjectDetails,
       "/delete-object": handleDeleteObject,
@@ -2546,36 +3703,46 @@ export default {
       "/create-folder": handleCreateFolder,
       "/delete-folder": handleDeleteFolder,
       "/rename-folder": handleRenameFolder,
-      "/put-object": handlePutObject,
-      "/update-ads-config": handleUpdateAdsConfig
+      "/put-object": handlePutObject
     };
 
     if (request.method === "POST" && postRoutes[path]) {
-      // Authentication check
       if (!authenticate(request, env)) {
-        return jsonResponse({
-          success: false,
-          error: "Unauthorized: Invalid or missing Bearer token",
-          code: "UNAUTHORIZED"
-        }, 401, {}, request);
+        return jsonResponse({ success: false, error: "Unauthorized", code: "UNAUTHORIZED" }, 401, {}, request);
       }
-
-      try {
-        return await postRoutes[path](request, env, ctx);
-      } catch (err) {
-        console.error(`[UNHANDLED_EXCEPTION] Unhandled error at ${path}:`, err);
-        return jsonResponse({
-          success: false,
-          error: `Internal server error: ${err.message}`,
-          code: "INTERNAL_SERVER_ERROR"
-        }, 500, {}, request);
-      }
+      return postRoutes[path](request, env);
     }
 
-    // Fallback 404 Route
+    // 11. D1 Catalog CRUD & Movies Routes
+    const parts = path.split("/").filter(Boolean);
+    let tableName = null;
+    let resourceId = null;
+    let isMoviesRoute = false;
+
+    if (parts[0] === "api") {
+      tableName = parts[1];
+      resourceId = parts[2] || null;
+    } else {
+      tableName = parts[0];
+      resourceId = parts[1] || null;
+    }
+
+    if (tableName === "movies") {
+      isMoviesRoute = true;
+    }
+
+    if (isMoviesRoute) {
+      return handleMoviesRoute(request, env, ctx, resourceId);
+    }
+
+    if (tableName && ALLOWED_TABLES.has(tableName)) {
+      return handleTableRoute(request, env, ctx, tableName, resourceId);
+    }
+
+    // 12. Fallback 404 Route Not Found
     return jsonResponse({
       success: false,
-      error: `Endpoint '${path}' with method '${request.method}' not found`,
+      message: `Route '${path}' not found`,
       code: "ROUTE_NOT_FOUND"
     }, 404, {}, request);
   }

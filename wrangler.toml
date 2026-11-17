@@ -15,5 +15,5 @@ database_id = "9acf968f-c714-4ca0-ad86-975c889cb58e"
 
 # Configuration Variables
 [vars]
-# UPLOAD_API_TOKEN is optional. Defaults to VIP_SECURE_TOKEN_2026 if not set
-
+UPLOAD_API_TOKEN = "VIP_SECURE_TOKEN_2026"
+DEFAULT_MEDIA_BASE_URL = "https://api-download.akatsuki-pvt-ltd.workers.dev"

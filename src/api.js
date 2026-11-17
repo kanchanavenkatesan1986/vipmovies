@@ -23,7 +23,21 @@
 'use strict';
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
-const API_BASE   = 'https://api-movies.akatsuki-pvt-ltd.workers.dev';
+var API_BASE = (function() {
+    try {
+        var local = (typeof localStorage !== 'undefined') ? localStorage.getItem('vip_upload_settings') : null;
+        if (local) {
+            var parsed = JSON.parse(local);
+            if (parsed.apiBaseUrl && typeof parsed.apiBaseUrl === 'string' && parsed.apiBaseUrl.trim()) {
+                return parsed.apiBaseUrl.trim().replace(/\/+$/, '');
+            }
+        }
+    } catch(e) {}
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL) {
+        return import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, '');
+    }
+    return 'https://api-movies.akatsuki-pvt-ltd.workers.dev';
+}());
 const DB_NAME    = 'vip_movies_db';
 const DB_VERSION = 1;
 
@@ -218,6 +232,12 @@ var ApiManager = (function() {
                 .then(function(res) {
                     if (!res.ok) throw new Error('Version check failed: ' + res.status);
                     return res.json();
+                })
+                .then(function(data) {
+                    if (data && data.mediaBaseUrl && typeof window !== 'undefined' && window.setVipMediaBaseUrl) {
+                        window.setVipMediaBaseUrl(data.mediaBaseUrl);
+                    }
+                    return data;
                 });
         });
     }
@@ -237,6 +257,9 @@ var ApiManager = (function() {
             }).then(function(data) {
                 if (!data || !data.success || !Array.isArray(data.movies)) {
                     throw new Error('Invalid API payload');
+                }
+                if (data.mediaBaseUrl && typeof window !== 'undefined' && window.setVipMediaBaseUrl) {
+                    window.setVipMediaBaseUrl(data.mediaBaseUrl);
                 }
                 return data;
             });
